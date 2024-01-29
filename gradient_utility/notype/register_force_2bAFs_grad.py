@@ -5,7 +5,7 @@ from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import sparse_ops
 
-root_path='/home/francegm/alphaGPU_done/alphanes_mixture_v4_Ck_notrain_tf11'
+root_path='/home/francegm/AlphaNesGpu'
 compforcradgrad_module = tf.load_op_library(root_path+'/src/notype/bin/op_grad_of_force_2bAFs.so')
 
 @ops.RegisterGradient("ComputeForceRadial")

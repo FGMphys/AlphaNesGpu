@@ -10,12 +10,12 @@ static int BLOCK_DIM;
 void init_block_dim(int buffdim){
      int i;
      for (i=buffdim;i>0;i--){
-         if (buffdim%i==0) & (i<512){
+         if ((buffdim%i==0) && (i<512)){
             BLOCK_DIM=i;
-            i=-1;
+            i=0;
          }
      }
-     if (i!=1){
+     if (i!=-1){
         printf("Alpha_nes: No integer divisor found for the given angular buffer size\n");
      }
      else{
@@ -31,7 +31,7 @@ __global__ void computeforce_tripl_kernel(const float*  netderiv_T, const float*
                         const int* intmap_r_T,const int* intmap_a_T_l,
                         int nr, const int na, int N, int dimbat , int num_finger,const float* type_emb3b,int nt,
                         const int* tipos_T,
-                        const int* actual_type_p,float* forces3b_T_l,const int *num_triplets,const float* smooth_a_T_l,const int* type_map_T_d)
+                        const int* actual_type_p,float* forces3b_T_l,const int *num_triplets,const float* smooth_a_T_l,const int* type_map_T_d,int BLOCK_DIM)
 {
 
 
@@ -49,7 +49,7 @@ __global__ void computeforce_tripl_kernel(const float*  netderiv_T, const float*
 
     int t=blockIdx.x*blockDim.x+threadIdx.x;
 
-    __shared__ float3 forza_i[BLOCK_DIM];
+    extern __shared__ float3 forza_i[];//[BLOCK_DIM];
 
     forza_i[threadIdx.x].x=0.;
     forza_i[threadIdx.x].y=0.;
@@ -219,12 +219,12 @@ void computeforce_tripl_Launcher(const float*  netderiv_T_d, const float* desr_T
 
     dim3 dimGrid(ceil(float(prod)/float(BLOCK_DIM)),1,1);
     dim3 dimBlock(BLOCK_DIM,1,1);
-    TF_CHECK_OK(::tensorflow::GpuLaunchKernel(computeforce_tripl_kernel, dimGrid, dimBlock, 0, nullptr,netderiv_T_d,desr_T_d,desa_T_d,
+    TF_CHECK_OK(::tensorflow::GpuLaunchKernel(computeforce_tripl_kernel, dimGrid, dimBlock, BLOCK_DIM*sizeof(float3), nullptr,netderiv_T_d,desr_T_d,desa_T_d,
         intderiv_r_T_d,intderiv_a_T_d,intmap_r_T_d,
         intmap_a_T_d,nr,na,N,dimbat,
         num_finger,
         type_emb3b_d,nt,tipos_T,
-        actual_type,forces3b_T_d,num_triplets_d,smooth_a_T,type_map_T_d));
+        actual_type,forces3b_T_d,num_triplets_d,smooth_a_T,type_map_T_d,BLOCK_DIM));
 
     cudaDeviceSynchronize();
 

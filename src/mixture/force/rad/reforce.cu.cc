@@ -10,13 +10,13 @@ static int BLOCK_DIM;
 void init_block_dim(int buffdim){
      int i;
      for (i=buffdim;i>0;i--){
-         if (buffdim%i==0) & (i<512){
+         if ((buffdim%i==0) & (i<512)){
             BLOCK_DIM=i;
-            i=-1;
-         }
+            i=0;
+	    }
      }
-     if (i!=1){
-        printf("Alpha_nes: No integer divisor found for the given radial buffer size\n");
+     if (i!=-1){
+        printf("Alpha_nes: No integer divisor found for the given radial buffer size \n");
      }
      else{
         printf("Alpha_nes: Blocks for radial forces set to %d\n",BLOCK_DIM);
@@ -27,7 +27,7 @@ __global__ void computeforce_doublets_kernel(const float* netderiv,const float* 
             int nr,int N,int dimbat,
             int num_alpha_radiale,const float* alpha_radiale,
             const float* type_emb2b,int nt,const int* tipos_T,
-            const int* actual_type_p,const int* type_map,float* forces2b_l)
+            const int* actual_type_p,const int* type_map,float* forces2b_l,int BLOCK_DIM)
 {
 
     int actual_type=actual_type_p[0];
@@ -42,7 +42,7 @@ __global__ void computeforce_doublets_kernel(const float* netderiv,const float* 
 
     int t=blockIdx.x*blockDim.x+threadIdx.x;
 
-    __shared__ float3 forza_i[BLOCK_DIM];
+    extern  __shared__ float3 forza_i[];//[BLOCK_DIM];
 
     forza_i[threadIdx.x].x=0.;
     forza_i[threadIdx.x].y=0.;
@@ -125,12 +125,12 @@ void computeforce_doublets_Launcher(const float*  netderiv, const float* des_r,
                       dim3 dimGrid(ceil(float(prod)/float(BLOCK_DIM)),1,1);
      		      dim3 dimBlock(BLOCK_DIM,1,1);
 
-     		      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(computeforce_doublets_kernel, dimGrid, dimBlock, 0, nullptr,netderiv,des_r,
+     		      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(computeforce_doublets_kernel, dimGrid, dimBlock, BLOCK_DIM*sizeof(float3), nullptr,netderiv,des_r,
                           intderiv_r,intmap_r,
                           nr,N,dimbat,
                           num_alpha_radiale,alpha_radiale,
                           type_emb2b,nt,tipos_T,
-                          actual_type,type_map,forces2b));
+                          actual_type,type_map,forces2b,BLOCK_DIM));
 
                       cudaDeviceSynchronize();
 

@@ -3,10 +3,11 @@
 #include "tensorflow/core/framework/op_kernel.h"
 using namespace tensorflow;
 
+void init_block_dim(int buffdim);
 
 REGISTER_OP("InitForceRadial")
-    .Input("buffdim: int")
-    .Output("code: int");
+    .Input("buffdim: int32")
+    .Output("code: int32");
 
     class InitForceRadialOp : public OpKernel {
      public:
@@ -106,7 +107,6 @@ class ComputeForceRadialOp : public OpKernel {
                                                      &forces2b_T));
 
     set_tensor_to_zero_float(forces2b_T->flat<float>().data(),dimbat*3*N);
-
     int prod=dimbat*Nlocal*nr;
    computeforce_doublets_Launcher(netderiv_T_flat.data(),desr_T_flat.data(),desder_T_flat.data(),intmap2b_T_flat.data(),nr,N,dimbat,num_alpha_radiale,alpha_radiale_T_flat.data(),type_emb2b_T_flat.data(),nt,tipos_T_flat.data(),actual_type,forces2b_T->flat<float>().data(),type_map_T_flat.data(),prod);
 

@@ -1,14 +1,16 @@
 import tensorflow as tf
 
-root_path='/home/francegm/alphaGPU_done/alphanes_mixture_v4_Ck_notrain_tf11'
+root_path='/home/francegm/AlphaNesGpu'
 force2b_sopath=root_path+'/src/mixture/force/rad/reforce.so'
 force3b_sopath=root_path+'/src/mixture/force/ang/reforce.so'
 
 class force_layer(tf.Module):
-      def __init__(self):
+      def __init__(self,radbuff,angbuff):
           self.force2b=tf.load_op_library(force2b_sopath)
           self.force3b=tf.load_op_library(force3b_sopath)
-
+          
+          self.force2b.init_force_radial(radbuff)
+          self.force3b.init_force_tripl(angbuff)
       @tf.function()
       def __call__(self,net_der_r,x2b,intder2b,int2b,alpha2b,net_der_a,
                    x3b,x3bsupp,intder3b,intder3bsupp,int3b,numtriplet,alpha3b,

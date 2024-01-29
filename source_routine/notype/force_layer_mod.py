@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 
-root_path='/home/francegm/alphaGPU_done/alphanes_mixture_v4_Ck_notrain_tf11'
+root_path='/home/francegm/AlphaNesGpu'
 force2b_sopath=root_path+'/src/notype/bin/op_force_2bAFs.so'
 force3b_sopath=root_path+'/src/notype/bin/op_force_3bAFs.so'
 

@@ -4,9 +4,11 @@
 //#include <cuda.h>
 using namespace tensorflow;
 
+void init_block_dim(int buffdim);
+
 REGISTER_OP("InitForceTripl")
-    .Input("buffdim: int")
-    .Output("code: int");
+    .Input("buffdim: int32")
+    .Output("code: int32");
 
     class InitForceTriplOp : public OpKernel {
      public:
@@ -33,7 +35,6 @@ REGISTER_OP("InitForceTripl")
 
 
 
-void init_block_dim(int buffdim);
 
 REGISTER_OP("ComputeForceTripl")
     .Input("netderiv: float")
@@ -128,7 +129,6 @@ class ComputeForceTriplOp : public OpKernel {
 
     set_tensor_to_zero_float(forces3b_T->flat<float>().data(),dimbat*3*N);
     int prod=netderiv_T.shape().dim_size(0)*netderiv_T.shape().dim_size(1)*desa_T.shape().dim_size(2);//dimbat*Nlocal*na
-
     computeforce_tripl_Launcher(netderiv_T_d.data(), desr_T_d.data(), desa_T_d.data(),
                         intderiv_r_T_d.data(),intderiv_a_T_d.data(),
                         intmap_r_T_d.data(),intmap_a_T_d.data(),

@@ -7,7 +7,7 @@ import sys
 
 
 
-root_path='/home/francegm/alphaGPU_done/alphanes_mixture_v4_Ck_notrain_tf11'
+root_path='/home/francegm/AlphaNesGpu'
 descriptor_sopath=root_path+'/src/descriptor_builder/reforce.so'
 
 class descriptor_layer(tf.Module):

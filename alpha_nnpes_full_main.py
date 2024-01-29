@@ -412,7 +412,7 @@ else:
 ##Initialise Log layer
 Lognorm_Layers=[lognorm_layer(init_mu[num_type]) for num_type in range(nt)]
 ##Initialise force layer
-Force_Layer=force_layer()
+Force_Layer=force_layer(rad_buff,ang_buff)
 ########Define Loss
 [model_loss,val_loss,pe,pf,pb]=make_loss(full_param)
 ###Compose the model by concatenation of layers
