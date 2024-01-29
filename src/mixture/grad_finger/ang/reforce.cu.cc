@@ -84,8 +84,8 @@ __global__ void alphagrad_ang_kernel(const float* radial_descriptor,const float*
         float a1dja2dy=expf(alpha1*dj+alpha2*dy);
         float a1dya2dj=expf(alpha1*dy+alpha2*dj);
         float btjy=expf(betaval*Tjy);
-        
-	grad_alpha_s[threadIdx.x].x=prevgradel*chtjy_par*(a1dja2dy*dj+a1dya2dj*dy)*btjy*Tjy/2.f;
+
+	      grad_alpha_s[threadIdx.x].x=prevgradel*chtjy_par*(a1dja2dy*dj+a1dya2dj*dy)*btjy*Tjy/2.f;
         grad_alpha_s[threadIdx.x].y=prevgradel*chtjy_par*(a1dja2dy*dy+a1dya2dj*dj)*btjy*Tjy/2.f;
         grad_alpha_s[threadIdx.x].z=prevgradel*chtjy_par*(a1dja2dy+a1dya2dj)*btjy*Tjy*Tjy/2.f;
         grad_ck_s[threadIdx.x]=prevgradel*Tjy*btjy*(a1dya2dj+a1dja2dy)/2.f;
@@ -118,7 +118,7 @@ void alphagrad_ang_Launcher(const float* radial_descriptor,const float* angular_
                  const float* type_emb3b,const int* type_map,
                  float* next_emb3b_grad,const int* num_triplet,int nt_couple){
 
-	         
+
 
                  dim3 dimGrid(ceil(float(dimbat*N_local*na)/float(BLOCK_DIM)),1,1);
                  dim3 dimBlock(BLOCK_DIM,1,1);

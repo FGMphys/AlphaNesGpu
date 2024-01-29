@@ -3,6 +3,33 @@
 #include "tensorflow/core/framework/op_kernel.h"
 using namespace tensorflow;
 
+
+REGISTER_OP("InitForceRadial")
+    .Input("buffdim: int")
+    .Output("code: int");
+
+    class InitForceRadialOp : public OpKernel {
+     public:
+      explicit InitForceRadialOp(OpKernelConstruction* context) : OpKernel(context) {}
+      void Compute(OpKernelContext* context) override {
+           const Tensor& buffdim = context->input(0);
+
+           init_block_dim(buffdim.flat<int>()(0));
+
+           Tensor* code = NULL;
+           TensorShape code_shape ;
+           code_shape.AddDim (1);
+
+           OP_REQUIRES_OK(context, context->allocate_output(0, code_shape,
+                                                            &code));
+            code->flat<int>()(0)=0;
+
+
+      }
+      };
+      REGISTER_KERNEL_BUILDER(Name("InitForceRadial").Device(DEVICE_CPU), InitForceRadialOp);
+
+
 REGISTER_OP("ComputeForceRadial")
     .Input("netderiv: float")
     .Input("descriptor_derivative_rad: float")
@@ -77,9 +104,9 @@ class ComputeForceRadialOp : public OpKernel {
     grad_net_shape.AddDim (N*3);
     OP_REQUIRES_OK(context, context->allocate_output(0, grad_net_shape,
                                                      &forces2b_T));
-   
-    set_tensor_to_zero_float(forces2b_T->flat<float>().data(),dimbat*3*N);    
-    
+
+    set_tensor_to_zero_float(forces2b_T->flat<float>().data(),dimbat*3*N);
+
     int prod=dimbat*Nlocal*nr;
    computeforce_doublets_Launcher(netderiv_T_flat.data(),desr_T_flat.data(),desder_T_flat.data(),intmap2b_T_flat.data(),nr,N,dimbat,num_alpha_radiale,alpha_radiale_T_flat.data(),type_emb2b_T_flat.data(),nt,tipos_T_flat.data(),actual_type,forces2b_T->flat<float>().data(),type_map_T_flat.data(),prod);
 

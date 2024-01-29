@@ -5,7 +5,26 @@
 #include "tensorflow/core/util/gpu_launch_config.h"
 
 
-#define BLOCK_DIM 118
+static int BLOCK_DIM;
+
+void init_block_dim(int buffdim){
+     int i;
+     for (i=buffdim;i>0;i--){
+         if (buffdim%i==0) & (i<512){
+            BLOCK_DIM=i;
+            i=-1;
+         }
+     }
+     if (i!=1){
+        printf("Alpha_nes: No integer divisor found for the given angular buffer size\n");
+     }
+     else{
+        printf("Alpha_nes: Blocks for angular forces set to %d\n",BLOCK_DIM);
+      }
+}
+
+
+
 
 __global__ void computeforce_tripl_kernel(const float*  netderiv_T, const float* desr_T, const float* desa_T,
                         const float* intderiv_r_T, const float* intderiv_a_T_l,
@@ -14,9 +33,7 @@ __global__ void computeforce_tripl_kernel(const float*  netderiv_T, const float*
                         const int* tipos_T,
                         const int* actual_type_p,float* forces3b_T_l,const int *num_triplets,const float* smooth_a_T_l,const int* type_map_T_d)
 {
-    
 
-      
 
     int actual_type=actual_type_p[0];
     int N_local=tipos_T[actual_type];
@@ -25,13 +42,13 @@ __global__ void computeforce_tripl_kernel(const float*  netderiv_T, const float*
     for (int y=0;y<actual_type;y++){
         tipos_shift=tipos_shift+tipos_T[y];
     }
-    const float2* intderiv_a_T=(const float2 *)intderiv_a_T_l; 
+    const float2* intderiv_a_T=(const float2 *)intderiv_a_T_l;
     const int2* intmap_a_T=(const int2 *) intmap_a_T_l;
     float3* forces3b_T=(float3 *)forces3b_T_l;
     const float3* smooth_a_T=(const float3 *)smooth_a_T_l;
 
     int t=blockIdx.x*blockDim.x+threadIdx.x;
-   
+
     __shared__ float3 forza_i[BLOCK_DIM];
 
     forza_i[threadIdx.x].x=0.;
@@ -47,23 +64,23 @@ __global__ void computeforce_tripl_kernel(const float*  netderiv_T, const float*
     int reminder=t%(na*N_local);
     int par=reminder/na;
     int nn=reminder%na;
-    int absolute_par=par+tipos_shift; 
+    int absolute_par=par+tipos_shift;
     if (t<N_local*dimbat*na)
     {
-    
-        
-        
+
+
+
         int na_particle=num_triplets[b*N_local+par];
         int nn_particle=(na_particle*(na_particle-1))/2;
         if (nn<nn_particle)
         {
 
-            
+
             float3 other_forcej = {0.f, 0.f, 0.f};
             float3 other_forcek = {0.f, 0.f, 0.f};
 
             int na_dim=na_particle;//floorf(0.5f + sqrtf(0.25f + 2*na));
-            
+
             int j=0;
             int prev_row=0;
             int next_row=na_dim-j-1;
@@ -74,35 +91,35 @@ __global__ void computeforce_tripl_kernel(const float*  netderiv_T, const float*
                 next_row+=na_dim-j-1;
             }
             int k=nn-prev_row+1+j;
-            
-            
-            
+
+
+
             float delta=0.f;
             float Bp_j=0.f;
             float Bp_k=0.f;
-            
 
-            
+
+
             int actual=b*N_local*nr+par*nr;
             int actual_ang=b*N_local*na+par*na;
             int actgrad=b*N_local*num_finger+par*num_finger;
 
             int2 neigh=intmap_a_T[b*(N_local*na)+na*par+nn];
 
-          
+
 
             int j_type=type_map_T_d[neigh.x];
             int k_type=type_map_T_d[neigh.y];
-          
+
             //float chtjk_par=type_emb3b[j_type*nt+k_type];
-            
+
             int sum=j_type+k_type;
 
             float angulardes=desa_T[actual_ang+nn];
             float radialdes_j=desr_T[actual+j];
             float radialdes_k=desr_T[actual+k];
 
-           
+
 
             // loop su alpha
             for (int a1=0; a1<num_finger; a1++)
@@ -128,7 +145,7 @@ __global__ void computeforce_tripl_kernel(const float*  netderiv_T, const float*
                 float2 intder = intderiv_a_T[b*(N_local*na)*3+par*na*3+0*na+nn];
                 float intder_r_j=intderiv_r_T[b*N_local*3*nr+nr*3*par+0*nr+j];
                 float intder_r_k=intderiv_r_T[b*N_local*3*nr+nr*3*par+0*nr+k];
-                
+
                 float fxij=net_der*(delta*intder.x+Bp_j*intder_r_j);
                 float fxik=net_der*(delta*intder.y+Bp_k*intder_r_k);
 
@@ -148,7 +165,7 @@ __global__ void computeforce_tripl_kernel(const float*  netderiv_T, const float*
                 forza_i[threadIdx.x].y-=(fxij+fxik);
                 other_forcej.y+=fxij;
                 other_forcek.y+=fxik;
-            
+
 
                 // z
                 intder = intderiv_a_T[b*(N_local*na)*3+par*na*3+2*na+nn];
@@ -161,17 +178,17 @@ __global__ void computeforce_tripl_kernel(const float*  netderiv_T, const float*
                 forza_i[threadIdx.x].z-=(fxij+fxik);
                 other_forcej.z+=fxij;
                 other_forcek.z+=fxik;
-                
+
             }
-                  
+
             atomicAdd((float*)&(forces3b_T[b*N+neigh.x].x),other_forcej.x);
             atomicAdd((float*)&(forces3b_T[b*N+neigh.x].y),other_forcej.y);
             atomicAdd((float*)&(forces3b_T[b*N+neigh.x].z),other_forcej.z);
-            
+
             atomicAdd((float*)&(forces3b_T[b*N+neigh.y].x),other_forcek.x);
             atomicAdd((float*)&(forces3b_T[b*N+neigh.y].y),other_forcek.y);
             atomicAdd((float*)&(forces3b_T[b*N+neigh.y].z),other_forcek.z);
-        
+
 
 
         }
@@ -194,7 +211,7 @@ __global__ void computeforce_tripl_kernel(const float*  netderiv_T, const float*
 
     }
 }
-    
+
 void computeforce_tripl_Launcher(const float*  netderiv_T_d, const float* desr_T_d, const float* desa_T_d,
                         const float* intderiv_r_T_d, const float* intderiv_a_T_d,
                         const int* intmap_r_T_d,const int* intmap_a_T_d,
@@ -208,7 +225,7 @@ void computeforce_tripl_Launcher(const float*  netderiv_T_d, const float* desr_T
         num_finger,
         type_emb3b_d,nt,tipos_T,
         actual_type,forces3b_T_d,num_triplets_d,smooth_a_T,type_map_T_d));
-     
+
     cudaDeviceSynchronize();
 
 }

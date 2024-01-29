@@ -48,16 +48,12 @@ __global__ void angularAFs_kernel(const float* radial_descriptor,const float* an
         int actual_ang=b*N_local*na+par*na;
         int aux2=nn;
         int2 neigh=intmap_a[b*N_local*na+par*na+aux2];
-	if (neigh.x>767 | neigh.y>767)
-           printf("\nneighx %d neighy %d\n",neigh.x,neigh.y);
-        if (par>767)
-           printf("\nPar %d\n",par);
-       int j_type=type_map[neigh.x];
-       int k_type=type_map[neigh.y];
+        int j_type=type_map[neigh.x];
+        int k_type=type_map[neigh.y];
 
-       float angulardes=angular_descriptor[actual_ang+aux2];
-       int sum=j_type+k_type;
-       for (int a1=0;a1<nsmooth_a;a1++){
+        float angulardes=angular_descriptor[actual_ang+aux2];
+        int sum=j_type+k_type;
+        for (int a1=0;a1<nsmooth_a;a1++){
              float alpha1=alphas[sum*nsmooth_a+a1].x;
              float alpha2=alphas[sum*nsmooth_a+a1].y;
              float betaval=alphas[sum*nsmooth_a+a1].z;

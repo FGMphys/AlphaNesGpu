@@ -5,8 +5,23 @@
 #include "tensorflow/core/util/gpu_launch_config.h"
 
 
-#define BLOCK_DIM 80
+static int BLOCK_DIM;
 
+void init_block_dim(int buffdim){
+     int i;
+     for (i=buffdim;i>0;i--){
+         if (buffdim%i==0) & (i<512){
+            BLOCK_DIM=i;
+            i=-1;
+         }
+     }
+     if (i!=1){
+        printf("Alpha_nes: No integer divisor found for the given radial buffer size\n");
+     }
+     else{
+        printf("Alpha_nes: Blocks for radial forces set to %d\n",BLOCK_DIM);
+      }
+}
 
 __global__ void computeforce_doublets_kernel(const float* netderiv,const float* des_r,const float* intderiv_r,const int* intmap_r,
             int nr,int N,int dimbat,
@@ -97,7 +112,7 @@ __global__ void computeforce_doublets_kernel(const float* netderiv,const float* 
         atomicAdd((float*)&(forces2b[b*N+absolute_par].z),local_force.z);
 
     }
-  
+
    }
 }
 
@@ -109,7 +124,7 @@ void computeforce_doublets_Launcher(const float*  netderiv, const float* des_r,
 {
                       dim3 dimGrid(ceil(float(prod)/float(BLOCK_DIM)),1,1);
      		      dim3 dimBlock(BLOCK_DIM,1,1);
-     
+
      		      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(computeforce_doublets_kernel, dimGrid, dimBlock, 0, nullptr,netderiv,des_r,
                           intderiv_r,intmap_r,
                           nr,N,dimbat,

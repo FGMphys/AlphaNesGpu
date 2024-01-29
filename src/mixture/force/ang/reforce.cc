@@ -4,6 +4,36 @@
 //#include <cuda.h>
 using namespace tensorflow;
 
+REGISTER_OP("InitForceTripl")
+    .Input("buffdim: int")
+    .Output("code: int");
+
+    class InitForceTriplOp : public OpKernel {
+     public:
+      explicit InitForceTriplOp(OpKernelConstruction* context) : OpKernel(context) {}
+      void Compute(OpKernelContext* context) override {
+           const Tensor& buffdim = context->input(0);
+
+           init_block_dim(buffdim.flat<int>()(0));
+
+           Tensor* code = NULL;
+           TensorShape code_shape ;
+           code_shape.AddDim (1);
+
+           OP_REQUIRES_OK(context, context->allocate_output(0, code_shape,
+                                                            &code));
+            code->flat<int>()(0)=0;
+
+
+      }
+      };
+      REGISTER_KERNEL_BUILDER(Name("InitForceTripl").Device(DEVICE_CPU), InitForceTriplOp);
+
+
+
+
+
+void init_block_dim(int buffdim);
 
 REGISTER_OP("ComputeForceTripl")
     .Input("netderiv: float")
@@ -49,7 +79,7 @@ class ComputeForceTriplOp : public OpKernel {
 
     const Tensor& tipos_T = context->input(10);
     const Tensor& actual_type_T = context->input(11);
-    
+
     const Tensor& num_triplets_T=context->input(12);
 
     //flatting the tensor
@@ -66,14 +96,14 @@ class ComputeForceTriplOp : public OpKernel {
     //int N=N_flat(0);
 
     int nt = tipos_T.shape().dim_size(0);
-    
+
     const int* actual_type=actual_type_T.flat<int>().data();
     //int actual_type=actual_type_T_flat(0);
 
     int num_finger=int(smooth_a_T.shape().dim_size(1)/3);
 
     //printf("\n\n %d %d %d %d %d %d  \n\n",dimbat,nr,na,N,nt,num_finger);
-   
+
 
     //Arrays read
     auto netderiv_T_d=netderiv_T.flat<float>();
@@ -96,7 +126,7 @@ class ComputeForceTriplOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(0, grad_net_shape,
                                                      &forces3b_T));
 
-    set_tensor_to_zero_float(forces3b_T->flat<float>().data(),dimbat*3*N);     
+    set_tensor_to_zero_float(forces3b_T->flat<float>().data(),dimbat*3*N);
     int prod=netderiv_T.shape().dim_size(0)*netderiv_T.shape().dim_size(1)*desa_T.shape().dim_size(2);//dimbat*Nlocal*na
 
     computeforce_tripl_Launcher(netderiv_T_d.data(), desr_T_d.data(), desa_T_d.data(),
@@ -105,7 +135,7 @@ class ComputeForceTriplOp : public OpKernel {
                         nr, na, N, dimbat,num_finger,type_emb3b_T_d.data(),nt,
                         tipos_T_d.data(),
                         actual_type,forces3b_T->flat<float>().data(),num_triplets_T_d.data(),smooth_a_T_d.data(),type_map_T_d.data(),prod);
- 
+
 }
 };
 REGISTER_KERNEL_BUILDER(Name("ComputeForceTripl").Device(DEVICE_GPU), ComputeForceTriplOp);
