@@ -1,0 +1,321 @@
+#if GOOGLE_CUDA
+#define EIGEN_USE_GPU
+#include "unsupported/Eigen/CXX11/Tensor"  // from @eigen_archive
+#include "tensorflow/core/util/gpu_kernel_helper.h"
+#include "tensorflow/core/util/gpu_launch_config.h"
+
+#include "vector.h"
+
+#define SQR(x) ((x)*(x))
+
+
+#define BLOCK_DIM 256
+
+#define PI 3.141592654f
+
+__global__ void DescriptorsRadial_kernel(float range,int radial_buffer,float range_angolare,int angular_buffer,int N,
+                      float* position,const float* boxes,
+                      int *howmany,int *with,
+                      float* descriptors,int* intmap2b,float* der2b,
+                      float* des3bsupp,
+                      float* der3bsupp, int nf,int* numtriplet,
+		      float rs, float coeffa,float coeffb,float coeffc,float pow_alpha, float pow_beta)
+{
+  int t=blockIdx.x*blockDim.x+threadIdx.x;
+
+  // from t to b,par,j,k
+  int b=t/(radial_buffer*N);
+  int reminder=t%(radial_buffer*N);
+  int i=reminder/radial_buffer;
+  int k=reminder%radial_buffer;
+
+  float3* coor=(float3*)position;
+  // shared memory counter for numero di vicini angolari
+  __shared__ int3 num_angolare[BLOCK_DIM];
+
+  num_angolare[threadIdx.x].x=b;
+  num_angolare[threadIdx.x].y=i;
+  num_angolare[threadIdx.x].z=0;
+
+  if (t<nf*N*radial_buffer)
+  {
+    if (k==0)
+    {
+      intmap2b[b*N*(radial_buffer+1)+i*(radial_buffer+1)]=howmany[b*N+i];
+    }
+
+    vector olddist,dist;
+    float dist_norm;
+
+    if (k<howmany[b*N+i])
+    {
+      int j=with[b*N*radial_buffer+i*radial_buffer+k];
+      //coor is in internal coordinate
+      olddist.x=coor[b*N+i].x-coor[b*N+j].x;
+      olddist.y=coor[b*N+i].y-coor[b*N+j].y;
+      olddist.z=coor[b*N+i].z-coor[b*N+j].z;
+
+      olddist.x-=rint(olddist.x);
+      olddist.y-=rint(olddist.y);
+      olddist.z-=rint(olddist.z);
+      // vectorial distance is bring back in cartesian coordinate
+      dist.x=boxes[b*6+0]*olddist.x+boxes[b*6+1]*olddist.y+boxes[b*6+2]*olddist.z;
+      dist.y=boxes[b*6+3]*olddist.y+boxes[b*6+4]*olddist.z;
+      dist.z=boxes[b*6+5]*olddist.z;
+
+      dist_norm=sqrt(SQR(dist.x)+SQR(dist.y)+SQR(dist.z));
+
+      int actual_pos=b*N*radial_buffer+i*radial_buffer;
+      //STEP 0: filling the radial part with the smaller angular cut-off
+      if (dist_norm<range_angolare)
+      {
+        num_angolare[threadIdx.x].z=1;
+
+        des3bsupp[actual_pos+k]=0.5*(cosf(PI*dist_norm/range_angolare)+1);
+        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sinf(PI*dist_norm/range_angolare)*PI/range_angolare*dist.x/dist_norm;
+        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sinf(PI*dist_norm/range_angolare)*PI/range_angolare*dist.y/dist_norm;
+        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sinf(PI*dist_norm/range_angolare)*PI/range_angolare*dist.z/dist_norm;
+      }
+      //STEP 1: filling radial descriptor with larger cutoff
+      if (dist_norm<rs){
+          descriptors[actual_pos+k]=coeffa/powf(dist_norm,pow_alpha)+coeffb/powf(dist_norm,pow_beta)+coeffc;
+
+          der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=(-pow_alpha*coeffa/powf(dist_norm,pow_alpha+1.)-pow_beta*coeffb/powf(dist_norm,pow_beta+1.))*dist.x/dist_norm;
+          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=(-pow_alpha*coeffa/powf(dist_norm,pow_alpha+1.)-pow_beta*coeffb/powf(dist_norm,pow_beta+1.))*dist.y/dist_norm;
+          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=(-pow_alpha*coeffa/powf(dist_norm,pow_alpha+1.)-pow_beta*coeffb/powf(dist_norm,pow_beta+1.))*dist.z/dist_norm;
+      }
+      else{
+        descriptors[actual_pos+k]=0.5*(cosf(PI*dist_norm/range)+1);
+        der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sinf(PI*dist_norm/range)*PI/range*dist.x/dist_norm;
+        der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sinf(PI*dist_norm/range)*PI/range*dist.y/dist_norm;
+        der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sinf(PI*dist_norm/range)*PI/range*dist.z/dist_norm;
+      }
+      //STEP 2: filling interaction map for pair descriptors
+      intmap2b[b*N*(radial_buffer+1)+i*(radial_buffer+1)+1+k]=with[b*radial_buffer*N+i*radial_buffer+k];
+
+    }
+  }
+
+  __syncthreads();
+
+  if (threadIdx.x==0)
+  {
+      for (int i=0;i<BLOCK_DIM;i++)
+      {
+        atomicAdd((int*)&(numtriplet[num_angolare[i].x*N+num_angolare[i].y]),num_angolare[i].z);
+      }
+  }
+
+}
+
+__global__ void DescriptorsAngular_kernel(float range,int radial_buffer,float range_angolare,int angular_buffer,int N,
+                      float* position,const float* boxes,
+                      int *howmany,int *with,
+                      float* descriptors,int* intmap3b_l,
+                      float* des3bsupp,float* der3b_l,
+                      float* der3bsupp, int nf,int* numtriplet)
+{
+  int t=blockIdx.x*blockDim.x+threadIdx.x;
+
+  int2* intmap3b=(int2*)intmap3b_l;
+  float2* der3b=(float2*)der3b_l;
+  float3* coor=(float3*)position;
+  // from t to b,par,j,k
+  int b=t/(angular_buffer*N);
+  int reminder=t%(angular_buffer*N);
+  int i=reminder/angular_buffer;
+  int nn=reminder%angular_buffer;
+  if (t<nf*N*angular_buffer)
+  {
+
+    int na_dim=numtriplet[b*N+i];
+    int na_tripl=na_dim*(na_dim-1)/2;
+    if (nn<na_tripl){
+
+
+    int j=0;
+    int prev_row=0;
+    int next_row=na_dim-j-1;
+    while (nn>=next_row)
+    {
+        j+=1;
+        prev_row=next_row;
+        next_row+=na_dim-j-1;
+    }
+    int k=nn-prev_row+1+j;
+    
+    intmap3b[b*N*angular_buffer+i*angular_buffer+nn].x=with[b*N*radial_buffer+i*radial_buffer+j];
+    intmap3b[b*N*angular_buffer+i*angular_buffer+nn].y=with[b*N*radial_buffer+i*radial_buffer+k];
+
+
+
+    vector olddist;
+
+    vector distj, distk;
+
+    float dist_normj,dist_normk;
+
+    int j_who=with[b*N*radial_buffer+i*radial_buffer+j];
+    int k_who=with[b*N*radial_buffer+i*radial_buffer+k];
+
+    olddist.x=coor[b*N+i].x-coor[b*N+j_who].x;
+    olddist.y=coor[b*N+i].y-coor[b*N+j_who].y;
+    olddist.z=coor[b*N+i].z-coor[b*N+j_who].z;
+
+    olddist.x-=rint(olddist.x);
+    olddist.y-=rint(olddist.y);
+    olddist.z-=rint(olddist.z);
+
+    distj.x=boxes[b*6+0]*olddist.x+boxes[b*6+1]*olddist.y+boxes[b*6+2]*olddist.z;
+    distj.y=boxes[b*6+3]*olddist.y+boxes[b*6+4]*olddist.z;
+    distj.z=boxes[b*6+5]*olddist.z;
+
+    dist_normj=sqrt(SQR(distj.x)+SQR(distj.y)+SQR(distj.z));
+
+    olddist.x=coor[b*N+i].x-coor[b*N+k_who].x;
+    olddist.y=coor[b*N+i].y-coor[b*N+k_who].y;
+    olddist.z=coor[b*N+i].z-coor[b*N+k_who].z;
+
+    olddist.x-=rint(olddist.x);
+    olddist.y-=rint(olddist.y);
+    olddist.z-=rint(olddist.z);
+
+    distk.x=boxes[b*6+0]*olddist.x+boxes[b*6+1]*olddist.y+boxes[b*6+2]*olddist.z;
+    distk.y=boxes[b*6+3]*olddist.y+boxes[b*6+4]*olddist.z;
+    distk.z=boxes[b*6+5]*olddist.z;
+
+    dist_normk=sqrt(SQR(distk.x)+SQR(distk.y)+SQR(distk.z));
+    float angle=(distj.x*distk.x+distj.y*distk.y+distj.z*distk.z)/(dist_normj*dist_normk);
+
+    //Here we implement a cosine cutoff
+    float cutoffj,cutoffk;
+    float3 dcij,dcik;
+
+    cutoffj=0.5f*(1.f+cosf(PI*dist_normj/range_angolare));
+    cutoffk=0.5f*(1.f+cosf(PI*dist_normk/range_angolare));
+
+    float tijk=0.5*(angle+1)*cutoffj*cutoffk;
+
+
+    dcij.x=-0.5f*sinf(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.x;
+    dcij.y=-0.5f*sinf(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.y;
+    dcij.z=-0.5f*sinf(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.z;
+
+    dcik.x=-0.5f*sinf(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.x;
+    dcik.y=-0.5f*sinf(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.y;
+    dcik.z=-0.5f*sinf(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.z;
+
+
+    float3 dangleij,dangleik;
+
+    dangleij.x = 0.5 * (SQR(dist_normj) * distk.x - distj.x * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
+    dangleij.y = 0.5 * (SQR(dist_normj) * distk.y - distj.y * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
+    dangleij.z = 0.5 * (SQR(dist_normj) * distk.z - distj.z * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
+
+    dangleik.x = 0.5 * (SQR(dist_normk) * distj.x - distk.x * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
+    dangleik.y = 0.5 * (SQR(dist_normk) * distj.y - distk.y * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
+    dangleik.z = 0.5 * (SQR(dist_normk) * distj.z - distk.z * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
+
+    int na=angular_buffer;
+    der3b[b*N*na*3+i*na*3+na*0+nn].x=dangleij.x*cutoffj*cutoffk+0.5*(angle+1)*dcij.x*cutoffk;
+    der3b[b*N*na*3+i*na*3+na*0+nn].y=dangleik.x*cutoffj*cutoffk+0.5*(angle+1)*cutoffj*dcik.x;
+
+    der3b[b*N*na*3+i*na*3+na*1+nn].x=dangleij.y*cutoffj*cutoffk+0.5*(angle+1)*dcij.y*cutoffk;
+    der3b[b*N*na*3+i*na*3+na*1+nn].y=dangleik.y*cutoffj*cutoffk+0.5*(angle+1)*cutoffj*dcik.y;
+
+    der3b[b*N*na*3+i*na*3+na*2+nn].x=dangleij.z*cutoffj*cutoffk+0.5*(angle+1)*dcij.z*cutoffk;
+    der3b[b*N*na*3+i*na*3+na*2+nn].y=dangleik.z*cutoffj*cutoffk+0.5*(angle+1)*cutoffj*dcik.z;
+
+    descriptors[b*N*angular_buffer+i*angular_buffer+nn]=tijk;
+
+
+     }
+
+  }
+}
+
+void fill_radial_launcher(float R_c,int radbuff,float R_a,int angbuff,int N,
+                      float* inopos_d,const float* box_d,
+                      int *howmany_d,int *with_d,
+                      float* descriptor_d,int* intmap2b_d,float* der2b_d,
+                      float* des3bsupp_d,
+                      float* der3bsupp_d, int nf,int* numtriplet_d,
+                      float rs, float coeffa,float coeffb,float coeffc,float pow_alpha, float pow_beta){
+
+      dim3 dimGrid(ceil(float(nf*N*radbuff)/float(BLOCK_DIM)),1,1);
+      dim3 dimBlock(BLOCK_DIM,1,1);
+
+      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(DescriptorsRadial_kernel,dimGrid, dimBlock,
+                  0, nullptr,R_c,radbuff,R_a,angbuff,N,inopos_d,box_d,
+                      howmany_d,with_d,descriptor_d,intmap2b_d,der2b_d,
+                      des3bsupp_d,der3bsupp_d,nf,numtriplet_d,
+                      rs,coeffa,coeffb,coeffc,pow_alpha,pow_beta));
+      cudaDeviceSynchronize();
+
+}
+
+
+
+void fill_angular_launcher(float R_c,int radbuff,float R_a,int angbuff,int N,
+                      float* inopos_d,const float* box_d,
+                      int *howmany_d,int *with_d,
+                      float* ang_descr_d,int* intmap3b_d,
+                      float* des3bsupp_d,float* der3b_d,
+                      float* der3bsupp_d, int nf,int* numtriplet_d){
+
+                dim3 dimGrid(ceil(float(nf*N*angbuff)/float(BLOCK_DIM)),1,1);
+                dim3 dimBlock(BLOCK_DIM,1,1);
+                
+                TF_CHECK_OK(::tensorflow::GpuLaunchKernel(DescriptorsAngular_kernel,
+                           dimGrid,dimBlock,0, nullptr,R_c,radbuff,R_a,angbuff,N,
+                           inopos_d,box_d,howmany_d,with_d,
+                           ang_descr_d,intmap3b_d,des3bsupp_d,der3b_d,
+                           der3bsupp_d,nf,numtriplet_d));
+
+                cudaDeviceSynchronize();
+
+     }
+
+__global__ void set_tensor_to_zero_float_kernel(float* tensor,int dim){
+          int t=blockIdx.x*blockDim.x+threadIdx.x;
+
+          if (t<dim)
+             tensor[t]=0.f;
+}
+void set_tensor_to_zero_float(float* tensor,int dimten){
+     int grids=ceil(float(dimten)/float(300));
+     dim3 dimGrid(grids,1,1);
+     dim3 dimBlock(300,1,1);
+     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_float_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
+     cudaDeviceSynchronize();
+     }
+
+__global__ void set_tensor_to_zero_int_kernel(int* tensor,int dim){
+          int t=blockIdx.x*blockDim.x+threadIdx.x;
+
+          if (t<dim)
+             tensor[t]=0;
+}
+void set_tensor_to_zero_int(int* tensor,int dimten){
+     int grids=ceil(float(dimten)/float(300));
+     dim3 dimGrid(grids,1,1);
+     dim3 dimBlock(300,1,1);
+     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_int_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
+     cudaDeviceSynchronize();
+     }
+__global__ void check_max_kernel(int* tensor,int dim,int maxval,int* resval){
+           int t=blockIdx.x*blockDim.x+threadIdx.x;
+	   if (t<dim){
+	      if (tensor[t]*(tensor[t]+1)/2>maxval){
+                  atomicAdd((int*)&(resval[0]),tensor[t]);
+	         }
+           }
+}
+void check_max_launcher(int* tensor,int dimten,int maxval,int* resval){
+     int grids=ceil(float(dimten)/float(300));
+     dim3 dimGrid(grids,1,1);
+     dim3 dimBlock(300,1,1);
+     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(check_max_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten,maxval,resval));
+     cudaDeviceSynchronize();
+}
+#endif
