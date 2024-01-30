@@ -9,6 +9,7 @@ import tensorflow.keras.optimizers as tfopt
 
 def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
     if param[0]=='expdec':
+       tf=ne*buffer_stream_tr
        try:
            initial_learning_rate=float(param[1])
        except:
@@ -17,18 +18,11 @@ def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
            final_learning_rate=float(param[2])
        except:
            final_learning_rate=10**(-7)
-       try:
-           decay_steps=float(param[3])
-       except:
-           decay_steps=3000
-       decay_rate=(final_learning_rate/initial_learning_rate)**(decay_steps/(ne*nb*buffer_stream_tr))
        if num_call==0:
            print("alpha_nes: ",name," learning rate decay is set to exponential decay.",sep=' ',end='\n')
            print("alpha_nes: ",name," initial learning rate set to",initial_learning_rate,sep=' ',end='\n')
            print("alpha_nes: ",name," final learning rate set to",final_learning_rate,sep=' ',end='\n')
-           print("alpha_nes: ",name," decay step set to",decay_steps,sep=' ',end='\n')
-           print("alpha_nes: ",name," decay rate set to",decay_rate,sep=' ',end='\n')
-       lr_built=optsch.ExponentialDecay(initial_learning_rate,decay_steps, decay_rate,
+       lr_built=optsch.ExponentialDecay(initial_learning_rate,1,(final_learning_rate/initial_learning_rate)**(1/tf),
                          staircase=False, name=None)
 
     elif param[0]=='cosann':
