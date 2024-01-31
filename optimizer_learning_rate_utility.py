@@ -31,9 +31,9 @@ def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
         except:
             initial_learning_rate=0.01
         try:
-            first_decay_steps=float(param[2])*nb*buffer_stream_tr
+            first_decay_steps=int(float(param[2])*nb*buffer_stream_tr)
         except:
-            first_decay_steps=2*nb*buffer_stream_tr
+            first_decay_steps=int(2*nb*buffer_stream_tr)
         try:
             t_mul=float(param[3])
         except:

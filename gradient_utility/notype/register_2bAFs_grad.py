@@ -4,7 +4,7 @@ from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import sparse_ops
 
-root_path='/home/francegm/AlphaNesGpu'
+root_path='/leonardo_work/IscrB_NNPWATER/AlphaNesGpu'
 compute_2b_pargrad = tf.load_op_library(root_path+'/src/notype/bin/alphagrad_2body.so')
 
 @ops.RegisterGradient("ComputeSortProj")
