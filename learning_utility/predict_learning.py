@@ -41,7 +41,7 @@ elif sys.argv[1]=='cosann':
    
    [t_vec,lrt]=cosannlr(x,eta0,m_mul,alpha,t_mul,first_dec,num_step)
    lrt=np.concatenate(lrt)
-   x=np.concatenate(t_vec)/(2304/4)
+   x=np.concatenate(t_vec)/(2400/4)
 
         
 plt.plot(x,lrt)

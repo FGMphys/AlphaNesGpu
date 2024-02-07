@@ -1,12 +1,20 @@
+import numpy as np
+from numpy.random import seed
+from numpy import random
+from numpy.random import default_rng
+
 ###Initialize alphas
-def init_AFs_param(restart,full_param,nt):
-    ntcouple=int(nt*(nt+1)/2)
+def init_AFs_param(restart,full_param,nt,seed_par):
+    seed(seed_par)
+    nt_couple=int(nt*(nt+1)/2)
     try:
         alpha_bound=float(full_param['alpha_bound'])
         print("alpha_nes: alphas will be upper-bound to custom",alpha_bound,sep=' ',end='\n')
     except:
         alpha_bound=1.
         print("alpha_nes: alphas will be upper-bound to default",alpha_bound,sep=' ',end='\n')
+    limit=alpha_bound
+    limit3b=alpha_bound
     if restart=='no':
         nalpha_r_list=full_param['dimension_encoder_2body'].split()
         nalpha_a_list=full_param['dimension_encoder_3body'].split()
@@ -72,4 +80,5 @@ def init_AFs_param(restart,full_param,nt):
         print("alpha_nes: atom type   number\n")
     for k in range(nt):
         print("alpha_nes:      ",nalpha_a_arr[k,0],"        ",nalpha_a_arr[k,1])
- return init_alpha2b,init_alpha3b,init_mu,initial_type_emb
+
+    return init_alpha2b,init_alpha3b,init_mu,initial_type_emb
