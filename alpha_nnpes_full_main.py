@@ -18,6 +18,7 @@ from source_routine.descriptor_builder import descriptor_layer
 
 from optimizer_learning_rate_utility import build_learning_rate
 from optimizer_learning_rate_utility import build_optimizer
+from init_params.init_AFs_param import init_AFs_param
 
 
 
@@ -186,31 +187,17 @@ except:
     sys.exit("alpha_nes: In the dataset folder it is expected to have a type.dat file with the code for the atom type!")
 
 
-if (nt>1):
-    from gradient_utility.mixture import register_force_3bAFs_grad
-    from gradient_utility.mixture import register_force_2bAFs_grad
-    from gradient_utility.mixture import register_3bAFs_grad
-    from gradient_utility.mixture import register_2bAFs_grad
-else:
-    from gradient_utility.notype import register_force_3bAFs_grad
-    from gradient_utility.notype import register_force_2bAFs_grad
-    from gradient_utility.notype import register_3bAFs_grad
-    from gradient_utility.notype import register_2bAFs_grad
-if (nt>1):
-    from alphanes_models.mixture.alpha_nes_model import alpha_nes_full
-else:
-    from alphanes_models.notype.alpha_nes_model import alpha_nes_full
+from gradient_utility.mixture import register_force_3bAFs_grad
+from gradient_utility.mixture import register_force_2bAFs_grad
+from gradient_utility.mixture import register_3bAFs_grad
+from gradient_utility.mixture import register_2bAFs_grad
 
-if (nt>1):
-    from source_routine.mixture.physics_layer_mod import physics_layer
-    from source_routine.mixture.physics_layer_mod import lognorm_layer
-    from source_routine.mixture.force_layer_mod import force_layer
-    #from source_routine.mixture.pressure_layer_mod import pressure_layer
-else:
-    from source_routine.notype.physics_layer_mod import physics_layer
-    from source_routine.notype.physics_layer_mod import lognorm_layer
-    from source_routine.notype.force_layer_mod import force_layer
-    #from source_routine.notype.pressure_layer_mod import pressure_layer
+from alphanes_models.mixture.alpha_nes_model import alpha_nes_full
+
+from source_routine.mixture.physics_layer_mod import physics_layer
+from source_routine.mixture.physics_layer_mod import lognorm_layer
+from source_routine.mixture.force_layer_mod import force_layer
+#from source_routine.mixture.pressure_layer_mod import pressure_layer
 
 
 
@@ -337,6 +324,9 @@ limit=alpha_bound
 limit3b=alpha_bound
 nt=len(tipos)
 nt_couple=int(nt+nt*(nt-1)/2)
+
+[init_alpha2b,init_alpha3b,init_mu,initial_type_emb]=init_AFs_param(restart,full_param,nt)
+'''
 ###Initialize alphas
 if restart=='no':
     nalpha_r_list=full_param['dimension_encoder_2body'].split()
@@ -361,6 +351,11 @@ if restart=='no':
        initial_type_emb_2b=[(np.random.rand(nt*nalpha_r_arr[k,1])*5.).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
        initial_type_emb_3b=[(np.random.rand(nt_couple*nalpha_a_arr[k,1])*5.).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float32') for k in range(nt)]
        initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
+   else:
+       initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
+       initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float32') for k in range(nt)]
+       initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
+
 
 ##Initialise only afs by reading them from file. State of optimizer is started from scratch.
 elif restart=='only afs':
@@ -394,7 +389,7 @@ print("alpha_nes: atom type   number\n")
 for k in range(nt):
     print("alpha_nes:      ",nalpha_a_arr[k,0],"        ",nalpha_a_arr[k,1])
 
-
+'''
 
 [rc,rad_buff,rc_ang,ang_buff,Rs]=read_cutoff_info(full_param)
 #################INITIALISE ALL THE LAYER FOR THE MODEL ##############################
@@ -402,13 +397,9 @@ for k in range(nt):
 max_batch=int(np.max([buffer_stream_tr,buffer_stream_ts]))
 Descriptor_Layer=descriptor_layer(rc,rad_buff,rc_ang,ang_buff,N,box_map_tr[0],Rs,max_batch)
 #######Initialise AFS Layer
-if nt>1:
-    Physics_Layers=[physics_layer(init_alpha2b[num_type],init_alpha3b[num_type],
+Physics_Layers=[physics_layer(init_alpha2b[num_type],init_alpha3b[num_type],
                                 initial_type_emb[num_type]) for num_type
                                 in range(nt)]
-else:
-    Physics_Layers=[physics_layer(init_alpha2b[num_type],init_alpha3b[num_type])
-                    for num_type in range(nt)]
 ##Initialise Log layer
 Lognorm_Layers=[lognorm_layer(init_mu[num_type]) for num_type in range(nt)]
 ##Initialise force layer
@@ -416,20 +407,20 @@ Force_Layer=force_layer(rad_buff,ang_buff)
 ########Define Loss
 [model_loss,val_loss,pe,pf,pb]=make_loss(full_param)
 ###Compose the model by concatenation of layers
+'''
 if nt==1:
    N=f_map_tr.shape[1]
    model=alpha_nes_full(Physics_Layers,Force_Layer,nhl,nD,actfun,1,model_loss,
                      val_loss,opt_net,opt_phys,alpha_bound,Lognorm_Layers,N,restart)
    print("alpha_nes: one atom type system has been detected. Model will be built with no atom type embedding")
 else:
-    model=alpha_nes_full(Physics_Layers,Force_Layer,nhl,nD,actfun,1,model_loss,
-                 val_loss,opt_net,opt_phys,alpha_bound,Lognorm_Layers,tipos,
-                 type_map,restart,seed_par)
+'''
+model=alpha_nes_full(Physics_Layers,Force_Layer,nhl,nD,actfun,1,model_loss,
+             val_loss,opt_net,opt_phys,alpha_bound,Lognorm_Layers,tipos,
+             type_map,restart,seed_par)
 [trainmeth,testmeth]=make_method(full_param,model)
 #################################################################################
 #################################################################################
-
-
 
 bestval=10**5
 if restart_par!='no' and restart_par!='only afs':
@@ -485,7 +476,7 @@ for ep in range(restart_ep,ne):
         intmap2b,intmap3b,intder2b,
         intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(tf.constant(pos_map_tr[el]),tf.constant(box_map_tr[el]))
         #print(time.time()-start)
-        #accumul=accumul+1     
+        #accumul=accumul+1
         nb=int(buffer_stream_tr/bs)
         for k in range(nb):
             start3=time.time()
@@ -516,7 +507,7 @@ for ep in range(restart_ep,ne):
            intmap2b,intmap3b,intder2b,
            intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(pos_map_ts[el],box_map_ts[el])
            nb=int(buffer_stream_ts/bs_test)
-           for k in range(nb):        
+           for k in range(nb):
                [val_loss,val_lossf,val_losse]=testmeth(raddescr[k*bs_test:(k+1)*bs_test],angdescr[k*bs_test:(k+1)*bs_test],des3bsupp[k*bs_test:(k+1)*bs_test],intmap2b[k*bs_test:(k+1)*bs_test],intder2b[k*bs_test:(k+1)*bs_test],intmap3b[k*bs_test:(k+1)*bs_test],intder3b[k*bs_test:(k+1)*bs_test],intder3bsupp[k*bs_test:(k+1)*bs_test],numtriplet[k*bs_test:(k+1)*bs_test],e_map_ts[el][k*bs_test:(k+1)*bs_test],f_map_ts[el][k*bs_test:(k+1)*bs_test])
                vallosstot_buff+=val_loss
                vallosstote_buff+=val_losse
