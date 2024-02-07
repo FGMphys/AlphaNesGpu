@@ -35,13 +35,13 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
 
 
     __shared__ float3 grad_alpha_s[BLOCK_DIM];
-    __shared__ float grad_ck_s[BLOCK_DIM];
+    //__shared__ float grad_ck_s[BLOCK_DIM];
     __shared__ float grad_net_s[BLOCK_DIM];
     grad_alpha_s[threadIdx.x].x=0.f;
     grad_alpha_s[threadIdx.x].y=0.f;
     grad_alpha_s[threadIdx.x].z=0.f;
 
-    grad_ck_s[threadIdx.x]=0.f;
+    //grad_ck_s[threadIdx.x]=0.f;
 
     grad_net_s[threadIdx.x]=0.f;
 
@@ -99,7 +99,7 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
 
 
 	       float accumulate_1=0.f;
-               float accumulate_2=0.f;
+               //float accumulate_2=0.f;
                float accumulate_3=0.f;
                float accumulate_4=0.f;
                float accumulate_5=0.f;
@@ -133,10 +133,10 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
                     float gradxik=chtjk_par*delta*intder.y+chtjk_par*Bp_k*intder_r_k;
                     accumulate_1+=-prevgrad_loc*0.5f*(gradxij+gradxik);
 	            accumulate_1+=prevgrad_neighj*0.5f*gradxij+prevgrad_neighk*0.5f*gradxik;
-		    float grad_emb_xij=(delta*intder.x+Bp_j*intder_r_j);
-                    float grad_emb_xik=(delta*intder.y+Bp_k*intder_r_k);
-                    accumulate_2+=-prevgrad_loc*0.5f*NGel*(grad_emb_xij+grad_emb_xik);
-	            accumulate_2+=prevgrad_neighj*0.5*NGel*grad_emb_xij+prevgrad_neighk*0.5f*NGel*grad_emb_xik;
+		    //float grad_emb_xij=(delta*intder.x+Bp_j*intder_r_j);
+                    //float grad_emb_xik=(delta*intder.y+Bp_k*intder_r_k);
+                    //accumulate_2+=-prevgrad_loc*0.5f*NGel*(grad_emb_xij+grad_emb_xik);
+	            //accumulate_2+=prevgrad_neighj*0.5*NGel*grad_emb_xij+prevgrad_neighk*0.5f*NGel*grad_emb_xik;
 
                     float buff_a1_ang=expbeta*(1.f+alphas.z*angulardes)*(sim1*radialdes_k+sim2*radialdes_j)*0.5f;
                     float buff_a2_ang=expbeta*(1.f+alphas.z*angulardes)*(sim1*radialdes_j+sim2*radialdes_k)*0.5f;
@@ -173,7 +173,7 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
 	       grad_alpha_s[threadIdx.x].y=accumulate_4;
 	       grad_alpha_s[threadIdx.x].z=accumulate_5;
 
-	       grad_ck_s[threadIdx.x]=accumulate_2;
+	   //    grad_ck_s[threadIdx.x]=accumulate_2;
 	     }
    
                
@@ -185,11 +185,11 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
            local_alpha.x+=grad_alpha_s[dd].x;
            local_alpha.y+=grad_alpha_s[dd].y;
            local_alpha.z+=grad_alpha_s[dd].z;
-           local_ck+=grad_ck_s[dd];
+         //  local_ck+=grad_ck_s[dd];
            local_net+=grad_net_s[dd];
            }
        atomicAdd((float*)&(gradnet_3b_T_d[actgrad+req_alpha]),local_net);
-       atomicAdd((float*)&(grad_emb3b_T_d[req_sum*num_finger+req_alpha]),local_ck);         
+       //atomicAdd((float*)&(grad_emb3b_T_d[req_sum*num_finger+req_alpha]),local_ck);         
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].x),local_alpha.x);
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].y),local_alpha.y);
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].z),local_alpha.z);
