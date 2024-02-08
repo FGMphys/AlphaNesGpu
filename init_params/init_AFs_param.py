@@ -3,6 +3,30 @@ from numpy.random import seed
 from numpy import random
 from numpy.random import default_rng
 
+
+
+def filtered_matrix(map_to_build):
+    nrow=len(map_to_build)
+    ncol=sum(map_to_build)
+    matrix=np.zeros((nrow,ncol),dtype='float32')
+    prev=0
+    for k in range(nrow):
+        matrix[k,prev:prev+map_to_build[k]]=1.
+        prev+=map_to_build[k]
+    return matrix
+
+def gen_map_type_AFs(full_param):
+    map_rad_afs=full_param['map_rad_afs']
+    map_ang_afs=full_param['map_ang_afs']
+    nt=len(map_rad_afs)
+    nt_couple=int(nt*(nt+1)/2)
+    tot_rad_afs=[sum(map_rad_afs[k]) for k in range(nt)]
+    tot_ang_afs=[sum(map_ang_afs[k]) for k in range(nt)]
+    type_emb2b=[filtered_matrix(map_rad_afs[tt]) for tt in range(nt)]
+    type_emb3b=[filtered_matrix(map_ang_afs[tt]) for tt in range(nt)]
+    type_emb=[[type_emb2b[k],type_emb3b[k]] for k in range(nt)]
+    return type_emb
+
 ###Initialize alphas
 def init_AFs_param(restart,full_param,nt,seed_par):
     seed(seed_par)
