@@ -105,7 +105,8 @@ def read_cutoff_info(full_param):
     rc=float(full_param['Rc'])
     rad_buff=int(full_param['Radial_Buffer'])
     rc_ang=float(full_param['Rc_Angular'])
-    ang_buff=int(full_param['Angular_Buffer'])
+    maxneigh=int(full_param['Max_Angular_Neigh'])
+    ang_buff=int(maxneigh*(maxneigh-1)/2) 
     print("alpha_nes: Rc ",rc," Radial_Buffer ",rad_buff," Rc_Angular ",
            rc_ang,"Angular_Buffer ",ang_buff,"Hard cut-off ",rs)
     return [rc,rad_buff,rc_ang,ang_buff,rs]
