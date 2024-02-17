@@ -405,6 +405,11 @@ for ep in range(restart_ep,ne):
         [raddescr,angdescr,des3bsupp,
         intmap2b,intmap3b,intder2b,
         intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(tf.constant(pos_map_tr[el]),tf.constant(box_map_tr[el]))
+        max_ang=np.max(numtriplet.numpy())
+        max_buff=int(max_ang*(max_ang-1)/2)
+        if (max_buff>ang_buff):
+            print("alpha_nes: found angular neighbours beyond the buffer (%d vs %d)"%(max_buf,ang_buff))
+            sys.exit()
         #print(time.time()-start)
         #accumul=accumul+1
         nb=int(buffer_stream_tr/bs)
