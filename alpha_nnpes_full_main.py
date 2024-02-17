@@ -408,7 +408,7 @@ for ep in range(restart_ep,ne):
         max_ang=np.max(numtriplet.numpy())
         max_buff=int(max_ang*(max_ang-1)/2)
         if (max_buff>ang_buff):
-            print("alpha_nes: found angular neighbours beyond the buffer (%d vs %d)"%(max_buf,ang_buff))
+            print("alpha_nes: found angular neighbours beyond the buffer (%d vs %d)"%(max_buff,ang_buff))
             sys.exit()
         #print(time.time()-start)
         #accumul=accumul+1
