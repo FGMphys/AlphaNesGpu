@@ -11,6 +11,10 @@ print("alpha_nes: Inference of v4 model")
 def make_typemap(tipos):
     num=0
     list_tmap=[]
+    try:
+        res=len(tipos)
+    except:
+        tipos=[tipos]
     for el in tipos:
         for k in range(el):
             list_tmap.append(num)
@@ -21,8 +25,11 @@ class alpha_nes_full_inference(tf.Module):
       def __init__(self,modelname):
           super(alpha_nes_full_inference, self).__init__()
           self.max_batch=1
-          self.tipos=tf.constant(np.loadtxt(modelname+'/type.dat'),dtype='int32')
-          self.ntipos=len(self.tipos)
+          self.tipos=tf.constant(np.loadtxt(modelname+'/type.dat').reshape((-1,)),dtype='int32')
+          try:
+              self.ntipos=len(self.tipos)
+          except:
+              self.ntipos=1
           self.type_map=tf.constant(make_typemap(np.loadtxt(modelname+'/type.dat',dtype='int32')))
           self.cutoff_info=np.loadtxt(modelname+'/cutoff_info')
           self.rc=float(self.cutoff_info[0,0])
@@ -32,6 +39,10 @@ class alpha_nes_full_inference(tf.Module):
           self.rs=self.cutoff_info[2,0]
           self.boxinit=np.array([12.,0.,0.,12.,0.,12.],dtype='float32')
           self.N=len(self.type_map)
+          if self.ntipos==1:
+             self.nt_couple=1
+          else:
+             self.nt_couple=int(self.ntipos*(self.ntipos-1)/2)
           print("Model 4")
           print("Alpha_inference: Found ",self.ntipos," types of atoms")
           print("Alpha_inference: Found ",self.N," atoms")
@@ -43,23 +54,30 @@ class alpha_nes_full_inference(tf.Module):
 
           self.descriptor_layer=descriptor_layer(self.rc,self.rad_buff,self.rc_ang,self.ang_buff,self.N,self.boxinit,self.rs,self.max_batch)
 
-          init_alpha2b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_2body.dat',dtype='float32') for k in range(self.ntipos)]
-          init_alpha3b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_3body.dat',dtype='float32') for k in range(self.ntipos)]
-          initial_type_emb2b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_2b.dat',dtype='float32') for k in range(self.ntipos)]
-          initial_type_emb3b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_3b.dat',dtype='float32') for k in range(self.ntipos)]
-          initial_type_emb=[[initial_type_emb2b[k],initial_type_emb3b[k]] for k in range(self.ntipos)]
+          init_alpha2b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_2body.dat',dtype='float32').reshape((self.ntipos,-1)) for k in range(self.ntipos)]
+          init_alpha3b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_3body.dat',dtype='float32').reshape((self.nt_couple,-1)) for k in range(self.ntipos)]
+          if self.ntipos==1:
+               num_finger_rad=init_alpha2b[0].shape[1]
+               num_finger_ang=init_alpha3b[0].shape[1]
+               initial_type_emb2b=np.ones(num_finger_rad,dtype='float32')
+               initial_type_emb3b=np.ones(num_finger_ang,dtype='float32')
+               initial_type_emb=[[initial_type_emb2b,initial_type_emb3b]]
+          else:
+               initial_type_emb2b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_2b.dat',dtype='float32') for k in range(self.ntipos)]
+               initial_type_emb3b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_3b.dat',dtype='float32') for k in range(self.ntipos)]
+               initial_type_emb=[[initial_type_emb2b[k],initial_type_emb3b[k]] for k in range(self.ntipos)]
           self.physics_layer=[physics_layer(init_alpha2b[k],init_alpha3b[k],
                        initial_type_emb[k]) for k in range(self.ntipos)]
 
           self.nets=[tf.saved_model.load(modelname+'/model_type'+str(k))
                           for k in range(self.ntipos)]
-          self.force_layer=force_layer()
+          self.force_layer=force_layer(self.rad_buff,self.ang_buff)
 
 
 
 
 
-      @tf.function()
+      #@tf.function()
       def full_test(self,pos,box):
 
           [x1,x2,x3bsupp,
@@ -67,7 +85,6 @@ class alpha_nes_full_inference(tf.Module):
         intder3b,intder3bsupp,numtriplet]=self.descriptor_layer(pos,box)
 
           nt=self.ntipos
-  
           self.x2b=tf.split(x1,self.tipos,axis=1)
           self.x3b=tf.split(x2,self.tipos,axis=1)
           self.x3bsupp=tf.split(x3bsupp,self.tipos,axis=1)
