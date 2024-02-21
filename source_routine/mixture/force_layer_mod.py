@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-root_path='/leonardo_work/IscrB_NNPWATER/AlphaNesGpu'
+root_path='/home/francegm/AlphaNesGpu_local'
 force2b_sopath=root_path+'/src/mixture/force/rad/reforce.so'
 force3b_sopath=root_path+'/src/mixture/force/ang/reforce.so'
 
@@ -34,9 +34,12 @@ class force_layer(tf.Module):
 
 
 class force_debug_layer(tf.Module):
-      def __init__(self):
+      def __init__(self,radbuff,angbuff):
           self.force2b=tf.load_op_library(force2b_sopath)
           self.force3b=tf.load_op_library(force3b_sopath)
+
+          self.force2b.init_force_radial(radbuff)
+          self.force3b.init_force_tripl(angbuff)
 
       @tf.function()
       def __call__(self,net_der_r,x2b,intder2b,int2b,alpha2b,net_der_a,
