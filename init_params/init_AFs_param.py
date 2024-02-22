@@ -29,7 +29,7 @@ def gen_map_type_AFs(full_param):
 
 ###Initialize alphas
 def init_AFs_param(restart,full_param,nt,seed_par):
-    seed(seed_par)
+    np.random.set_state(seed_par)
     nt_couple=int(nt*(nt+1)/2)
     try:
         alpha_bound=float(full_param['alpha_bound'])
@@ -45,9 +45,6 @@ def init_AFs_param(restart,full_param,nt,seed_par):
 
         nalpha_r_arr=np.array([int(k) for k in nalpha_r_list]).reshape((nt,2))
         nalpha_a_arr=np.array([int(k) for k in nalpha_a_list]).reshape((nt,2))
-        #Initialised Z for each AFS
-        init_mu=[(np.random.rand(nalpha_r_arr[k,1]+nalpha_a_arr[k,1])*2*limit-limit).astype('float32')
-                for k in range(nt)]
         ###Initialize radial AFS parameters
         init_alpha2b=[(np.random.rand((nalpha_r_arr[k,1]*nt))*2*limit-limit).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
         ###Initialize angular AFS parameters
@@ -57,6 +54,9 @@ def init_AFs_param(restart,full_param,nt,seed_par):
             vec[:,:2]=(np.random.rand((nalpha_a_arr[k,1]*nt_couple*2))*2*limit3b-limit3b).reshape((nalpha_a_arr[k,1]*nt_couple,2)).astype('float32')
             vec[:,2]=(np.random.rand((nalpha_a_arr[k,1]*nt_couple))*-10).reshape(nalpha_a_arr[k,1]*nt_couple).astype('float32')
             init_alpha3b.append(vec.reshape((nt_couple,nalpha_a_arr[k,1]*3)))
+        #Initialised Z for each AFS 
+        init_mu=[(np.random.rand(nalpha_r_arr[k,1]+nalpha_a_arr[k,1])*2*limit-limit).astype('float32')
+                for k in range(nt)]
         ###Initialize Ck parameters (only for mixtures)
         if nt>1:
            initial_type_emb_2b=[(np.random.rand(nt*nalpha_r_arr[k,1])*5.).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
@@ -105,4 +105,4 @@ def init_AFs_param(restart,full_param,nt,seed_par):
     for k in range(nt):
         print("alpha_nes:      ",nalpha_a_arr[k,0],"        ",nalpha_a_arr[k,1])
 
-    return init_alpha2b,init_alpha3b,init_mu,initial_type_emb
+    return init_alpha2b,init_alpha3b,init_mu,initial_type_emb,np.random.get_state()

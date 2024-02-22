@@ -222,8 +222,7 @@ class alpha_nes_full(tf.Module):
         grad_2b=[tf.gradients(loss,physlay.alpha2b) for physlay in self.physics_layer]
         grad_3b=[tf.gradients(loss,physlay.alpha3b) for physlay in self.physics_layer]
         grad_mu=[tf.gradients(loss,lognorm.mu) for lognorm in self.lognorm_layer]
-        #grad_tem_2b=[tf.gradients(loss,physlay.type_emb_2b) for physlay in self.physics_layer]
-        #grad_tem_3b=[tf.gradients(loss,physlay.type_emb_3b) for physlay in self.physics_layer]
+        
         all_net_grad=[grad_w[k][0] for k in range(nt)]
         all_net_param=[self.nets[k].trainable_variables[0] for k in range(nt)]
         self.opt_net.apply_gradients(zip(all_net_grad,all_net_param))
@@ -234,24 +233,17 @@ class alpha_nes_full(tf.Module):
             all_AFs_param.append(self.physics_layer[k].alpha3b)
         for k in range(nt):
             all_AFs_param.append(self.lognorm_layer[k].mu)
-       # for k in range(nt):
-       #     all_AFs_param.append(self.physics_layer[k].type_emb_2b)
-       # for k in range(nt):
-       #     all_AFs_param.append(self.physics_layer[k].type_emb_3b)
 
         all_AFS_grad=[grad_2b[k][0] for k in range(nt)]
         for k in range(nt):
             all_AFS_grad.append(grad_3b[k][0])
         for k in range(nt):
             all_AFS_grad.append(grad_mu[k][0])
-       # for k in range(nt):
-       #     all_AFS_grad.append(grad_tem_2b[k][0])
-       # for k in range(nt):
-       #     all_AFS_grad.append(grad_tem_3b[k][0])
+        
         self.opt_phys.apply_gradients(zip(all_AFS_grad,
                                               all_AFs_param))
         self.global_step=self.global_step+1
-        return loss,loss_energy,loss_bound,loss_force #self.grad_listed,tf.constant(0.,dtype='float32'),tf.constant(0.,dtype='float32') #loss,loss_force,loss_energy
+        return loss,loss_energy,loss_bound,loss_force
 
     @tf.function()
     def full_test_e_f(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,intder3bsupp,

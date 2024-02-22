@@ -327,8 +327,11 @@ limit3b=alpha_bound
 nt=len(tipos)
 nt_couple=int(nt+nt*(nt-1)/2)
 
-[init_alpha2b,init_alpha3b,init_mu,initial_type_emb]=init_AFs_param(restart,full_param,nt,seed_par)
-
+#Initializing params for atomic finger prints
+rng_state = np.random.get_state()
+[init_alpha2b,init_alpha3b,init_mu,initial_type_emb,new_rng_state]=init_AFs_param(restart,full_param,nt,rng_state)
+np.random.set_state(new_rng_state)
+#Reading cutoff info from input file
 [rc,rad_buff,rc_ang,ang_buff,Rs]=read_cutoff_info(full_param)
 #################INITIALISE ALL THE LAYER FOR THE MODEL ##############################
 #######Initialise Descriptor Layer###################################################
@@ -369,6 +372,10 @@ model_name=full_param['model_name']
 if restart_par=='no' or restart_par=='only afs':
     restart_ep=0
     os.mkdir(model_name)
+    model.save_model_init(model_name)
+    for k in range(nt):
+       Physics_Layers[k].savealphas(model_name,"type"+str(k)+"initial_")
+       Lognorm_Layers[k].savemu(model_name,"type"+str(k)+"initial_")
 else:
     restart_ep=int(restart_par.split('log')[-1])+1
     model_name=model_name
