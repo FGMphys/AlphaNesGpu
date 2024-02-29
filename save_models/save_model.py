@@ -71,7 +71,6 @@ call = [toexport[k].testmodel.get_concrete_function(tf.TensorSpec([None,None,nAF
 
 
 ###Save the model
-sh.copy('cutoff_info',namemodel)
 sh.copy(input_model+'/model_error',namemodel)
 for k in range(nt):
     sh.copy(input_model+'/type'+str(k)+'_alpha_2body.dat',namemodel)
