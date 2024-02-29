@@ -29,7 +29,7 @@ REGISTER_OP("InitGradForceTripl")
 
       }
       };
-      REGISTER_KERNEL_BUILDER(Name("InitGradForceTripl").Device(DEVICE_CPU), InitGardForceTriplOp);
+      REGISTER_KERNEL_BUILDER(Name("InitGradForceTripl").Device(DEVICE_CPU), InitGradForceTriplOp);
 
 REGISTER_OP("ComputeForceTriplGrad")
     .Input("prevgrad: float")

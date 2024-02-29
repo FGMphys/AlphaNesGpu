@@ -1,6 +1,6 @@
 #if GOOGLE_CUDA
 #define EIGEN_USE_GPU
-#include "unsupported/Eigen/CXX11/Tensor"  // from @eigen_archive
+#include "unsupported/Eigen/CXX11/Tensor" 
 #include "tensorflow/core/util/gpu_kernel_helper.h"
 #include "tensorflow/core/util/gpu_launch_config.h"
 
@@ -34,7 +34,7 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
                                        const int* actual_type_p,
                                        const int *num_triplets,const float* smooth_a_T_l,
                                        const int* type_map_T_d,float* gradnet_3b_T_d,
-                                      float* grad_alpha3b_T,float* grad_emb3b_T_d,int req_alpha,int req_sum)
+                                      float* grad_alpha3b_T,float* grad_emb3b_T_d,int req_alpha,int req_sum,int BLOCK_DIM)
 {
 
     int actual_type=actual_type_p[0];
@@ -51,14 +51,12 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
     int t=blockIdx.x*blockDim.x+threadIdx.x;
 
 
-    __shared__ float3 grad_alpha_s[BLOCK_DIM];
-    //__shared__ float grad_ck_s[BLOCK_DIM];
-    __shared__ float grad_net_s[BLOCK_DIM];
+    extern __shared__ float3 grad_alpha_s[];
+    extern __shared__ float grad_net_s[];
     grad_alpha_s[threadIdx.x].x=0.f;
     grad_alpha_s[threadIdx.x].y=0.f;
     grad_alpha_s[threadIdx.x].z=0.f;
 
-    //grad_ck_s[threadIdx.x]=0.f;
 
     grad_net_s[threadIdx.x]=0.f;
 
@@ -116,7 +114,6 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
 
 
 	       float accumulate_1=0.f;
-               //float accumulate_2=0.f;
                float accumulate_3=0.f;
                float accumulate_4=0.f;
                float accumulate_5=0.f;
@@ -150,10 +147,6 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
                     float gradxik=chtjk_par*delta*intder.y+chtjk_par*Bp_k*intder_r_k;
                     accumulate_1+=-prevgrad_loc*0.5f*(gradxij+gradxik);
 	            accumulate_1+=prevgrad_neighj*0.5f*gradxij+prevgrad_neighk*0.5f*gradxik;
-		    //float grad_emb_xij=(delta*intder.x+Bp_j*intder_r_j);
-                    //float grad_emb_xik=(delta*intder.y+Bp_k*intder_r_k);
-                    //accumulate_2+=-prevgrad_loc*0.5f*NGel*(grad_emb_xij+grad_emb_xik);
-	            //accumulate_2+=prevgrad_neighj*0.5*NGel*grad_emb_xij+prevgrad_neighk*0.5f*NGel*grad_emb_xik;
 
                     float buff_a1_ang=expbeta*(1.f+alphas.z*angulardes)*(sim1*radialdes_k+sim2*radialdes_j)*0.5f;
                     float buff_a2_ang=expbeta*(1.f+alphas.z*angulardes)*(sim1*radialdes_j+sim2*radialdes_k)*0.5f;
@@ -190,7 +183,6 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
 	       grad_alpha_s[threadIdx.x].y=accumulate_4;
 	       grad_alpha_s[threadIdx.x].z=accumulate_5;
 
-	   //    grad_ck_s[threadIdx.x]=accumulate_2;
 	     }
 
 
@@ -202,11 +194,9 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
            local_alpha.x+=grad_alpha_s[dd].x;
            local_alpha.y+=grad_alpha_s[dd].y;
            local_alpha.z+=grad_alpha_s[dd].z;
-         //  local_ck+=grad_ck_s[dd];
            local_net+=grad_net_s[dd];
            }
        atomicAdd((float*)&(gradnet_3b_T_d[actgrad+req_alpha]),local_net);
-       //atomicAdd((float*)&(grad_emb3b_T_d[req_sum*num_finger+req_alpha]),local_ck);
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].x),local_alpha.x);
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].y),local_alpha.y);
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].z),local_alpha.z);
@@ -232,12 +222,12 @@ void gradforce_tripl_Launcher(const float*  prevgrad_T_d,const float*  netderiv_
     for (int req_alpha=0;req_alpha<num_finger;req_alpha++){
 	for (int req_sum=0;req_sum<nt_couple;req_sum++){
     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(gradforce_tripl_kernel,dimGrid,
-                dimBlock, 0, nullptr,prevgrad_T_d,netderiv_T_d,desr_T_d,desa_T_d,
+                dimBlock, BLOCK_DIM*(sizeof(float3)+sizeof(float)), nullptr,prevgrad_T_d,netderiv_T_d,desr_T_d,desa_T_d,
                 intderiv_r_T_d,intderiv_a_T_d,intmap_r_T_d,
                 intmap_a_T_d,nr,na,N,dimbat,num_finger,
                 type_emb3b_d,nt,tipos_T,actual_type,
                 num_triplets_d,smooth_a_T,type_map_T_d,
-                gradnet_3b_T_d,grad_alpha3b_T_d,grad_emb3b_T_d,req_alpha,req_sum));
+                gradnet_3b_T_d,grad_alpha3b_T_d,grad_emb3b_T_d,req_alpha,req_sum,BLOCK_DIM));
 
 	}
     }
