@@ -6,8 +6,7 @@ from tensorflow.python.ops import sparse_ops
 
 root_path='/leonardo_work/IscrB_NNPWATER/AlphaNesGpu'
 compforcradgrad_module = tf.load_op_library(root_path+'/src/mixture/grad_force/rad/reforce.so')
-
-
+    
 @ops.RegisterGradient("ComputeForceRadial")
 def _compute_force_radial_grad(op, grad):
 

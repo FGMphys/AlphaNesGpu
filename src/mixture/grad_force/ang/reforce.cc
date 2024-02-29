@@ -4,6 +4,33 @@
 
 using namespace tensorflow;
 
+void init_block_dim(int buffdim);
+
+REGISTER_OP("InitGradForceTripl")
+    .Input("buffdim: int32")
+    .Output("code: int32");
+
+    class InitGradForceTriplOp : public OpKernel {
+     public:
+      explicit InitGradForceTriplOp(OpKernelConstruction* context) : OpKernel(context) {}
+      void Compute(OpKernelContext* context) override {
+           const Tensor& buffdim = context->input(0);
+
+           init_block_dim(buffdim.flat<int>()(0));
+
+           Tensor* code = NULL;
+           TensorShape code_shape ;
+           code_shape.AddDim (1);
+
+           OP_REQUIRES_OK(context, context->allocate_output(0, code_shape,
+                                                            &code));
+            code->flat<int>()(0)=0;
+
+
+      }
+      };
+      REGISTER_KERNEL_BUILDER(Name("InitGradForceTripl").Device(DEVICE_CPU), InitGardForceTriplOp);
+
 REGISTER_OP("ComputeForceTriplGrad")
     .Input("prevgrad: float")
     .Input("netderiv: float")
@@ -120,7 +147,7 @@ class ComputeForceTriplGradOp : public OpKernel {
                                                      &grad_emb3b_T));
     set_tensor_to_zero_float(grad_emb3b_T->flat<float>().data(),nt_couple*num_finger);
 
-    
+
     int prod=dimbat*Nlocal*na;
     gradforce_tripl_Launcher(prevgrad_T_d.data(),netderiv_T_d.data(), desr_T_d.data(), desa_T_d.data(),intderiv_r_T_d.data(),intderiv_a_T_d.data(),
                         intmap_r_T_d.data(),intmap_a_T_d.data(),

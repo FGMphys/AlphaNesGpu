@@ -5,7 +5,25 @@
 #include "tensorflow/core/util/gpu_launch_config.h"
 
 
-#define BLOCK_DIM 80
+
+static int BLOCK_DIM;
+
+void init_block_dim(int buffdim){
+     int i;
+     for (i=buffdim;i>0;i--){
+         if ((buffdim%i==0) & (i<512)){
+            BLOCK_DIM=i;
+            i=0;
+	    }
+     }
+     if (i!=-1){
+        printf("Alpha_nes: No integer divisor found for the given radial buffer size \n");
+        exit(0);
+     }
+     else{
+        printf("Alpha_nes: Blocks for radial forces set to %d\n",BLOCK_DIM);
+      }
+}
 
 __global__ void back_prop_grad_force2b_kernel(const float* prevgrad,const float* ds,
                            int nr,const float* alpha2b,int num_finger,
@@ -28,7 +46,7 @@ __global__ void back_prop_grad_force2b_kernel(const float* prevgrad,const float*
          int reminder=t%(nr*N_local);
          int par=reminder/nr;
          int j=reminder%nr;
-         
+
 	  int nr_particle=intmap_r[b*N_local*(nr+1)+par*(nr+1)];
 
          if (j<nr_particle)

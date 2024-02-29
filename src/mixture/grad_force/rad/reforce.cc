@@ -5,6 +5,33 @@
 
 using namespace tensorflow;
 
+void init_block_dim(int buffdim);
+
+REGISTER_OP("InitGradForceRadial")
+    .Input("buffdim: int32")
+    .Output("code: int32");
+
+    class InitGradForceRadialOp : public OpKernel {
+     public:
+      explicit InitGradForceRadialOp(OpKernelConstruction* context) : OpKernel(context) {}
+      void Compute(OpKernelContext* context) override {
+           const Tensor& buffdim = context->input(0);
+
+           init_block_dim(buffdim.flat<int>()(0));
+
+           Tensor* code = NULL;
+           TensorShape code_shape ;
+           code_shape.AddDim (1);
+
+           OP_REQUIRES_OK(context, context->allocate_output(0, code_shape,
+                                                            &code));
+            code->flat<int>()(0)=0;
+
+
+      }
+      };
+      REGISTER_KERNEL_BUILDER(Name("InitGradForceRadial").Device(DEVICE_CPU), InitGradForceRadialOp);
+
 void set_tensor_to_zero_float(float* tensor_data,int dimension);
 
 REGISTER_OP("ComputeForceRadialGrad")
@@ -75,7 +102,7 @@ class ComputeForceRadialGradOp : public OpKernel {
       // Create an output tensor
       Tensor* grad_net_T = NULL;
       TensorShape grad_net_shape ;
-      
+
       grad_net_shape.AddDim (dimbat);
       grad_net_shape.AddDim (N_local);
       grad_net_shape.AddDim (num_finger);

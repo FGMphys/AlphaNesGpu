@@ -17,6 +17,7 @@ void init_block_dim(int buffdim){
      }
      if (i!=-1){
         printf("Alpha_nes: No integer divisor found for the given radial buffer size \n");
+        exit(0);
      }
      else{
         printf("Alpha_nes: Blocks for radial forces set to %d\n",BLOCK_DIM);

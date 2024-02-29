@@ -7,7 +7,6 @@ from tensorflow.python.ops import sparse_ops
 root_path='/leonardo_work/IscrB_NNPWATER/AlphaNesGpu'
 compforcegradtripl_module = tf.load_op_library(root_path+'/src/mixture/grad_force/ang/reforce.so')
 
-
 @ops.RegisterGradient("ComputeForceTripl")
 def _compute_force_tripl_grad(op, grad):
     [net_grad0,net_grad1,grad_emb3b_par] =  compforcegradtripl_module.compute_force_tripl_grad (grad,

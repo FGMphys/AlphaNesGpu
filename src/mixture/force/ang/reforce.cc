@@ -57,7 +57,8 @@ REGISTER_OP("ComputeForceTripl")
                         const int* intmap_r_T_d,const int* intmap_a_T_d,
                         int nr, int na, int N, int dimbat,int num_finger,const float* type_emb3b_d,int nt,
                         const int* tipos_T,
-                        const int* actual_type,float* forces3b_T_d,const int *num_triplets_d,const float* smooth_a_T,const int* type_map_T_d,int prod);
+                        const int* actual_type,float* forces3b_T_d,const int *num_triplets_d,const float* smooth_a_T,const int* type_map_T_d,
+                        int prod);
 
 void set_tensor_to_zero_float(float* tensor,int dimten);
 

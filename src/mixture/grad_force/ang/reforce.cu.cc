@@ -5,7 +5,24 @@
 #include "tensorflow/core/util/gpu_launch_config.h"
 
 
-#define BLOCK_DIM 118
+static int BLOCK_DIM;
+
+void init_block_dim(int buffdim){
+     int i;
+     for (i=buffdim;i>0;i--){
+         if ((buffdim%i==0) && (i<512)){
+            BLOCK_DIM=i;
+            i=0;
+         }
+     }
+     if (i!=-1){
+        printf("Alpha_nes: No integer divisor found for the given angular buffer size\n");
+        exit(0);
+     }
+     else{
+        printf("Alpha_nes: Blocks for angular forces set to %d\n",BLOCK_DIM);
+      }
+}
 
 
 __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  netderiv_T,
@@ -175,11 +192,11 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
 
 	   //    grad_ck_s[threadIdx.x]=accumulate_2;
 	     }
-   
-               
+
+
     __syncthreads();
 //Il thread zero deve essere usato fuori dagli if. Infatti se la prima tripletta
-//è tipo sum=1 e io sto calcolando req_sum=0 non entra nel loop e non fa la riduzione	       
+//è tipo sum=1 e io sto calcolando req_sum=0 non entra nel loop e non fa la riduzione
     if (threadIdx.x==0){
        for (int dd=0;dd<BLOCK_DIM;dd++){
            local_alpha.x+=grad_alpha_s[dd].x;
@@ -189,11 +206,11 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
            local_net+=grad_net_s[dd];
            }
        atomicAdd((float*)&(gradnet_3b_T_d[actgrad+req_alpha]),local_net);
-       //atomicAdd((float*)&(grad_emb3b_T_d[req_sum*num_finger+req_alpha]),local_ck);         
+       //atomicAdd((float*)&(grad_emb3b_T_d[req_sum*num_finger+req_alpha]),local_ck);
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].x),local_alpha.x);
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].y),local_alpha.y);
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].z),local_alpha.z);
-      }  
+      }
      }
    }
 }
