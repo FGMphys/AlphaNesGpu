@@ -199,7 +199,6 @@ from alphanes_models.mixture.alpha_nes_model import alpha_nes_full
 from source_routine.mixture.physics_layer_mod import physics_layer
 from source_routine.mixture.physics_layer_mod import lognorm_layer
 from source_routine.mixture.force_layer_mod import force_layer
-#from source_routine.mixture.pressure_layer_mod import pressure_layer
 
 
 
@@ -265,12 +264,11 @@ if nhl>0:
    nD=[int(k) for k in full_param['number_of_decoding_nodes'].split()]
 else:
    nD=0
-###Initialize the Encoder and Decoder
+
+#Fix precision
 tf.keras.backend.set_floatx('float32')
 
 ##Building the learning rate and then the optimizer
-##If nt==1 so we need only 3 optimizer for AFs due to the lack of type emb
-
 try:
     restart_par=full_param['restart']
     if os.path.isdir(restart_par):
@@ -390,18 +388,18 @@ else:
 
 lcurve_notmean=open('lcurve_notmean','w')
 try:
-   displ_freq=int(full_param['displ_freq']) #deve essere minore di nb
+   displ_freq=int(full_param['displ_freq'])
 except:
    displ_freq=1
 try:
-   freq_test=int(full_param['freq_test']) #deve essere minore di nb
+   freq_test=int(full_param['freq_test'])
+   print("alpha_nes: test will be ever ",freq_test," epochs")
 except:
    freq_test=1
+   print("alpha_nes: test will be ever ",freq_test," epochs")
 accumul=0
 start_loc=time.time()
 for ep in range(restart_ep,ne):
-    #start=time.time()
-    #accumul=0
     losstot=tf.constant(0.,dtype='float32')
     vallosstot=tf.constant(0.,dtype='float32')
     vallosstote=tf.constant(0.,dtype='float32')
@@ -417,16 +415,13 @@ for ep in range(restart_ep,ne):
         if (max_buff>ang_buff):
             print("alpha_nes: found angular neighbours beyond the buffer (%d vs %d)"%(max_buff,ang_buff))
             sys.exit()
-        #print(time.time()-start)
-        #accumul=accumul+1
         nb=int(buffer_stream_tr/bs)
         for k in range(nb):
             start3=time.time()
             [loss,losse,loss_bound,lossf]=trainmeth(raddescr[k*bs:(k+1)*bs],angdescr[k*bs:(k+1)*bs],des3bsupp[k*bs:(k+1)*bs],intmap2b[k*bs:(k+1)*bs],intder2b[k*bs:(k+1)*bs],intmap3b[k*bs:(k+1)*bs],intder3b[k*bs:(k+1)*bs],intder3bsupp[k*bs:(k+1)*bs],numtriplet[k*bs:(k+1)*bs],e_map_tr[el][k*bs:(k+1)*bs],f_map_tr[el][k*bs:(k+1)*bs],pe,pf,pb)
-            #print("Time to compute train step ",time.time()-start3)
             lrnow=model.get_lrnet()
             lrnow2=model.get_lrphys()
-            print(np.sqrt(losse),np.sqrt(lossf),np.sqrt(loss_bound),file=lcurve_notmean)
+            print(losse,lossf,loss_bound,file=lcurve_notmean)
             lcurve_notmean.flush()
             lr_file.write(str(lrnow.numpy())+'\n')
             lr_file.flush()
@@ -462,14 +457,10 @@ for ep in range(restart_ep,ne):
        vallosstotf=vallosstotf/(k+1)/(numbuf+1)
 
 
-       #stop_ts=time.time()
-
        outfold_name=model_name+str(ep)
        model.save_model(outfold_name)
        np.savetxt(outfold_name+"/model_error",[np.sqrt(vallosstote),np.sqrt(vallosstotf)],header='RMSE_e  RMSE_f ')
        print(np.sqrt(vallosstote.numpy()),np.sqrt(vallosstotf.numpy()),losstot.numpy(),lrnow.numpy(),lrnow2.numpy(),sep=' ',end='\n',file=fileOU)
-       #stop=time.time()
-       #print(stop_tr-start,stop_ts-stop_tr,sep=' ',end='\n',file=out_time)
        print("Testing model at epoch ",ep," val_lossE ",np.sqrt(vallosstote.numpy())," val_lossF ",np.sqrt(vallosstotf.numpy())," loss_Tot ",losstot.numpy()," lr_net ",lrnow.numpy()," lr_finger ",lrnow2.numpy(),sep=' ',end='\n')
        print("We are at epoch ",ep)
        fileOU.flush()
