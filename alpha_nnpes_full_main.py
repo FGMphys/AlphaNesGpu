@@ -2,6 +2,12 @@ import os
 import time
 import sys
 
+import logging
+import absl.logging
+
+# Disabilita tutti i messaggi di avvertimento per il modulo absl
+absl.logging.set_verbosity("ERROR")
+
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 import numpy as np
@@ -421,7 +427,7 @@ for ep in range(restart_ep,ne):
             [loss,losse,loss_bound,lossf]=trainmeth(raddescr[k*bs:(k+1)*bs],angdescr[k*bs:(k+1)*bs],des3bsupp[k*bs:(k+1)*bs],intmap2b[k*bs:(k+1)*bs],intder2b[k*bs:(k+1)*bs],intmap3b[k*bs:(k+1)*bs],intder3b[k*bs:(k+1)*bs],intder3bsupp[k*bs:(k+1)*bs],numtriplet[k*bs:(k+1)*bs],e_map_tr[el][k*bs:(k+1)*bs],f_map_tr[el][k*bs:(k+1)*bs],pe,pf,pb)
             lrnow=model.get_lrnet()
             lrnow2=model.get_lrphys()
-            print(losse,lossf,loss_bound,file=lcurve_notmean)
+            print(losse.numpy(),lossf.numpy(),loss_bound.numpy(),file=lcurve_notmean)
             lcurve_notmean.flush()
             lr_file.write(str(lrnow.numpy())+'\n')
             lr_file.flush()
