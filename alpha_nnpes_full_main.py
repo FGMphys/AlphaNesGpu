@@ -112,7 +112,7 @@ def read_cutoff_info(full_param):
     rad_buff=int(full_param['Radial_Buffer'])
     rc_ang=float(full_param['Rc_Angular'])
     maxneigh=int(full_param['Max_Angular_Neigh'])
-    ang_buff=int(maxneigh*(maxneigh-1)/2) 
+    ang_buff=int(maxneigh*(maxneigh-1)/2)
     print("alpha_nes: Rc ",rc," Radial_Buffer ",rad_buff," Rc_Angular ",
            rc_ang,"Angular_Buffer ",ang_buff,"Hard cut-off ",rs)
     return [rc,rad_buff,rc_ang,ang_buff,rs]
@@ -373,7 +373,7 @@ else:
    lr_file=open("lr_step.dat",'w')
 
 model_name=full_param['model_name']
-if restart_par=='no' or restart_par=='only afs':
+if restart_par=='no' or restart_par=='only afs' or restart_par=='all_params':
     restart_ep=0
     os.mkdir(model_name)
     model.save_model_init(model_name)

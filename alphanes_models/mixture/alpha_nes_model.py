@@ -38,13 +38,14 @@ class alpha_nes_full(tf.Module):
         else:
              self.nets=[tf.keras.models.load_model(restart+'/net_model_type'+str(k))
                        for k in range(self.ntipos)]
-             with open(restart+'/opt_net_weights','rb') as source:
-                  weight_net=pickle.load(source)
-             self.opt_net_weights=weight_net
-             with open(restart+'/opt_phys_weights','rb') as source:
-                  weight_phys=pickle.load(source)
-             self.opt_phys_weights=weight_phys
-        res=[self.nets[k].compile() for k in range(self.ntipos)]         
+             if restart!='all_params':
+                with open(restart+'/opt_net_weights','rb') as source:
+                     weight_net=pickle.load(source)
+                self.opt_net_weights=weight_net
+                with open(restart+'/opt_phys_weights','rb') as source:
+                     weight_phys=pickle.load(source)
+                self.opt_phys_weights=weight_phys
+                #res=[self.nets[k].compile() for k in range(self.ntipos)]
         self.lossfunction=lossfunction
         self.val_loss=val_loss
 
@@ -207,7 +208,7 @@ class alpha_nes_full(tf.Module):
         grad_2b=[tf.gradients(loss,physlay.alpha2b) for physlay in self.physics_layer]
         grad_3b=[tf.gradients(loss,physlay.alpha3b) for physlay in self.physics_layer]
         grad_mu=[tf.gradients(loss,lognorm.mu) for lognorm in self.lognorm_layer]
-        
+
         all_net_grad=[grad_w[k][0] for k in range(nt)]
         all_net_param=[self.nets[k].trainable_variables[0] for k in range(nt)]
         self.opt_net.apply_gradients(zip(all_net_grad,all_net_param))
@@ -253,7 +254,7 @@ class alpha_nes_full(tf.Module):
                     for k in range(nt)]
         self.log_norm_projdes=[self.lognorm_layer[k](finger)
                          for k,finger in enumerate(self.fingerprint)]
-        
+
         self.energy=[self.nets[k](cp) for k,cp in enumerate(self.log_norm_projdes)]
         self.grad_ene=[tf.gradients(self.energy[k],cp) for k,cp in enumerate(self.fingerprint)]
 

@@ -54,20 +54,20 @@ def init_AFs_param(restart,full_param,nt,seed_par):
             vec[:,:2]=(np.random.rand((nalpha_a_arr[k,1]*nt_couple*2))*2*limit3b-limit3b).reshape((nalpha_a_arr[k,1]*nt_couple,2)).astype('float32')
             vec[:,2]=(np.random.rand((nalpha_a_arr[k,1]*nt_couple))*-10).reshape(nalpha_a_arr[k,1]*nt_couple).astype('float32')
             init_alpha3b.append(vec.reshape((nt_couple,nalpha_a_arr[k,1]*3)))
-        #Initialised Z for each AFS 
+        #Initialised Z for each AFS
         init_mu=[(np.random.rand(nalpha_r_arr[k,1]+nalpha_a_arr[k,1])*2*limit-limit).astype('float32')
                 for k in range(nt)]
         ###Initialize Ck parameters (only for mixtures)
         if nt>1:
-           initial_type_emb_2b=[(np.random.rand(nt*nalpha_r_arr[k,1])*5.).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
-           initial_type_emb_3b=[(np.random.rand(nt_couple*nalpha_a_arr[k,1])*5.).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float32') for k in range(nt)]
-           initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
+           #initial_type_emb_2b=[(np.random.rand(nt*nalpha_r_arr[k,1])*5.).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
+           #initial_type_emb_3b=[(np.random.rand(nt_couple*nalpha_a_arr[k,1])*5.).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float32') for k in range(nt)]
+           initial_type_emb=gen_map_type_AFs(full_param) #[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
         else:
            initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
            initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float32') for k in range(nt)]
            initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
     ##Initialise only afs by reading them from file. State of optimizer is started from scratch.
-    elif restart=='only afs':
+    elif restart=='only_afs' or restart=='all_params':
          afs_param=full_param['afs_param_folder']
          init_mu=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_mu.dat',dtype='float32') for k in range(nt)]
          init_alpha2b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_2body.dat',dtype='float32') for k in range(nt)]
