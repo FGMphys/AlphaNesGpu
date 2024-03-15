@@ -285,7 +285,7 @@ try:
         folders.sort(key=order_folder)
         restart_par=folders[-2]
         print("alpha_nes: Training will restart from last previous state ",restart_par)
-    elif restart_par=='only afs':
+    elif restart_par=='only_afs':
         print("alpha_nes: AFs will be initialised by user. Be sure to have defined afs_param_folder key.")
     else:
         restart_par='no'
@@ -296,7 +296,7 @@ except:
 restart=restart_par
 
 ##If we are not restarting, we initialiaze the optimizer and the learning rate
-if restart_par=='no' or restart_par=='only afs':
+if restart_par=='no' or restart_par=='only_afs':
     lr_net_param=full_param['lr_dense_net'].split()
     lr_net=build_learning_rate(lr_net_param,ne,nb,idx_str_tr.shape[0],'net',0)
 
@@ -360,7 +360,7 @@ model=alpha_nes_full(Physics_Layers,Force_Layer,nhl,nD,actfun,1,model_loss,
 #################################################################################
 
 bestval=10**5
-if restart_par!='no' and restart_par!='only afs':
+if restart_par!='no' and restart_par!='only_afs':
    fileOU=open('lcurve.out','a')
    print("alpha_nes: learning curve restart from ",restart_par)
    out_time=open("time_story_restart.dat",'a')
@@ -373,7 +373,7 @@ else:
    lr_file=open("lr_step.dat",'w')
 
 model_name=full_param['model_name']
-if restart_par=='no' or restart_par=='only afs' or restart_par=='all_params':
+if restart_par=='no' or restart_par=='only_afs' or restart_par=='all_params':
     restart_ep=0
     os.mkdir(model_name)
     model.save_model_init(model_name)
