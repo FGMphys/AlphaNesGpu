@@ -85,29 +85,25 @@ __global__ void alphagrad_ang_kernel(const float* radial_descriptor,const float*
         float a1dya2dj=expf(alpha1*dy+alpha2*dj);
         float btjy=expf(betaval*Tjy);
 
-	      grad_alpha_s[threadIdx.x].x=prevgradel*chtjy_par*(a1dja2dy*dj+a1dya2dj*dy)*btjy*Tjy/2.f;
+	grad_alpha_s[threadIdx.x].x=prevgradel*chtjy_par*(a1dja2dy*dj+a1dya2dj*dy)*btjy*Tjy/2.f;
         grad_alpha_s[threadIdx.x].y=prevgradel*chtjy_par*(a1dja2dy*dy+a1dya2dj*dj)*btjy*Tjy/2.f;
         grad_alpha_s[threadIdx.x].z=prevgradel*chtjy_par*(a1dja2dy+a1dya2dj)*btjy*Tjy*Tjy/2.f;
-        grad_ck_s[threadIdx.x]=prevgradel*Tjy*btjy*(a1dya2dj+a1dja2dy)/2.f;
 
 
 	}
+      }
      __syncthreads();
-
      if (threadIdx.x==0){
        for (int dd=0;dd<BLOCK_DIM;dd++){
            local_alpha.x+=grad_alpha_s[dd].x;
            local_alpha.y+=grad_alpha_s[dd].y;
            local_alpha.z+=grad_alpha_s[dd].z;
-           local_ck+=grad_ck_s[dd];
            }
-       atomicAdd((float*)&(next_emb3b_grad[req_sum*nsmooth_a+a1]),local_ck);
-       atomicAdd((float*)&(next_alpha3b_grad[req_sum*nsmooth_a*3+a1*3+0]),local_alpha.x);
-       atomicAdd((float*)&(next_alpha3b_grad[req_sum*nsmooth_a*3+a1*3+1]),local_alpha.y);
-       atomicAdd((float*)&(next_alpha3b_grad[req_sum*nsmooth_a*3+a1*3+2]),local_alpha.z);
+       atomicAdd((float*)&(next_alpha3b_grad[req_sum*nsmooth_a*3+req_alpha*3+0]),local_alpha.x);
+       atomicAdd((float*)&(next_alpha3b_grad[req_sum*nsmooth_a*3+req_alpha*3+1]),local_alpha.y);
+       atomicAdd((float*)&(next_alpha3b_grad[req_sum*nsmooth_a*3+req_alpha*3+2]),local_alpha.z);
      }
    }
- }
 }
 
 
@@ -129,7 +125,7 @@ void alphagrad_ang_Launcher(const float* radial_descriptor,const float* angular_
                                 nsmooth_a,next_alpha3b_grad,
                                 type_emb3b,type_map,
                                 next_emb3b_grad,num_triplet,req_alpha,req_sum));
-                           }
+		        }
 		 }
                    cudaDeviceSynchronize();
 }

@@ -11,7 +11,7 @@ static int BLOCK_DIM;
 void init_block_dim(int buffdim){
      int i;
      for (i=buffdim;i>0;i--){
-         if ((buffdim%i==0) & (i<512)){
+         if ((buffdim%i==0) && (i<512)){
             BLOCK_DIM=i;
             i=0;
 	    }

@@ -6,7 +6,7 @@
 #include "tensorflow/core/util/gpu_launch_config.h"
 
 
-#define BLOCK_DIM 80
+#define BLOCK_DIM 50
 
 __global__ void alphagrad_dist_kernel(const float* radial_descriptor,int nr,
 const float* alpha2b_parameters,int nalpha_r,int dimbat,int N_local,

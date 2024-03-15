@@ -51,14 +51,14 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
     int t=blockIdx.x*blockDim.x+threadIdx.x;
 
 
-    extern __shared__ float3 grad_alpha_s[];
-    extern __shared__ float grad_net_s[];
-    grad_alpha_s[threadIdx.x].x=0.f;
-    grad_alpha_s[threadIdx.x].y=0.f;
-    grad_alpha_s[threadIdx.x].z=0.f;
+    extern __shared__ float4 allgrad[];
+    allgrad[threadIdx.x].x=0.f;
+    allgrad[threadIdx.x].y=0.f;
+    allgrad[threadIdx.x].z=0.f;
 
 
-    grad_net_s[threadIdx.x]=0.f;
+    allgrad[threadIdx.x].w=0.f;
+
 
     float3 local_alpha= {0.f, 0.f, 0.f};
     float local_ck= 0.f;
@@ -177,24 +177,24 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
                     accumulate_5+=-prevgrad_loc*0.5f*NGel*(grad_beta_xij+grad_beta_xik)+prevgrad_neighj*0.5f*NGel*grad_beta_xij+prevgrad_neighk*0.5f*NGel*grad_beta_xik;
                }
 
-               grad_net_s[threadIdx.x]=accumulate_1;
-	       grad_alpha_s[threadIdx.x].x=accumulate_3;
+               allgrad[threadIdx.x].w=accumulate_1;
+	       allgrad[threadIdx.x].x=accumulate_3;
 
-	       grad_alpha_s[threadIdx.x].y=accumulate_4;
-	       grad_alpha_s[threadIdx.x].z=accumulate_5;
+	       allgrad[threadIdx.x].y=accumulate_4;
+	       allgrad[threadIdx.x].z=accumulate_5;
 
 	     }
 
-
+            }
     __syncthreads();
 //Il thread zero deve essere usato fuori dagli if. Infatti se la prima tripletta
 //è tipo sum=1 e io sto calcolando req_sum=0 non entra nel loop e non fa la riduzione
     if (threadIdx.x==0){
        for (int dd=0;dd<BLOCK_DIM;dd++){
-           local_alpha.x+=grad_alpha_s[dd].x;
-           local_alpha.y+=grad_alpha_s[dd].y;
-           local_alpha.z+=grad_alpha_s[dd].z;
-           local_net+=grad_net_s[dd];
+           local_alpha.x+=allgrad[dd].x;
+           local_alpha.y+=allgrad[dd].y;
+           local_alpha.z+=allgrad[dd].z;
+           local_net+=allgrad[dd].w;
            }
        atomicAdd((float*)&(gradnet_3b_T_d[actgrad+req_alpha]),local_net);
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].x),local_alpha.x);
@@ -202,7 +202,6 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].z),local_alpha.z);
       }
      }
-   }
 }
 
 
@@ -222,7 +221,7 @@ void gradforce_tripl_Launcher(const float*  prevgrad_T_d,const float*  netderiv_
     for (int req_alpha=0;req_alpha<num_finger;req_alpha++){
 	for (int req_sum=0;req_sum<nt_couple;req_sum++){
     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(gradforce_tripl_kernel,dimGrid,
-                dimBlock, BLOCK_DIM*(sizeof(float3)+sizeof(float)), nullptr,prevgrad_T_d,netderiv_T_d,desr_T_d,desa_T_d,
+                dimBlock, BLOCK_DIM*sizeof(float4), nullptr,prevgrad_T_d,netderiv_T_d,desr_T_d,desa_T_d,
                 intderiv_r_T_d,intderiv_a_T_d,intmap_r_T_d,
                 intmap_a_T_d,nr,na,N,dimbat,num_finger,
                 type_emb3b_d,nt,tipos_T,actual_type,
@@ -234,6 +233,7 @@ void gradforce_tripl_Launcher(const float*  prevgrad_T_d,const float*  netderiv_
     cudaDeviceSynchronize();
 
 }
+
 __global__ void set_tensor_to_zero_float_kernel(float* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
 
