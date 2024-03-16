@@ -23,7 +23,7 @@ class alpha_nes_full(tf.Module):
         self.force_layer=force_layer
 
 
-        if restart=='no' or restart=='only afs':
+        if restart=='no' or restart=='only_afs':
             self.nhl=num_layers
             self.node=node_seq
             self.actfun=actfun
