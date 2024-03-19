@@ -40,8 +40,8 @@ def init_AFs_param(restart,full_param,nt,seed_par):
     limit=alpha_bound
     limit3b=alpha_bound
     if restart=='no':
-        nalpha_r_list=full_param['dimension_encoder_2body'].split()
-        nalpha_a_list=full_param['dimension_encoder_3body'].split()
+        nalpha_r_list=full_param['Total_number_radial_AFs'].split()
+        nalpha_a_list=full_param['Total_number_angular_AFs'].split()
 
         nalpha_r_arr=np.array([int(k) for k in nalpha_r_list]).reshape((nt,2))
         nalpha_a_arr=np.array([int(k) for k in nalpha_a_list]).reshape((nt,2))
@@ -59,9 +59,7 @@ def init_AFs_param(restart,full_param,nt,seed_par):
                 for k in range(nt)]
         ###Initialize Ck parameters (only for mixtures)
         if nt>1:
-           #initial_type_emb_2b=[(np.random.rand(nt*nalpha_r_arr[k,1])*5.).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
-           #initial_type_emb_3b=[(np.random.rand(nt_couple*nalpha_a_arr[k,1])*5.).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float32') for k in range(nt)]
-           initial_type_emb=gen_map_type_AFs(full_param) #[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
+           initial_type_emb=gen_map_type_AFs(full_param)
         else:
            initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
            initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float32') for k in range(nt)]
@@ -83,8 +81,8 @@ def init_AFs_param(restart,full_param,nt,seed_par):
            initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float32') for k in range(nt)]
            initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
     else:
-        init_alpha2b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_2body.dat',dtype='float32').reshape((nt,-1)) for k in range(nt)]
-        init_alpha3b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_3body.dat',dtype='float32').reshape((nt,-1)) for k in range(nt)]
+        init_alpha2b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_2body.dat',dtype='float32') for k in range(nt)]
+        init_alpha3b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_3body.dat',dtype='float32') for k in range(nt)]
         nalpha_r_arr=np.array([[k,init_alpha2b[k].shape[1]] for k in range(nt)])
         nalpha_a_arr=np.array([[k,int(init_alpha3b[k].shape[1]/3)] for k in range(nt)])
         init_mu=[np.loadtxt(restart+'/type'+str(k)+'_alpha_mu.dat',dtype='float32') for k in range(nt)]
