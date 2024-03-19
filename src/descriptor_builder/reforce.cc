@@ -263,7 +263,7 @@ class ComputeDescriptorsLightOp : public OpKernel {
         {
           printf("Buffer radiale saturato by \n");
 	  printf("Particle %d at frame %d with %d neighbours \n",i,ii,Ime->howmany[i]);
-          assert(0);
+          fflush(stdout);
         }
       }
 
