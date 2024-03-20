@@ -20,12 +20,16 @@ def gen_map_type_AFs(full_param):
     map_ang_afs=full_param['map_ang_afs']
     nt=len(map_rad_afs)
     nt_couple=int(nt*(nt+1)/2)
-    tot_rad_afs=[sum(map_rad_afs[k]) for k in range(nt)]
-    tot_ang_afs=[sum(map_ang_afs[k]) for k in range(nt)]
+    tot_rad_afs=[[k,sum(map_rad_afs[k])] for k in range(nt)]
+    tot_ang_afs=[[k,sum(map_ang_afs[k])] for k in range(nt)]
+
+    tot_rad_afs_arr=np.array(tot_rad_afs).reshape((nt,2))
+    tot_ang_afs_arr=np.array(tot_ang_afs).reshape((nt,2))
     type_emb2b=[filtered_matrix(map_rad_afs[tt]) for tt in range(nt)]
     type_emb3b=[filtered_matrix(map_ang_afs[tt]) for tt in range(nt)]
     type_emb=[[type_emb2b[k],type_emb3b[k]] for k in range(nt)]
-    return type_emb
+    return tot_rad_afs_arr,tot_ang_afs_arr,type_emb
+
 
 ###Initialize alphas
 def init_AFs_param(restart,full_param,nt,seed_par):
@@ -40,11 +44,14 @@ def init_AFs_param(restart,full_param,nt,seed_par):
     limit=alpha_bound
     limit3b=alpha_bound
     if restart=='no':
-        nalpha_r_list=full_param['Total_number_radial_AFs'].split()
-        nalpha_a_list=full_param['Total_number_angular_AFs'].split()
+        #nalpha_r_list=full_param['Total_number_radial_AFs'].split()
+        #nalpha_a_list=full_param['Total_number_angular_AFs'].split()
 
-        nalpha_r_arr=np.array([int(k) for k in nalpha_r_list]).reshape((nt,2))
-        nalpha_a_arr=np.array([int(k) for k in nalpha_a_list]).reshape((nt,2))
+        #nalpha_r_arr=np.array([int(k) for k in nalpha_r_list]).reshape((nt,2))
+        #nalpha_a_arr=np.array([int(k) for k in nalpha_a_list]).reshape((nt,2))
+
+        [nalpha_r_arr,nalpha_a_arr,initial_type_emb]=gen_map_type_AFs(full_param)
+        
         ###Initialize radial AFS parameters
         init_alpha2b=[(np.random.rand((nalpha_r_arr[k,1]*nt))*2*limit-limit).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
         ###Initialize angular AFS parameters
@@ -58,12 +65,14 @@ def init_AFs_param(restart,full_param,nt,seed_par):
         init_mu=[(np.random.rand(nalpha_r_arr[k,1]+nalpha_a_arr[k,1])*2*limit-limit).astype('float32')
                 for k in range(nt)]
         ###Initialize Ck parameters (only for mixtures)
+        '''
         if nt>1:
-           initial_type_emb=gen_map_type_AFs(full_param)
+           initial_type_emb=gen_map_type_AFs(full_param) #[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
         else:
            initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
            initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float32') for k in range(nt)]
            initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
+        '''
     ##Initialise only afs by reading them from file. State of optimizer is started from scratch.
     elif restart=='only_afs' or restart=='all_params':
          afs_param=full_param['afs_param_folder']
