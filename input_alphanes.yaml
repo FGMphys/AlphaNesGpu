@@ -29,8 +29,6 @@ Rc_Angular: 4.5
 Max_Angular_Neigh: 55
 
 #AFs parameter
-Total_number_radial_AFs: 0 10 1 10
-Total_number_angular_AFs: 0 60 1 60
 map_rad_afs: {0: [10,10],1: [10,10]}
 map_ang_afs: {0: [20,20,20],1: [20,20,20]}
 
