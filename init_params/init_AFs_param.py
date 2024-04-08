@@ -77,8 +77,8 @@ def init_AFs_param(restart,full_param,nt,seed_par):
     elif restart=='only_afs' or restart=='all_params':
          afs_param=full_param['afs_param_folder']
          init_mu=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_mu.dat',dtype='float32') for k in range(nt)]
-         init_alpha2b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_2body.dat',dtype='float32') for k in range(nt)]
-         init_alpha3b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_3body.dat',dtype='float32') for k in range(nt)]
+         init_alpha2b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_2body.dat',dtype='float32').reshape((nt,-1)) for k in range(nt)]
+         init_alpha3b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_3body.dat',dtype='float32').reshape((nt_couple,-1)) for k in range(nt)]
          nalpha_r_arr=np.array([[k,init_alpha2b[k].shape[1]] for k in range(nt)])
          nalpha_a_arr=np.array([[k,int(init_alpha3b[k].shape[1]/3)] for k in range(nt)])
          if nt>1:
@@ -90,8 +90,8 @@ def init_AFs_param(restart,full_param,nt,seed_par):
            initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float32') for k in range(nt)]
            initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
     else:
-        init_alpha2b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_2body.dat',dtype='float32') for k in range(nt)]
-        init_alpha3b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_3body.dat',dtype='float32') for k in range(nt)]
+        init_alpha2b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_2body.dat',dtype='float32').reshape((nt,-1)) for k in range(nt)]
+        init_alpha3b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_3body.dat',dtype='float32').reshape((nt_couple,-1)) for k in range(nt)]
         nalpha_r_arr=np.array([[k,init_alpha2b[k].shape[1]] for k in range(nt)])
         nalpha_a_arr=np.array([[k,int(init_alpha3b[k].shape[1]/3)] for k in range(nt)])
         init_mu=[np.loadtxt(restart+'/type'+str(k)+'_alpha_mu.dat',dtype='float32') for k in range(nt)]
