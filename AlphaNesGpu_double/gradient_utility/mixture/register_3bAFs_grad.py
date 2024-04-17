@@ -4,7 +4,7 @@ from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import sparse_ops
 
-root_path='/leonardo/pub/userexternal/fguidare/AlphaNesGpu_double'
+root_path='/home/francegm/AlphaNesGpu/AlphaNesGpu_double'
 module_alpha3body_grad = tf.load_op_library(root_path+'/src/mixture/grad_finger/ang/reforce.so')
 
 @ops.RegisterGradient("ComputeSortProj3body")

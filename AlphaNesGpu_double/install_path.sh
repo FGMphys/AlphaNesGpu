@@ -1,4 +1,11 @@
 #!/bin/sh
+
+NVCC_PATH="/usr/local/cuda/bin/nvcc"
+GPP_PATH="/usr/bin/g++"
+CUDA_LIB64_PATH="/usr/local/cuda/lib64"
+CUDA_INCLUDE_PATH="/usr/local/cuda/include"
+
+
 actual_path=$(pwd)
 
 sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' source_routine/descriptor_builder.py
@@ -12,22 +19,25 @@ sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' gradient_utility/mixtu
 sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' debug_mode/debug_alpha_force.py
 
 
-#cd src/mixture
-#echo Compiling for mixtures
-#for folder in $(ls -d *)
-#do
-#echo Compiling folder $folder radial 
-#cd $folder'/rad'
-#bash compila.sh ubu
-#cd ../..
-#echo Compiling folder $folder radial
-#cd $folder'/ang'
-#bash compila.sh ubu
-#cd ../..
-#done
-#
-#cd ..
-#cd descriptor_builder
-#echo Compiling Descriptors
-#bash compila.sh ubu
-#cd ../../..
+
+cd src
+cd descriptor_builder
+echo Compiling Descriptors
+bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH
+cd ../..
+
+cd src/mixture
+echo Compiling for mixtures
+for folder in $(ls -d *)
+do
+echo Compiling folder $folder radial 
+cd $folder'/rad'
+bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH
+cd ../..
+echo Compiling folder $folder radial
+cd $folder'/ang'
+bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH
+cd ../..
+done
+
+cd ..

@@ -228,7 +228,7 @@ class alpha_nes_full(tf.Module):
         self.opt_phys.apply_gradients(zip(all_AFS_grad,
                                               all_AFs_param))
         self.global_step=self.global_step+1
-        return loss,loss_energy,loss_bound,loss_force
+        return loss,loss_energy,loss_bound,loss_force,grad_2b,grad_3b,grad_w
 
     @tf.function()
     def full_test_e_f(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,intder3bsupp,
