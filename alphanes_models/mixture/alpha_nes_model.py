@@ -94,24 +94,34 @@ class alpha_nes_full(tf.Module):
         grad_2b=[tf.gradients(loss,physlay.alpha2b) for physlay in self.physics_layer]
         grad_3b=[tf.gradients(loss,physlay.alpha3b) for physlay in self.physics_layer]
         grad_mu=[tf.gradients(loss,lognorm.mu) for lognorm in self.lognorm_layer]
-        all_net_grad=[grad_w[k][0] for k in range(nt)]
-        all_net_param=[self.nets[k].trainable_variables[0] for k in range(nt)]
-        self.opt_net.apply_gradients(zip(all_net_grad,all_net_param))
 
-        all_AFs_param=[self.physics_layer[k].alpha2b for k in range(nt)]
+        ########MODIFICA 19.04: SOLVE BUG ONLY FIRST HIDDEN ###########
+        #all_net_grad=[grad_w[k] for k in range(nt)]
+        #all_net_param=[self.nets[k].trainable_variables for k in range(nt)]
+        grads_and_vars_net=[]
         for k in range(nt):
-            all_AFs_param.append(self.physics_layer[k].alpha3b)
-        for k in range(nt):
-            all_AFs_param.append(self.lognorm_layer[k].mu)
+            grad_var_pairs = [(grad, param) for grad, param in zip(grad_w[k], self.nets[k].trainable_variables)]
+            grads_and_vars_net.extend(grad_var_pairs)
+        #self.opt_net.apply_gradients(grads_and_vars_net)
+#        self.opt_net.apply_gradients(zip(all_net_grad,all_net_param))
+        grads_and_vars_afs = []
 
-        all_AFS_grad=[grad_2b[k][0] for k in range(nt)]
         for k in range(nt):
-            all_AFS_grad.append(grad_3b[k][0])
-        for k in range(nt):
-            all_AFS_grad.append(grad_mu[k][0])
-        self.opt_phys.apply_gradients(zip(all_AFS_grad,
-                                              all_AFs_param))
+            # Aggiungi i gradienti per alpha2b
+            grads_and_vars_afs.extend([(grad_2b[k][0], self.physics_layer[k].alpha2b)])
+
+            # Aggiungi i gradienti per alpha3b
+            grads_and_vars_afs.extend([(grad_3b[k][0], self.physics_layer[k].alpha3b)])
+
+            # Aggiungi i gradienti per mu
+            grads_and_vars_afs.extend([(grad_mu[k][0], self.lognorm_layer[k].mu)])
+
+        grads_and_vars_all = grads_and_vars_afs + grads_and_vars_net
+
+        self.opt_net.apply_gradients(grads_and_vars_all)
+        
         self.global_step=self.global_step+1
+        ######## FINE MODIFICA 19.04: SOLVE BUG ONLY FIRST HIDDEN ###########
         return loss_force+loss_energy,loss_force,loss_energy
 
     @tf.function()
@@ -209,25 +219,34 @@ class alpha_nes_full(tf.Module):
         grad_3b=[tf.gradients(loss,physlay.alpha3b) for physlay in self.physics_layer]
         grad_mu=[tf.gradients(loss,lognorm.mu) for lognorm in self.lognorm_layer]
 
-        all_net_grad=[grad_w[k][0] for k in range(nt)]
-        all_net_param=[self.nets[k].trainable_variables[0] for k in range(nt)]
-        self.opt_net.apply_gradients(zip(all_net_grad,all_net_param))
+        ########MODIFICA 19.04: SOLVE BUG ONLY FIRST HIDDEN ###########
+        #all_net_grad=[grad_w[k] for k in range(nt)]
+        #all_net_param=[self.nets[k].trainable_variables for k in range(nt)]
+        grads_and_vars_net=[]
+        for k in range(nt):
+            grad_var_pairs = [(grad, param) for grad, param in zip(grad_w[k], self.nets[k].trainable_variables)]
+            grads_and_vars_net.extend(grad_var_pairs)
+        #self.opt_net.apply_gradients(grads_and_vars_net)
+#        self.opt_net.apply_gradients(zip(all_net_grad,all_net_param))
+        grads_and_vars_afs = []
 
+        for k in range(nt):
+            # Aggiungi i gradienti per alpha2b
+            grads_and_vars_afs.extend([(grad_2b[k][0], self.physics_layer[k].alpha2b)])
 
-        all_AFs_param=[self.physics_layer[k].alpha2b for k in range(nt)]
-        for k in range(nt):
-            all_AFs_param.append(self.physics_layer[k].alpha3b)
-        for k in range(nt):
-            all_AFs_param.append(self.lognorm_layer[k].mu)
+            # Aggiungi i gradienti per alpha3b
+            grads_and_vars_afs.extend([(grad_3b[k][0], self.physics_layer[k].alpha3b)])
 
-        all_AFS_grad=[grad_2b[k][0] for k in range(nt)]
-        for k in range(nt):
-            all_AFS_grad.append(grad_3b[k][0])
-        for k in range(nt):
-            all_AFS_grad.append(grad_mu[k][0])
-        self.opt_phys.apply_gradients(zip(all_AFS_grad,
-                                              all_AFs_param))
+            # Aggiungi i gradienti per mu
+            grads_and_vars_afs.extend([(grad_mu[k][0], self.lognorm_layer[k].mu)])
+
+        grads_and_vars_all = grads_and_vars_afs + grads_and_vars_net
+
+        self.opt_net.apply_gradients(grads_and_vars_all)
+        
         self.global_step=self.global_step+1
+        ######## FINE MODIFICA 19.04: SOLVE BUG ONLY FIRST HIDDEN ###########
+
         return loss,loss_energy,loss_bound,loss_force
 
     @tf.function()

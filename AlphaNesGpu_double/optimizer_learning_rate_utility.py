@@ -7,6 +7,8 @@ import tensorflow.keras.optimizers.schedules as optsch
 import tensorflow.keras.experimental as tfexp
 import tensorflow.keras.optimizers as tfopt
 
+tf.keras.backend.set_floatx('float64')
+
 def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
     if param[0]=='expdec':
        tf=ne*buffer_stream_tr
@@ -27,7 +29,7 @@ def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
 
     elif param[0]=='cosann':
         try:
-            initial_learning_rate=float(param[1])
+            initial_learning_rate=np.float64(float(param[1]))
         except:
             initial_learning_rate=0.01
         try:
@@ -35,15 +37,15 @@ def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
         except:
             first_decay_steps=int(2*nb*buffer_stream_tr)
         try:
-            t_mul=float(param[3])
+            t_mul=np.float64(float(param[3]))
         except:
             t_mul=2.0
         try:
-            m_mul=float(param[4])
+            m_mul=np.float64(float(param[4]))
         except:
             m_mul=1.0
         try:
-            alpha=float(param[5])
+            alpha=np.float64(float(param[5]))
         except:
             alpha=0.0
         if num_call==0:
@@ -53,8 +55,10 @@ def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
             print("alpha_nes: ",name," t_mul set to ",t_mul,sep=' ',end='\n')
             print("alpha_nes: ",name," m_mul set to",m_mul,sep=' ',end='\n')
             print("alpha_nes: ",name," alpha set to",alpha,sep=' ',end='\n')
-        lr_built=tfexp.CosineDecayRestarts(initial_learning_rate,first_decay_steps,t_mul=t_mul,
+        lr_built=optsch.CosineDecayRestarts(initial_learning_rate,first_decay_steps,t_mul=t_mul,
                           m_mul=m_mul,alpha=alpha,name=None)
+        #tfexp.CosineDecayRestarts(initial_learning_rate,first_decay_steps,t_mul=t_mul,
+                          #m_mul=m_mul,alpha=alpha,name=None)
 
     else:
         sys.exit("alpha_nes: learning rate can be expdec or cosann.")
