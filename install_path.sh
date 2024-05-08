@@ -1,9 +1,9 @@
 #!/bin/sh
 
-NVCC_PATH="/usr/local/cuda/bin/nvcc"
-GPP_PATH="/usr/bin/g++"
-CUDA_LIB64_PATH="/usr/local/cuda/lib64"
-CUDA_INCLUDE_PATH="/usr/local/cuda/include"
+NVCC_PATH="put here full path to nvcc compiler"
+GPP_PATH="put here full path to g++ compiler"
+CUDA_LIB64_PATH="put here full path to cuda/lib64"
+CUDA_INCLUDE_PATH="put here full path to cuda/include"
 
 
 actual_path=$(pwd)
