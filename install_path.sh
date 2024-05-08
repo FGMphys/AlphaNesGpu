@@ -16,8 +16,6 @@ sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' gradient_utility/mixtu
 sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' gradient_utility/mixture/register_force_2bAFs_grad.py
 sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' gradient_utility/mixture/register_force_3bAFs_grad.py
 
-sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' debug_mode/debug_alpha_force.py
-
 
 
 cd src
