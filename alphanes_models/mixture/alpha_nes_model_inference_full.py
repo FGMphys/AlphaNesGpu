@@ -43,7 +43,7 @@ class alpha_nes_full_inference(tf.Module):
           if self.ntipos==1:
              self.nt_couple=1
           else:
-             self.nt_couple=int(self.ntipos*(self.ntipos-1)/2)
+             self.nt_couple=int(self.ntipos*(self.ntipos+1)/2)
           print("Model 4")
           print("Alpha_inference: Found ",self.ntipos," types of atoms")
           print("Alpha_inference: Found ",self.N," atoms")

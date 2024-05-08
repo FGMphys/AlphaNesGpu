@@ -7,7 +7,7 @@ from source_routine.mixture.physics_layer_mod import physics_layer
 from source_routine.mixture.physics_layer_mod import lognorm_layer
 from source_routine.descriptor_builder import descriptor_layer
 from source_routine.mixture.force_layer_mod import force_debug_layer
-print("alpha_nes: Inference of AlphaNesGPU")
+print("alpha_nes: Inference of AlphaNesGPU_double full")
 
 def make_typemap(tipos):
     num=0
@@ -43,7 +43,7 @@ class alpha_nes_full_inference(tf.Module):
           if self.ntipos==1:
              self.nt_couple=1
           else:
-             self.nt_couple=int(self.ntipos*(self.ntipos-1)/2)
+             self.nt_couple=int(self.ntipos*(self.ntipos+1)/2)
           print("Model 4")
           print("Alpha_inference: Found ",self.ntipos," types of atoms")
           print("Alpha_inference: Found ",self.N," atoms")
@@ -67,6 +67,7 @@ class alpha_nes_full_inference(tf.Module):
                initial_type_emb2b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_2b.dat',dtype='float64') for k in range(self.ntipos)]
                initial_type_emb3b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_3b.dat',dtype='float64') for k in range(self.ntipos)]
                initial_type_emb=[[initial_type_emb2b[k],initial_type_emb3b[k]] for k in range(self.ntipos)]
+          
           self.physics_layer=[physics_layer(init_alpha2b[k],init_alpha3b[k],
                        initial_type_emb[k]) for k in range(self.ntipos)]
 
@@ -119,7 +120,6 @@ class alpha_nes_full_inference(tf.Module):
                                  self.physics_layer[k].type_emb_3b,
                                  self.type_map,self.tipos,k) for k in range(nt)]
 
-          self.force=tf.math.add_n(self.force_list[:][0])
           
-          info="self.totenergy,self.force_list,self.grad_listed,self.fingerprint,self.x2b,self.x3b,self.x3bsupp,self.int2b,self.int3b,self.intder2b,self.intder3b,self.intder3bsupp"
+          info="self.totenergy,self.force_list,self.grad_listed,self.fingerprint,self.x2b,self.x3b,self.x3bsupp,self.int2b,self.int3b,self.intder2b,self.intder3b,self.intder3bsupp,force"
           return self.totenergy,self.force_list,self.grad_listed,self.fingerprint,self.x2b,self.x3b,self.x3bsupp,self.int2b,self.int3b,self.intder2b,self.intder3b,self.intder3bsupp,info
