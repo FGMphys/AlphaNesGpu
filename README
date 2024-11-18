@@ -1,5 +1,0 @@
-attualmente 23 sec a epoca con dataset di 160 frames training e 40 test di 1000 particelle e sono necessarie 2100 epoche quindi 13.5 ore. 
-
-oppure per eccesso:
-
-0.57 secondi a step
