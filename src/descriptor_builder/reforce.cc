@@ -66,7 +66,7 @@ void construct_repulsion(){
     float f=0.5*(cos(PI*rs/rc)+1);
     float f1=-0.5*PI/rc*sin(PI*rs/rc);
     float f2_red=-0.5*SQR(PI/rc)*cos(PI*rs/rc)*SQR(rs);
-    float gamma_red=1./(alpha-beta)*alpha-Power(rs,alpha);
+    float gamma_red=1./(alpha-beta)*alpha-1;
     float delta_red=1./(alpha-beta)*(f*(alpha-beta)-f1*rs-f*alpha);
     float eta_red=-alpha/(alpha-beta);
     float epsilon_red=1./(alpha-beta)*(rs*f1+alpha*f);
