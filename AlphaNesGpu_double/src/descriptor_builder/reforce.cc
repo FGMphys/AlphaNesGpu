@@ -66,7 +66,7 @@ void construct_repulsion(){
     double f=0.5*(cos(PI*rs/rc)+1);
     double f1=-0.5*PI/rc*sin(PI*rs/rc);
     double f2_red=-0.5*SQR(PI/rc)*cos(PI*rs/rc)*SQR(rs);
-    double gamma_red=1./(alpha-beta)*alpha-Power(rs,alpha);
+    double gamma_red=1./(alpha-beta)*alpha-1;
     double delta_red=1./(alpha-beta)*(f*(alpha-beta)-f1*rs-f*alpha);
     double eta_red=-alpha/(alpha-beta);
     double epsilon_red=1./(alpha-beta)*(rs*f1+alpha*f);
