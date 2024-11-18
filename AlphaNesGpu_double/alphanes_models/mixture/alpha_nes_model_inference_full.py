@@ -121,5 +121,5 @@ class alpha_nes_full_inference(tf.Module):
                                  self.type_map,self.tipos,k) for k in range(nt)]
 
           
-          info="self.totenergy,self.force_list,self.grad_listed,self.fingerprint,self.x2b,self.x3b,self.x3bsupp,self.int2b,self.int3b,self.intder2b,self.intder3b,self.intder3bsupp,force"
+          info="self.totenergy,self.force_list,self.grad_listed,self.fingerprint,self.x2b,self.x3b,self.x3bsupp,self.int2b,self.int3b,self.intder2b,self.intder3b,self.intder3bsupp"
           return self.totenergy,self.force_list,self.grad_listed,self.fingerprint,self.x2b,self.x3b,self.x3bsupp,self.int2b,self.int3b,self.intder2b,self.intder3b,self.intder3bsupp,info

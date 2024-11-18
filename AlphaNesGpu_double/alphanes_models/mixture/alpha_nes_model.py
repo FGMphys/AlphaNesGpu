@@ -88,13 +88,13 @@ class alpha_nes_full(tf.Module):
         loss_bound=tf.add_n(loss_bound_2b)+tf.add_n(loss_bound_3b)
 
         loss_energy=self.lossfunction(self.totenergy,etrue)
-        loss_force=tf.constant(0.,dtype='float64')
+        loss_force=tf.constant(0.,dtype='float32')
         loss=pe*loss_energy+pb*loss_bound
         grad_w=[tf.gradients(loss,net.trainable_variables) for net  in  self.nets]
         grad_2b=[tf.gradients(loss,physlay.alpha2b) for physlay in self.physics_layer]
         grad_3b=[tf.gradients(loss,physlay.alpha3b) for physlay in self.physics_layer]
         grad_mu=[tf.gradients(loss,lognorm.mu) for lognorm in self.lognorm_layer]
-        
+
         ########MODIFICA 19.04: SOLVE BUG ONLY FIRST HIDDEN ###########
         #all_net_grad=[grad_w[k] for k in range(nt)]
         #all_net_param=[self.nets[k].trainable_variables for k in range(nt)]
@@ -122,7 +122,6 @@ class alpha_nes_full(tf.Module):
         
         self.global_step=self.global_step+1
         ######## FINE MODIFICA 19.04: SOLVE BUG ONLY FIRST HIDDEN ###########
-
         return loss_force+loss_energy,loss_force,loss_energy
 
     @tf.function()
@@ -153,7 +152,7 @@ class alpha_nes_full(tf.Module):
 
 
         loss_energy=self.val_loss(self.totenergy,etrue)
-        loss_force=tf.constant(0.,dtype='float64')
+        loss_force=tf.constant(0.,dtype='float32')
         loss=loss_energy+loss_force
 
         return loss, loss_force,loss_energy
@@ -234,10 +233,10 @@ class alpha_nes_full(tf.Module):
         for k in range(nt):
             # Aggiungi i gradienti per alpha2b
             grads_and_vars_afs.extend([(grad_2b[k][0], self.physics_layer[k].alpha2b)])
-            
+
             # Aggiungi i gradienti per alpha3b
             grads_and_vars_afs.extend([(grad_3b[k][0], self.physics_layer[k].alpha3b)])
-            
+
             # Aggiungi i gradienti per mu
             grads_and_vars_afs.extend([(grad_mu[k][0], self.lognorm_layer[k].mu)])
 
@@ -247,7 +246,8 @@ class alpha_nes_full(tf.Module):
         
         self.global_step=self.global_step+1
         ######## FINE MODIFICA 19.04: SOLVE BUG ONLY FIRST HIDDEN ###########
-        return loss,loss_energy,loss_bound,loss_force,grad_2b,grad_3b,grad_mu,grad_w,[self.physics_layer[0].alpha2b,self.physics_layer[0].alpha3b,self.lognorm_layer[0].mu,self.nets[0].trainable_variables[0]]
+
+        return loss,loss_energy,loss_bound,loss_force
 
     @tf.function()
     def full_test_e_f(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,intder3bsupp,
@@ -324,6 +324,9 @@ class alpha_nes_full(tf.Module):
         for k,net in enumerate(self.nets):
             net.save(folder_ou+'/init_net_model_type'+str(k),overwrite=True)
 
+    def build_opt_weights(self):
+        self.opt_phys.build(self.opt_phys_weights)
+        self.opt_net.build(self.opt_net_weights)
     def set_opt_weight(self):
         self.opt_phys.set_weights(self.opt_phys_weights)
         self.opt_net.set_weights(self.opt_net_weights)
