@@ -13,13 +13,13 @@ def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
     if param[0]=='expdec':
        tf=ne*buffer_stream_tr
        try:
-           initial_learning_rate=float(param[1])
+           initial_learning_rate=np.float64(float(param[1]))
        except:
-           initial_learning_rate=0.001
+           initial_learning_rate=np.float64(0.001)
        try:
-           final_learning_rate=float(param[2])
+           final_learning_rate=np.float64(float(param[2]))
        except:
-           final_learning_rate=10**(-7)
+           final_learning_rate=np.float64(10**(-7))
        if num_call==0:
            print("alpha_nes: ",name," learning rate decay is set to exponential decay.",sep=' ',end='\n')
            print("alpha_nes: ",name," initial learning rate set to",initial_learning_rate,sep=' ',end='\n')
@@ -31,7 +31,7 @@ def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
         try:
             initial_learning_rate=np.float64(float(param[1]))
         except:
-            initial_learning_rate=0.01
+            initial_learning_rate=np.float64(0.01)
         try:
             first_decay_steps=int(float(param[2])*nb*buffer_stream_tr)
         except:
@@ -39,15 +39,15 @@ def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
         try:
             t_mul=np.float64(float(param[3]))
         except:
-            t_mul=2.0
+            t_mul=np.float64(2.0)
         try:
             m_mul=np.float64(float(param[4]))
         except:
-            m_mul=1.0
+            m_mul=np.float64(1.0)
         try:
             alpha=np.float64(float(param[5]))
         except:
-            alpha=0.0
+            alpha=np.float64(0.0)
         if num_call==0:
             print("alpha_nes: ",name," learning rate decay is set to cosine annealing.",sep=' ',end='\n')
             print("alpha_nes: ",name," initial learning rate set to",initial_learning_rate,sep=' ',end='\n')
@@ -57,8 +57,6 @@ def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
             print("alpha_nes: ",name," alpha set to",alpha,sep=' ',end='\n')
         lr_built=optsch.CosineDecayRestarts(initial_learning_rate,first_decay_steps,t_mul=t_mul,
                           m_mul=m_mul,alpha=alpha,name=None)
-        #tfexp.CosineDecayRestarts(initial_learning_rate,first_decay_steps,t_mul=t_mul,
-                          #m_mul=m_mul,alpha=alpha,name=None)
 
     else:
         sys.exit("alpha_nes: learning rate can be expdec or cosann.")
