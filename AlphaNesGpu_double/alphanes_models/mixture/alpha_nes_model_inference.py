@@ -61,7 +61,7 @@ class alpha_nes_full_inference(tf.Module):
                num_finger_ang=init_alpha3b[0].shape[1]
                initial_type_emb2b=np.ones(num_finger_rad,dtype='float64')
                initial_type_emb3b=np.ones(num_finger_ang,dtype='float64')
-               initial_type_emb=[initial_type_emb2b,initial_type_emb3b]
+               initial_type_emb=[[initial_type_emb2b,initial_type_emb3b]]
           else:
                initial_type_emb2b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_2b.dat',dtype='float64') for k in range(self.ntipos)]
                initial_type_emb3b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_3b.dat',dtype='float64') for k in range(self.ntipos)]
