@@ -23,16 +23,16 @@
 static int Radbuff,Angbuff;
 static double R_c,Rs,R_a,coeffA,coeffB,coeffC,Pow_alpha,Pow_beta;
 
-static double box[6],Inobox[6];
-static vector* Nowinopos;
+static double* nowbox;
+static double* nowinobox;
+static double* nowinobox_d;
+static vector* nowinopos_d;
 
 static double *with_dist2_d;
 static int *Cells;
 static int *Cells_howmany;
 static int MAX_PARTICLE_CELLS;
 
-static double* Full_pos;
-static double* Full_box;
 
 static int *howmany_d;
 static int *with_d;
@@ -88,15 +88,19 @@ void construct_repulsion(){
 void construct_descriptor(const double* box,int N,int max_batch){
 
 
-	  MAX_PARTICLE_CELLS=N/3;
-          cudaMalloc(&with_dist2_d,N*Radial_Buffer*sizeof(double));
-	  nf=max_batch
-	  cudaMalloc(&howmany_d,nf*N*sizeof(int));
-          cudaMalloc(&with_d,nf*N*Radbuff*sizeof(int));
-          
-	  cudaMalloc(&nowinopos_d,nf*N*3*sizeof(double));
-          cudaMalloc(&code_ret_d,sizeof(int));
-	  code_ret=(int*)calloc(1,sizeof(int));
+      MAX_PARTICLE_CELLS=N/3;
+      nf=max_batch
+      nowbox=(double*)calloc(nf*6,sizeof(double));
+      nowinobox=(double*)calloc(nf*6,sizeof(double));
+      cudaMalloc(&nowinobox_d,nf*6*sizeof(double));
+
+      cudaMalloc(&with_dist2_d,nf*N*Radial_Buffer*sizeof(double));
+      cudaMalloc(&howmany_d,nf*N*sizeof(int));
+      cudaMalloc(&with_d,nf*N*Radbuff*sizeof(int));
+
+      cudaMalloc(&nowinopos_d,nf*N*3*sizeof(double));
+      cudaMalloc(&code_ret_d,sizeof(int));
+      code_ret=(int*)calloc(1,sizeof(int));
  }
 
  void fill_radial_launcher(double R_c,int radbuff,double R_a,int angbuff,int N,
@@ -105,7 +109,8 @@ void construct_descriptor(const double* box,int N,int max_batch){
                        double* descriptor_d,int* intmap2b_d,double* der2b_d,
                        double* des3bsupp_d,
                        double* der3bsupp_d, int nf,int* numtriplet_d,
-                       double rs, double coeffa,double coeffb,double coeffc,double pow_alpha, double pow_beta);
+                       double rs, double coeffa,double coeffb,double coeffc,
+                       double pow_alpha, double pow_beta);
  void fill_angular_launcher(double R_c,int radbuff,double R_a,int angbuff,int N,
                        double* inopos_d,const double* box_d,
                        int *howmany_d,int *with_d,
@@ -147,7 +152,7 @@ REGISTER_OP("ConstructDescriptorsLight")
            const Tensor& box_T = context->input(4);
            const Tensor& rs_T = context->input(5);
            const Tensor& ra_T = context->input(6);
-           const Tensor& max_batch_T = context->input(7); 
+           const Tensor& max_batch_T = context->input(7);
 
            auto rs_T_flat=rs_T.flat<double>();
            Rs=rs_T_flat(0);
@@ -164,10 +169,10 @@ REGISTER_OP("ConstructDescriptorsLight")
            auto ra_T_flat=ra_T.flat<double>();
            R_a=ra_T_flat(0);
 
-	   int numpar=numpar_T.flat<int>()(0);
+	         int numpar=numpar_T.flat<int>()(0);
            int max_batch=max_batch_T.flat<int>()(0);
            printf("\nAlpha_nes: Descriptor constructor found Rc %f\n",R_c);
-	   printf("          Ra %f Rs %f Radbuff %d Angbuff %d max_batch %d N_max %d\n",R_a,Rs,Radbuff,Angbuff,max_batch,numpar);
+	         printf("          Ra %f Rs %f Radbuff %d Angbuff %d max_batch %d N_max %d\n",R_a,Rs,Radbuff,Angbuff,max_batch,numpar);
            construct_repulsion();
            construct_descriptor(box_T.flat<double>().data(),numpar,max_batch);
          }
@@ -203,8 +208,8 @@ class ComputeDescriptorsLightOp : public OpKernel {
 
 
     auto positions = positions_T.flat<double>();
-    const double* nowpos=positions.data();
-    const double* nowbox = box_T.flat<double>().data();
+    const double* nowpos_d=positions.data();
+    const double* nowbox_d = box_T.flat<double>().data();
 
 
 
@@ -212,58 +217,28 @@ class ComputeDescriptorsLightOp : public OpKernel {
     int nf=box_T.shape().dim_size(0);
     int N=int(positions_T.shape().dim_size(1)/3);
 
-
-
+    cudaMemcpy(nowbox,nowbox_d,sizeof(double)*nf*6,cudaMemcpyDeviceToHost);
+    for (int fr=0;fr<nf;fr++){
+    nowinobox[0+fr*6]=1./nowbox[0+fr*6];
+    nowinobox[1+fr*6]=-nowbox[1+fr*6]/(nowbox[0+fr*6]*nowbox[3+fr*6]);
+    nowinobox[2+fr*6]=(nowbox[1+fr*6]*nowbox[4+fr*6])/(nowbox[0+fr*6]*nowbox[3+fr*6]*nowbox[5+fr*6])-nowbox[2+fr*6]/(nowbox[0+fr*6]*nowbox[5+fr*6]);
+    nowinobox[3+fr*6]=1./nowbox[3+fr*6];
+    nowinobox[4+fr*6]=-nowbox[4+fr*6]/(nowbox[3+fr*6]*nowbox[5+fr*6]);
+    nowinobox[5+fr*6]=1./nowbox[5+fr*6];
+  }
+    cudaMemcpy(nowinobox_d,nowinobox,sizeof(double)*nf*6,cudaMemcpyHostToDevice);
+    //Convert nowpos_d in internal coordinates
+    convert_carte_to_int(nowinobox_d,nowpos_d,nowinopos_d,N,nf);
     ///Calcolo celle e mappa di interazione ordinata
-  MAX_PARTICLE_CELLS=N/3;
-  int c_nx,c_ny,c_nz;
-  celleCompute(N,box,pos_d,Cutoff,&Cells,&Cells_howmany,&c_nx,&c_ny,&c_nz,MAX_PARTICLE_CELLS);
-  imeCompute(N,box_d,pos_d,Cutoff,Cells,Cells_howmany,c_nx,c_ny,c_nz,with_d,howmany_d,with_dist2_d,MAX_PARTICLE_CELLS,Radial_Buffer);
-
-    //////////BUILDING CELL LIST AND IME (FULL ORDERED INTERACTION MAP)////
-    int ii;
-    for (ii=0;ii<nf;ii++)
-    {
-      Inobox[0] = 1.f / Full_box[ii*6+0];
-      Inobox[1] = -Full_box[ii*6+1] / (Full_box[ii*6+0] * Full_box[ii*6+3]);
-      Inobox[2] = (Full_box[ii*6+1] * Full_box[ii*6+4]) /
-                  (Full_box[ii*6+0] * Full_box[ii*6+3] * Full_box[ii*6+5]) -
-                  Full_box[ii*6+2] / (Full_box[ii*6+0] * Full_box[ii*6+5]);
-      Inobox[3] = 1.f / Full_box[ii*6+3];
-      Inobox[4] = -Full_box[ii*6+4] / (Full_box[ii*6+3] * Full_box[ii*6+5]);
-      Inobox[5] = 1.f / Full_box[ii*6+5];
-
-      for (int i=0;i<N;i++){
-        double px=Full_pos[ii*N*3+i*3];
-        double py=Full_pos[ii*N*3+i*3+1];
-        double pz=Full_pos[ii*N*3+i*3+2];
-
-        Nowinopos[i].x=(Inobox[0]*px+Inobox[1]*py+Inobox[2]*pz);
-        Nowinopos[i].y=(Inobox[3]*py+Inobox[4]*pz);
-        Nowinopos[i].z=(Inobox[5]*pz);
-      }
-
-      // calcolo delle celle e dei neighbour list
-      fullUpdateList(Cells,Nowinopos,N,&Full_box[ii*6],R_c);
-      resetInteractionMap(Ime);
-      calculateInteractionMapWithCutoffDistanceOrdered(Cells,Ime,Nowinopos,&Full_box[ii*6],R_c);
-
-      cudaMemcpy(howmany_d+ii*N,Ime->howmany,N*sizeof(int),cudaMemcpyHostToDevice);
-      cudaMemcpy(with_d+ii*N*Radbuff,Ime->with[0],N*Radbuff*sizeof(int),cudaMemcpyHostToDevice);
-      cudaMemcpy(nowinopos_d+ii*N*3,Nowinopos,N*3*sizeof(double),cudaMemcpyHostToDevice);
-
-      for (int i=0;i<N;i++)
-      {
-        if (Ime->howmany[i]>Radbuff)
-        {
-          printf("Buffer radiale saturato by \n");
-	  printf("Particle %d at frame %d with %d neighbours \n",i,ii,Ime->howmany[i]);
-          fflush(stdout);
-	  exit(0);
-        }
-      }
-
+    MAX_PARTICLE_CELLS=N/3;
+    int c_nx,c_ny,c_nz;
+    for (int fr=0;fr<nf;fr++){
+    celleCompute(N,nowbox+fr*6,nowinopos_d+fr*3*N,R_c,&Cells,&Cells_howmany,&c_nx,&c_ny,&c_nz,MAX_PARTICLE_CELLS);
+    imeCompute(N,nowbox_d+fr*6,nowinopos_d+fr*3*N,R_c,Cells,Cells_howmany,c_nx,c_ny,c_nz,with_d+fr*N*Radial_Buffer,howmany_d+N*fr,with_dist2_d+fr*N*Radial_Buffer,MAX_PARTICLE_CELLS,Radial_Buffer);
     }
+
+
+    //Metti check buffer
 
     ///////////////DESCRIPTORS///////////////
     // Create an output tensor
@@ -373,21 +348,15 @@ class ComputeDescriptorsLightOp : public OpKernel {
     double* der3b_d=der3b_tensor->flat<double>().data();
 
     fill_radial_launcher(R_c,Radbuff,R_a,Angbuff,N,
-                      nowinopos_d,nowbox,
+                      nowinopos_d,nowbox_d,
                       howmany_d,with_d,
                       rad_descr_d,intmap2b_d,der2b_d,
                       des3bsupp_d,
                       der3bsupp_d,nf,numtriplet_d,
                       Rs,coeffA,coeffB,coeffC,Pow_alpha,Pow_beta);
-    //cudaMemset(code_ret_d,sizeof(int),0);
-    //check_max_launcher(numtriplet_d,N*nf,Angbuff,code_ret_d);
-    //cudaMemcpy(code_ret,code_ret_d,sizeof(int),cudaMemcpyDeviceToHost);
-    //if (code_ret[0]!=0){
-    //   printf("alpha_nes: Buffer angolare saturato, %d vs %d",code_ret[0],Angbuff);
-    //   exit(0);
-    // }
+
     fill_angular_launcher(R_c, Radbuff, R_a, Angbuff, N, nowinopos_d,
-		         nowbox, howmany_d, with_d, ang_descr_d,
+		         nowbox_d, howmany_d, with_d, ang_descr_d,
 			 intmap3b_d, des3bsupp_d, der3b_d, der3bsupp_d,
 			 nf, numtriplet_d);
      }
