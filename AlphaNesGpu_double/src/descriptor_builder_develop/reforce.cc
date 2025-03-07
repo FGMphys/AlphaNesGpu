@@ -2,14 +2,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <complex.h>
+//#include <complex.h>
 #include <math.h>
 #include <ctype.h>
 
 #include "vector.h"
 #include "celle_gpu.h"
-#include "smart_allocator.h"
-#include "utilities.h"
+//#include "smart_allocator.h"
+//#include "utilities.h"
 #include <cuda_runtime.h>
 
 #include "tensorflow/core/framework/op.h"
@@ -26,7 +26,7 @@ static double R_c,Rs,R_a,coeffA,coeffB,coeffC,Pow_alpha,Pow_beta;
 static double* nowbox;
 static double* nowinobox;
 static double* nowinobox_d;
-static vector* nowinopos_d;
+static double *nowinopos_d;
 
 static double *with_dist2_d;
 static int *Cells;
@@ -38,7 +38,6 @@ static int *howmany_d;
 static int *with_d;
 static int *code_ret_d;
 static int *code_ret;
-static double *nowinopos_d;
 
 
 
@@ -89,19 +88,24 @@ void construct_descriptor(const double* box,int N,int max_batch){
 
 
       MAX_PARTICLE_CELLS=N/3;
-      nf=max_batch
+      int nf=max_batch;
       nowbox=(double*)calloc(nf*6,sizeof(double));
       nowinobox=(double*)calloc(nf*6,sizeof(double));
       cudaMalloc(&nowinobox_d,nf*6*sizeof(double));
 
-      cudaMalloc(&with_dist2_d,nf*N*Radial_Buffer*sizeof(double));
+      cudaMalloc(&with_dist2_d,nf*N*Radbuff*sizeof(double));
       cudaMalloc(&howmany_d,nf*N*sizeof(int));
       cudaMalloc(&with_d,nf*N*Radbuff*sizeof(int));
 
       cudaMalloc(&nowinopos_d,nf*N*3*sizeof(double));
       cudaMalloc(&code_ret_d,sizeof(int));
       code_ret=(int*)calloc(1,sizeof(int));
- }
+      
+      size_t freeMem, totalMem;
+      cudaMemGetInfo(&freeMem, &totalMem);
+      printf("Memoria libera: %zu bytes, Memoria totale: %zu bytes\n", freeMem, totalMem);
+      cudaDeviceSetLimit(cudaLimitMallocHeapSize, freeMem * 0.6);
+}
 
  void fill_radial_launcher(double R_c,int radbuff,double R_a,int angbuff,int N,
                        double* inopos_d,const double* box_d,
@@ -228,13 +232,13 @@ class ComputeDescriptorsLightOp : public OpKernel {
   }
     cudaMemcpy(nowinobox_d,nowinobox,sizeof(double)*nf*6,cudaMemcpyHostToDevice);
     //Convert nowpos_d in internal coordinates
-    convert_carte_to_int(nowinobox_d,nowpos_d,nowinopos_d,N,nf);
+    convert_carte_to_int_launcher(nowinobox_d,nowpos_d,nowinopos_d,N,nf);
     ///Calcolo celle e mappa di interazione ordinata
     MAX_PARTICLE_CELLS=N/3;
     int c_nx,c_ny,c_nz;
     for (int fr=0;fr<nf;fr++){
     celleCompute(N,nowbox+fr*6,nowinopos_d+fr*3*N,R_c,&Cells,&Cells_howmany,&c_nx,&c_ny,&c_nz,MAX_PARTICLE_CELLS);
-    imeCompute(N,nowbox_d+fr*6,nowinopos_d+fr*3*N,R_c,Cells,Cells_howmany,c_nx,c_ny,c_nz,with_d+fr*N*Radial_Buffer,howmany_d+N*fr,with_dist2_d+fr*N*Radial_Buffer,MAX_PARTICLE_CELLS,Radial_Buffer);
+    imeCompute(N,nowbox_d+fr*6,nowinopos_d+fr*3*N,R_c,Cells,Cells_howmany,c_nx,c_ny,c_nz,with_d+fr*N*Radbuff,howmany_d+N*fr,with_dist2_d+fr*N*Radbuff,MAX_PARTICLE_CELLS,Radbuff);
     }
 
 

@@ -2,14 +2,13 @@
 #include <stdio.h>
 #include <math.h>
 #include <assert.h>
-#include "src_nn/descriptor_builder/reforce.h"
 #include <thrust/device_vector.h>
 #include <thrust/sort.h>
 #include <cuda_runtime.h>
 #define BLOCK_DIM 256
 #define SQR(x) ((x)*(x))
 
-__global__ convert_carte_to_int_kernel(double* nowinobox_d,double* nowpos_d,double* nowinopos_d,int N,int nf){
+__global__ void convert_carte_to_int_kernel(double* nowinobox_d,const double* nowpos_d,double* nowinopos_d,int N,int nf){
 
   int t = blockIdx.x*blockDim.x+threadIdx.x;
   int b=t/N;
@@ -22,16 +21,16 @@ __global__ convert_carte_to_int_kernel(double* nowinobox_d,double* nowpos_d,doub
   double px=nowpos_d[b*N*3+par*3+0];
   double py=nowpos_d[b*N*3+par*3+1];
   double pz=nowpos_d[b*N*3+par*3+2];
-  nowinopos3_d[i].x=(Inobox[0]*px+Inobox[1]*py+Inobox[2]*pz);
-  nowinopos3_d[i].y=(Inobox[3]*py+Inobox[4]*pz);
-  nowinopos3_d[i].z=(Inobox[5]*pz);
+  nowinopos3_d[b*N+par].x=(Inobox[0]*px+Inobox[1]*py+Inobox[2]*pz);
+  nowinopos3_d[b*N+par].y=(Inobox[3]*py+Inobox[4]*pz);
+  nowinopos3_d[b*N+par].z=(Inobox[5]*pz);
 }
 }
 
 
 
 
-void convert_carte_to_int_launcher(double* nowinobox_d,double* nowpos_d,double* nowinopos_d,int N,int nf){
+void convert_carte_to_int_launcher(double* nowinobox_d,const double* nowpos_d,double* nowinopos_d,int N,int nf){
   int dimgrid=(N*nf+1)/BLOCK_DIM;
   dim3 dimGrid(dimgrid,1,1);
   dim3 dimBlock(BLOCK_DIM,1,1);
@@ -41,7 +40,7 @@ void convert_carte_to_int_launcher(double* nowinobox_d,double* nowpos_d,double* 
 
 }
 
-__global__ void imeBuild(int N,double *box,double *position,int *cells,int *cells_howmany,int celle_nx,int celle_ny,int celle_nz,double cutoff,int *with,int *howmany,double *with_dist2,int MAX_PARTICLE_CELLS,int maxneigh)
+__global__ void imeBuild(int N,const double *box,double *position,int *cells,int *cells_howmany,int celle_nx,int celle_ny,int celle_nz,double cutoff,int *with,int *howmany,double *with_dist2,int MAX_PARTICLE_CELLS,int maxneigh)
 {
     double3 *coor=(double3*)position;
     extern __shared__ unsigned char sharedMemory[];  // Dichiarazione generica
@@ -178,7 +177,7 @@ void sort_in_gpu(int *d_with, double *d_with_r2, int *d_howmany, int N, int Radi
     cudaDeviceSynchronize();
 }
 
-void imeCompute(int N,double *box_d,double *position_d,double cutoff,int *cells,int *cells_howmany,int celle_nx,int celle_ny,int celle_nz,int *with,int *howmany,double *with_dist2,int MAX_PARTICLE_CELLS,int Radial_Buffer)
+void imeCompute(int N,const double *box_d,double *position_d,double cutoff,int *cells,int *cells_howmany,int celle_nx,int celle_ny,int celle_nz,int *with,int *howmany,double *with_dist2,int MAX_PARTICLE_CELLS,int Radial_Buffer)
 {
 
     dim3 dimGrid(celle_nx,celle_ny,celle_nz);
@@ -233,7 +232,7 @@ __global__ void celleBuild(int N,double *inopos,int *cells,int *cells_howmany,do
     }
 }
 
-void celleCompute(int N,double *box,double *inopos_d,double cutoff,int **cells_address,int **cells_howmany_address,int *c_nx,int *c_ny,int *c_nz,int MAX_PARTICLE_CELLS)
+void celleCompute(int N,const double *box,double *inopos_d,double cutoff,int **cells_address,int **cells_howmany_address,int *c_nx,int *c_ny,int *c_nz,int MAX_PARTICLE_CELLS)
 {
 
 
