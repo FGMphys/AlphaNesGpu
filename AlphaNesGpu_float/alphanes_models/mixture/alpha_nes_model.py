@@ -324,6 +324,9 @@ class alpha_nes_full(tf.Module):
         for k,net in enumerate(self.nets):
             net.save(folder_ou+'/init_net_model_type'+str(k),overwrite=True)
 
+    def build_opt_weights(self):
+        self.opt_phys.build(self.opt_phys_weights)
+        self.opt_net.build(self.opt_net_weights)
     def set_opt_weight(self):
         self.opt_phys.set_weights(self.opt_phys_weights)
         self.opt_net.set_weights(self.opt_net_weights)

@@ -380,8 +380,10 @@ if restart_par=='no' or restart_par=='only_afs' or restart_par=='all_params':
     for k in range(nt):
        Physics_Layers[k].savealphas(model_name,"type"+str(k)+"initial_")
        Lognorm_Layers[k].savemu(model_name,"type"+str(k)+"initial_")
+       accumul=0
 else:
     restart_ep=int(restart_par.split('log')[-1])+1
+    accumul=restart_ep*nb*idx_str_tr.shape[0]
     model_name=model_name
     index=np.arange(0,bs)
     [raddescr,angdescr,des3bsupp,
@@ -389,6 +391,7 @@ else:
     intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(pos_map_tr[index],box_map_tr[index])
     k=0
     [dummyloss,dummylosse,dummylossb,dummylossf]=trainmeth(raddescr[k*bs:(k+1)*bs],angdescr[k*bs:(k+1)*bs],des3bsupp[k*bs:(k+1)*bs],intmap2b[k*bs:(k+1)*bs],intder2b[k*bs:(k+1)*bs],intmap3b[k*bs:(k+1)*bs],intder3b[k*bs:(k+1)*bs],intder3bsupp[k*bs:(k+1)*bs],numtriplet[k*bs:(k+1)*bs],e_map_tr[index][k*bs:(k+1)*bs],f_map_tr[index][k*bs:(k+1)*bs],0.,0.,0.)
+    model.build_opt_weights()
     model.set_opt_weight()
 
 
@@ -403,7 +406,6 @@ try:
 except:
    freq_test=1
    print("alpha_nes: test will be ever ",freq_test," epochs")
-accumul=0
 start_loc=time.time()
 for ep in range(restart_ep,ne):
     losstot=tf.constant(0.,dtype='float32')
@@ -466,8 +468,8 @@ for ep in range(restart_ep,ne):
        outfold_name=model_name+str(ep)
        model.save_model(outfold_name)
        np.savetxt(outfold_name+"/model_error",[np.sqrt(vallosstote),np.sqrt(vallosstotf)],header='RMSE_e  RMSE_f ')
-       print(np.sqrt(vallosstote.numpy()),np.sqrt(vallosstotf.numpy()),losstot.numpy(),lrnow.numpy(),lrnow2.numpy(),sep=' ',end='\n',file=fileOU)
-       print("Testing model at epoch ",ep," val_lossE ",np.sqrt(vallosstote.numpy())," val_lossF ",np.sqrt(vallosstotf.numpy())," loss_Tot ",losstot.numpy()," lr_net ",lrnow.numpy()," lr_finger ",lrnow2.numpy(),sep=' ',end='\n')
+       print(accumul,ep,np.sqrt(vallosstote.numpy()),np.sqrt(vallosstotf.numpy()),losstot.numpy(),lrnow.numpy(),lrnow2.numpy(),sep=' ',end='\n',file=fileOU)
+       print("Testing model at global step",accumul," and epoch ",ep," val_lossE ",np.sqrt(vallosstote.numpy())," val_lossF ",np.sqrt(vallosstotf.numpy())," loss_Tot ",losstot.numpy()," lr_net ",lrnow.numpy()," lr_finger ",lrnow2.numpy(),sep=' ',end='\n')
        print("We are at epoch ",ep)
        fileOU.flush()
        out_time.flush()
