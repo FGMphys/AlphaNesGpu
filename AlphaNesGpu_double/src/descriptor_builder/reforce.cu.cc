@@ -78,11 +78,11 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
       }
       //STEP 1: filling radial descriptor with larger cutoff
       if (dist_norm<rs){
-          descriptors[actual_pos+k]=coeffa/powf(dist_norm,pow_alpha)+coeffb/powf(dist_norm,pow_beta)+coeffc;
+          descriptors[actual_pos+k]=coeffa/pow(dist_norm,pow_alpha)+coeffb/pow(dist_norm,pow_beta)+coeffc;
 
-          der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=(-pow_alpha*coeffa/powf(dist_norm,pow_alpha+1.)-pow_beta*coeffb/powf(dist_norm,pow_beta+1.))*dist.x/dist_norm;
-          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=(-pow_alpha*coeffa/powf(dist_norm,pow_alpha+1.)-pow_beta*coeffb/powf(dist_norm,pow_beta+1.))*dist.y/dist_norm;
-          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=(-pow_alpha*coeffa/powf(dist_norm,pow_alpha+1.)-pow_beta*coeffb/powf(dist_norm,pow_beta+1.))*dist.z/dist_norm;
+          der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=(-pow_alpha*coeffa/pow(dist_norm,pow_alpha+1.)-pow_beta*coeffb/pow(dist_norm,pow_beta+1.))*dist.x/dist_norm;
+          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=(-pow_alpha*coeffa/pow(dist_norm,pow_alpha+1.)-pow_beta*coeffb/pow(dist_norm,pow_beta+1.))*dist.y/dist_norm;
+          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=(-pow_alpha*coeffa/pow(dist_norm,pow_alpha+1.)-pow_beta*coeffb/pow(dist_norm,pow_beta+1.))*dist.z/dist_norm;
       }
       else{
         descriptors[actual_pos+k]=0.5*(cosf(PI*dist_norm/range)+1);
