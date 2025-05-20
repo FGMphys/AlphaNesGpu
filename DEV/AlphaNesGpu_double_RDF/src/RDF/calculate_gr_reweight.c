@@ -5,10 +5,10 @@
 #include <unistd.h>
 
 #include "vector.h"
-#include "global_definitions.h"
-#include "log.h"
-#include "smart_allocator.h"
-#include "io.h"
+//#include "global_definitions.h"
+//#include "log.h"
+//#include "smart_allocator.h"
+//#include "io.h"
 
 
 #define SQR(x) ((x)*(x))
@@ -27,28 +27,29 @@ typedef struct _grstruct {
 
 
 grstruct* grConstruct(double binsize,double range);
+void from_car_to_int(vector* ipos,const double* positions,int numparticle,double* box);
 
-
-void grSample(grstruct *gr,vector *pos,int numparticles,double box[],int* type_map,int nt,int nt2,int* type,double delta_E);
+void grSample(grstruct *gr,vector *pos,int numparticles,double box[],const int* type_map,int nt,int nt2,const int* type,double delta_E);
 void grAverage(grstruct *gr,int numparticles,double box[]);
 
 void grFree(grstruct *gr);
 
 void grPrint(grstruct *gr,FILE *p_file);
 void grSave(grstruct *gr,FILE *p_file);
+void compute_rdf(const double* energy,const double* position,const double* box_glob, int nf, int N,
+    const double* ground_energy,const int* type_pair,const int* type, 
+    const int* type_map,const double* binsize,const double* betarewe,double* RDF){
 
-void compute_rdf(double* energy,double* position,double* box_glob,int nf,int N,double* ground_energy,int* type_pair,int* type,int* type_map,double* bin_size,double* betarewe,double* RDF)
-{
 
 
-	double bin_size=bin_size[0];
+	double bin_size=binsize[0];
 
 	int numtypes[1];
 
 	int num_files=nf;
 
 
-        double* delta_E_arr=ground_energy;
+    const double* delta_E_arr=ground_energy;
 
 
 
@@ -58,10 +59,10 @@ void compute_rdf(double* energy,double* position,double* box_glob,int nf,int N,d
 	// potenzialmente le configurazioni vengono da simulazioni NpT
 	// in cui il lato della box cambia. Fissiamo come range la meta'
 	// del lato piu' piccolo
-	double box[6],ibox[6];
-	steps step;
+	double ibox[6],box[6];
 	int numparticles=N;
-        int old_numparticles;
+	vector* ipos=(vector*)calloc(N,sizeof(vector));
+    int old_numparticles;
 	int i;
 
 
@@ -71,7 +72,7 @@ void compute_rdf(double* energy,double* position,double* box_glob,int nf,int N,d
 //Computing average density of dataset
 	for (i=0;i<num_files;i++)
 	{
-            box=&box_gl[i*6];
+            memcpy(box,&box_glob[i*6],6*sizeof(double));
 
 /*		if ((numparticles!=old_numparticles) && (first_file==0))
 		{
@@ -89,7 +90,6 @@ void compute_rdf(double* energy,double* position,double* box_glob,int nf,int N,d
 			min_box_size=box[5];
 
 
-		first_file=0;
 		old_numparticles=numparticles;
 	}
 
@@ -98,37 +98,36 @@ void compute_rdf(double* energy,double* position,double* box_glob,int nf,int N,d
 //Building gr for given pair
 
           	
-                vector *pos;
-		nt=type_pair[0];
-                nt2=type_pair[1];
-                grstruct *gr=grConstruct(bin_size,0.5*min_box_size);
+		int nt=type_pair[0];
+		int nt2=type_pair[1];
+		grstruct *gr=grConstruct(bin_size,0.5*min_box_size);
 		for (i=0;i<num_files;i++)
 			{
-                        pos=&positions[i*N*3];
-                        box=&box_glob[i*6];
-	                double delta_E=delta_E_arr[i]-energy[i]*betarewe;	
-			grSample(gr,pos,numparticles,box,type_map,nt,nt2,type,delta_E);
+//                      memcpy(&pos[0].x,&position[i*N*3],3*N*sizeof(double));
+                        memcpy(box,&box_glob[i*6],6*sizeof(double));
+                        from_car_to_int(ipos,&position[i*N*3],N,box);
+	                double delta_E=-delta_E_arr[i]+energy[i]*betarewe[0];
+		        //printf("%lf\n",delta_E);	
+			grSample(gr,ipos,numparticles,box,type_map,nt,nt2,type,delta_E);
 		
 			}
         
 
 	grAverage(gr,type[nt2],box);
-        int steppy=0;
-        sprintf(filename,"gr_%d_%d_rewe_step_%d.dat",nt,nt2,steppy);
-        FILE *pfile=fopen(filename,"w");
-        grSave(gr,pfile);
+	int steppy=0;
+	char filename[100];
+	sprintf(filename,"gr_%d_%d_rewe_step_%d.dat",nt,nt2,steppy);
+	FILE *pfile=fopen(filename,"w");
+	grSave(gr,pfile);
 	
         for (i=0;i<(gr->dimh);i++)
          {
-                 r=(gr->bin)*(i+0.5);
+                 double r=(gr->bin)*(i+0.5);
 
                  RDF[i]=gr->histogram[i];
          }
 	grFree(gr);
 	fclose(pfile);
-	logClose();
-
-	return 0;
 }
 
 grstruct* grConstruct(double binsize,double range)
@@ -158,8 +157,25 @@ grstruct* grConstruct(double binsize,double range)
 	return gr;
 }
 
+void from_car_to_int(vector* ipos,const double* positions,int numparticle,double* box){
+     double Inobox[6];
+     Inobox[0]=1./box[0];
+     Inobox[1]=-box[1]/(box[0]*box[3]);
+     Inobox[2]=(box[1]*box[4])/(box[0]*box[3]*box[5])-box[2]/(box[0]*box[5]);
+     Inobox[3]=1./box[3];
+     Inobox[4]=-box[4]/(box[3]*box[5]);
+     Inobox[5]=1./box[5];
+     for (int par=0;par<numparticle;par++){
+	 double px=positions[3*par];
+	 double py=positions[3*par+1];
+	 double pz=positions[3*par+2];
+         ipos[par].x=(Inobox[0]*px+Inobox[1]*py+Inobox[2]*pz);
+         ipos[par].y=(Inobox[3]*py+Inobox[4]*pz);
+         ipos[par].z=(Inobox[5]*pz); 
+      }
+};
 
-void grSample(grstruct *gr,vector *pos,int numparticles,double Box[],int* type_map,int nt,int nt2,int* type,double delta_E)
+void grSample(grstruct *gr,vector *pos,int numparticles,double Box[],const int* type_map,int nt,int nt2,const int* type,double delta_E)
 {
 	
 	gr->nsamples++;
@@ -173,6 +189,7 @@ void grSample(grstruct *gr,vector *pos,int numparticles,double Box[],int* type_m
 	// attenzione la densita' potrebbe cambiare tra i diversi file
 	// e quindi la campioniamo direttamente
 	double two_over_density=2.*(Box[0]*Box[3]*Box[5])/(double)type[nt2];
+	
 	for (i=0;i<(numparticles-1);i++){
 	    if (type_map[i]==nt){
 
@@ -227,7 +244,8 @@ void grAverage(grstruct *gr,int numparticles,double box[])
         {
                 mean_last_frac+=(gr->histogram[i])/frac;
         }
-        for (i=0;i<(gr->dimh);i++)
+        printf("norm fact %lf\n",mean_last_frac);
+       	for (i=0;i<(gr->dimh);i++)
         {
                 (gr->histogram[i])*=1/mean_last_frac;
         }

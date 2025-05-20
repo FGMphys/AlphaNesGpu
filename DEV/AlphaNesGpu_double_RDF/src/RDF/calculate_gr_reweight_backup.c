@@ -322,6 +322,7 @@ void grAverage(grstruct *gr,int numparticles,double box[])
         {
                 mean_last_frac+=(gr->histogram[i])/frac;
         }
+	printf("norm fact %lf\n",mean_last_frac);
         for (i=0;i<(gr->dimh);i++)
         {
                 (gr->histogram[i])*=1/mean_last_frac;
