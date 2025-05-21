@@ -1,0 +1,3 @@
+# Ignora tutti i file con estensione .so e .o nelle cartelle e sottocartelle
+**/*.so
+**/*.o
