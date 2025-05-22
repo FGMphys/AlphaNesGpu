@@ -3,6 +3,8 @@ from numpy.random import seed
 from numpy import random
 from numpy.random import default_rng
 
+import sys
+
 
 
 def filtered_matrix(map_to_build):
@@ -35,7 +37,17 @@ def gen_map_type_AFs(full_param):
 def init_AFs_param(restart,full_param,number_of_interaction,seed_par):
     np.random.set_state(seed_par)
     #nt_couple=int(nt*(nt+1)/2)
+    map_rad_afs=full_param['map_rad_afs']
+    for el in map_rad_afs.keys():
+        if (len(map_rad_afs[el])!=number_of_interaction):
+            print("Alpha_nes: The number of interaction is ",number_of_interaction, "but you indicate ",len(map_rad_afs[el])," number in the map_rad_afs section!")
+            sys.exit()
+    map_ang_afs=full_param['map_ang_afs']
     nt_couple_interaction=int((number_of_interaction+1)*number_of_interaction/2)
+    for el in map_ang_afs.keys():
+        if (len(map_ang_afs[el])!=nt_couple_interaction):
+            print("Alpha_nes: The number of possible angular interaction is ",nt_couple_interaction, "but you indicate ",len(map_ang_afs[el])," number in the map_ang_afs section!")
+            sys.exit()    
     try:
         alpha_bound=float(full_param['alpha_bound'])
         print("alpha_nes: alphas will be upper-bound to custom",alpha_bound,sep=' ',end='\n')
@@ -61,25 +73,27 @@ def init_AFs_param(restart,full_param,number_of_interaction,seed_par):
         init_mu=[(np.random.rand(nalpha_r_arr[k,1]+nalpha_a_arr[k,1])*2*limit-limit).astype('float64')
                 for k in range(number_of_NN)]
     ##Initialise only afs by reading them from file. State of optimizer is started from scratch.
-    else restart=='only_afs' or restart=='all_params':
+    else :
         map_rad_afs=full_param['map_rad_afs']
         number_of_NN=len(map_rad_afs)
-         afs_param=full_param['afs_param_folder']
-         init_mu=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_mu.dat',dtype='float64') for k in range(number_of_NN)]
-         init_alpha2b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_2body.dat',dtype='float64').reshape((number_of_interaction,-1)) for k in range(number_of_NN)]
-         init_alpha3b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_3body.dat',dtype='float64').reshape((nt_couple_interaction,-1)) for k in range(number_of_NN)]
-         nalpha_r_arr=np.array([[k,init_alpha2b[k].shape[1]] for k in range(number_of_NN)])
-         nalpha_a_arr=np.array([[k,int(init_alpha3b[k].shape[1]/3)] for k in range(number_of_NN)])
-         initial_type_emb_2b=[np.loadtxt(afs_param+'/type'+str(k)+'_type_emb_2b.dat',dtype='float64') for k in range(number_of_NN)]
-         initial_type_emb_3b=[np.loadtxt(afs_param+'/type'+str(k)+'_type_emb_3b.dat',dtype='float64') for k in range(number_of_NN)]
-         initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(number_of_NN)]
+        afs_param=full_param['afs_param_folder']
+        init_mu=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_mu.dat',dtype='float64') for k in range(number_of_NN)]
+        init_alpha2b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_2body.dat',dtype='float64').reshape((number_of_interaction,-1)) for k in range(number_of_NN)]
+        init_alpha3b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_3body.dat',dtype='float64').reshape((nt_couple_interaction,-1)) for k in range(number_of_NN)]
+        nalpha_r_arr=np.array([[k,init_alpha2b[k].shape[1]] for k in range(number_of_NN)])
+        nalpha_a_arr=np.array([[k,int(init_alpha3b[k].shape[1]/3)] for k in range(number_of_NN)])
+        initial_type_emb_2b=[np.loadtxt(afs_param+'/type'+str(k)+'_type_emb_2b.dat',dtype='float64') for k in range(number_of_NN)]
+        initial_type_emb_3b=[np.loadtxt(afs_param+'/type'+str(k)+'_type_emb_3b.dat',dtype='float64') for k in range(number_of_NN)]
+        initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(number_of_NN)]
     print("alpha_nes: Two-Body Atomic fingerprints are ",end='\n')
-    print("alpha_nes: atom type   number\n")
+    print("alpha_nes: NN Index   number\n")
     for k in range(number_of_NN):
         print("alpha_nes:     ",nalpha_r_arr[k,0],"        ",nalpha_r_arr[k,1])
-        print("alpha_nes: Three-Body Atomic fingerprints are ",end='\n')
-        print("alpha_nes: atom type   number\n")
+    print("alpha_nes: Three-Body Atomic fingerprints are ",end='\n')
+    print("alpha_nes: NN index   number\n")
     for k in range(number_of_NN):
         print("alpha_nes:      ",nalpha_a_arr[k,0],"        ",nalpha_a_arr[k,1])
 
     return init_alpha2b,init_alpha3b,init_mu,initial_type_emb,np.random.get_state()
+
+breakpoint()
