@@ -18,23 +18,24 @@ def filtered_matrix(map_to_build):
 def gen_map_type_AFs(full_param):
     map_rad_afs=full_param['map_rad_afs']
     map_ang_afs=full_param['map_ang_afs']
-    nt=len(map_rad_afs)
-    nt_couple=int(nt*(nt+1)/2)
-    tot_rad_afs=[[k,sum(map_rad_afs[k])] for k in range(nt)]
-    tot_ang_afs=[[k,sum(map_ang_afs[k])] for k in range(nt)]
+    number_of_NN=len(map_rad_afs)
+    #nt_couple=int(nt*(nt+1)/2)
+    tot_rad_afs=[[k,sum(map_rad_afs[k])] for k in range(number_of_NN)]
+    tot_ang_afs=[[k,sum(map_ang_afs[k])] for k in range(number_of_NN)]
 
-    tot_rad_afs_arr=np.array(tot_rad_afs).reshape((nt,2))
-    tot_ang_afs_arr=np.array(tot_ang_afs).reshape((nt,2))
-    type_emb2b=[filtered_matrix(map_rad_afs[tt]) for tt in range(nt)]
-    type_emb3b=[filtered_matrix(map_ang_afs[tt]) for tt in range(nt)]
-    type_emb=[[type_emb2b[k],type_emb3b[k]] for k in range(nt)]
-    return tot_rad_afs_arr,tot_ang_afs_arr,type_emb
+    tot_rad_afs_arr=np.array(tot_rad_afs).reshape((number_of_NN,2))
+    tot_ang_afs_arr=np.array(tot_ang_afs).reshape((number_of_NN,2))
+    type_emb2b=[filtered_matrix(map_rad_afs[tt]) for tt in range(number_of_NN)]
+    type_emb3b=[filtered_matrix(map_ang_afs[tt]) for tt in range(number_of_NN)]
+    type_emb=[[type_emb2b[k],type_emb3b[k]] for k in range(number_of_NN)]
+    return tot_rad_afs_arr,tot_ang_afs_arr,type_emb,number_of_NN
 
 
 ###Initialize alphas
-def init_AFs_param(restart,full_param,nt,seed_par):
+def init_AFs_param(restart,full_param,number_of_interaction,seed_par):
     np.random.set_state(seed_par)
-    nt_couple=int(nt*(nt+1)/2)
+    #nt_couple=int(nt*(nt+1)/2)
+    nt_couple_interaction=int((number_of_interaction+1)*number_of_interaction/2)
     try:
         alpha_bound=float(full_param['alpha_bound'])
         print("alpha_nes: alphas will be upper-bound to custom",alpha_bound,sep=' ',end='\n')
@@ -44,72 +45,41 @@ def init_AFs_param(restart,full_param,nt,seed_par):
     limit=alpha_bound
     limit3b=alpha_bound
     if restart=='no':
-        #nalpha_r_list=full_param['Total_number_radial_AFs'].split()
-        #nalpha_a_list=full_param['Total_number_angular_AFs'].split()
 
-        #nalpha_r_arr=np.array([int(k) for k in nalpha_r_list]).reshape((nt,2))
-        #nalpha_a_arr=np.array([int(k) for k in nalpha_a_list]).reshape((nt,2))
-
-        [nalpha_r_arr,nalpha_a_arr,initial_type_emb]=gen_map_type_AFs(full_param)
+        [nalpha_r_arr,nalpha_a_arr,initial_type_emb,number_of_NN]=gen_map_type_AFs(full_param)
         
         ###Initialize radial AFS parameters
-        init_alpha2b=[(np.random.rand((nalpha_r_arr[k,1]*nt))*2*limit-limit).reshape((nt,nalpha_r_arr[k,1])).astype('float64') for k in range(nt)]
+        init_alpha2b=[(np.random.rand((nalpha_r_arr[k,1]*number_of_interaction))*2*limit-limit).reshape((number_of_interaction,nalpha_r_arr[k,1])).astype('float64') for k in range(number_of_NN)]
         ###Initialize angular AFS parameters
         init_alpha3b=[]
-        for k in range(nt):
-            vec=np.zeros((nalpha_a_arr[k,1]*nt_couple,3),dtype='float64')
-            vec[:,:2]=(np.random.rand((nalpha_a_arr[k,1]*nt_couple*2))*2*limit3b-limit3b).reshape((nalpha_a_arr[k,1]*nt_couple,2)).astype('float64')
-            vec[:,2]=(np.random.rand((nalpha_a_arr[k,1]*nt_couple))*-10).reshape(nalpha_a_arr[k,1]*nt_couple).astype('float64')
-            init_alpha3b.append(vec.reshape((nt_couple,nalpha_a_arr[k,1]*3)))
+        for k in range(number_of_NN):
+            vec=np.zeros((nalpha_a_arr[k,1]*nt_couple_interaction,3),dtype='float64')
+            vec[:,:2]=(np.random.rand((nalpha_a_arr[k,1]*nt_couple_interaction*2))*2*limit3b-limit3b).reshape((nalpha_a_arr[k,1]*nt_couple_interaction,2)).astype('float64')
+            vec[:,2]=(np.random.rand((nalpha_a_arr[k,1]*nt_couple_interaction))*-10).reshape(nalpha_a_arr[k,1]*nt_couple_interaction).astype('float64')
+            init_alpha3b.append(vec.reshape((nt_couple_interaction,nalpha_a_arr[k,1]*3)))
         #Initialised Z for each AFS
         init_mu=[(np.random.rand(nalpha_r_arr[k,1]+nalpha_a_arr[k,1])*2*limit-limit).astype('float64')
-                for k in range(nt)]
-        ###Initialize Ck parameters (only for mixtures)
-        '''
-        if nt>1:
-           initial_type_emb=gen_map_type_AFs(full_param) #[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
-        else:
-           initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype('float64') for k in range(nt)]
-           initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float64') for k in range(nt)]
-           initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
-        '''
+                for k in range(number_of_NN)]
     ##Initialise only afs by reading them from file. State of optimizer is started from scratch.
-    elif restart=='only_afs' or restart=='all_params':
+    else restart=='only_afs' or restart=='all_params':
+        map_rad_afs=full_param['map_rad_afs']
+        number_of_NN=len(map_rad_afs)
          afs_param=full_param['afs_param_folder']
-         init_mu=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_mu.dat',dtype='float64') for k in range(nt)]
-         init_alpha2b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_2body.dat',dtype='float64').reshape((nt,-1)) for k in range(nt)]
-         init_alpha3b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_3body.dat',dtype='float64').reshape((nt_couple,-1)) for k in range(nt)]
-         nalpha_r_arr=np.array([[k,init_alpha2b[k].shape[1]] for k in range(nt)])
-         nalpha_a_arr=np.array([[k,int(init_alpha3b[k].shape[1]/3)] for k in range(nt)])
-         if nt>1:
-             initial_type_emb_2b=[np.loadtxt(afs_param+'/type'+str(k)+'_type_emb_2b.dat',dtype='float64') for k in range(nt)]
-             initial_type_emb_3b=[np.loadtxt(afs_param+'/type'+str(k)+'_type_emb_3b.dat',dtype='float64') for k in range(nt)]
-             initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
-         else:
-           initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype('float64') for k in range(nt)]
-           initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float64') for k in range(nt)]
-           initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
-    else:
-        init_alpha2b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_2body.dat',dtype='float64').reshape((nt,-1)) for k in range(nt)]
-        init_alpha3b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_3body.dat',dtype='float64').reshape((nt_couple,-1)) for k in range(nt)]
-        nalpha_r_arr=np.array([[k,init_alpha2b[k].shape[1]] for k in range(nt)])
-        nalpha_a_arr=np.array([[k,int(init_alpha3b[k].shape[1]/3)] for k in range(nt)])
-        init_mu=[np.loadtxt(restart+'/type'+str(k)+'_alpha_mu.dat',dtype='float64') for k in range(nt)]
-        if nt>1:
-            initial_type_emb_2b=[np.loadtxt(restart+'/type'+str(k)+'_type_emb_2b.dat',dtype='float64') for k in range(nt)]
-            initial_type_emb_3b=[np.loadtxt(restart+'/type'+str(k)+'_type_emb_3b.dat',dtype='float64') for k in range(nt)]
-            initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
-        else:
-           initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype('float64') for k in range(nt)]
-           initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float64') for k in range(nt)]
-           initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
+         init_mu=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_mu.dat',dtype='float64') for k in range(number_of_NN)]
+         init_alpha2b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_2body.dat',dtype='float64').reshape((number_of_interaction,-1)) for k in range(number_of_NN)]
+         init_alpha3b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_3body.dat',dtype='float64').reshape((nt_couple_interaction,-1)) for k in range(number_of_NN)]
+         nalpha_r_arr=np.array([[k,init_alpha2b[k].shape[1]] for k in range(number_of_NN)])
+         nalpha_a_arr=np.array([[k,int(init_alpha3b[k].shape[1]/3)] for k in range(number_of_NN)])
+         initial_type_emb_2b=[np.loadtxt(afs_param+'/type'+str(k)+'_type_emb_2b.dat',dtype='float64') for k in range(number_of_NN)]
+         initial_type_emb_3b=[np.loadtxt(afs_param+'/type'+str(k)+'_type_emb_3b.dat',dtype='float64') for k in range(number_of_NN)]
+         initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(number_of_NN)]
     print("alpha_nes: Two-Body Atomic fingerprints are ",end='\n')
     print("alpha_nes: atom type   number\n")
-    for k in range(nt):
+    for k in range(number_of_NN):
         print("alpha_nes:     ",nalpha_r_arr[k,0],"        ",nalpha_r_arr[k,1])
         print("alpha_nes: Three-Body Atomic fingerprints are ",end='\n')
         print("alpha_nes: atom type   number\n")
-    for k in range(nt):
+    for k in range(number_of_NN):
         print("alpha_nes:      ",nalpha_a_arr[k,0],"        ",nalpha_a_arr[k,1])
 
     return init_alpha2b,init_alpha3b,init_mu,initial_type_emb,np.random.get_state()

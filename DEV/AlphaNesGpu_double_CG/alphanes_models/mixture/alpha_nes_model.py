@@ -6,38 +6,42 @@ import pickle
 
 
 class alpha_nes_full(tf.Module):
-    def __init__(self,physics_layer,force_layer,num_layers,node_seq,actfun,
-               output_dim,lossfunction,val_loss,opt_net,opt_phys,alpha_bound,
-               lognorm_layer,tipos,type_map,restart,seed_fix):
+    def __init__(self,physics_layer,force_layer,output_dim,lossfunction,val_loss,
+                opt_net,opt_phys,alpha_bound,lognorm_layer,color_type_map,
+                restart,seed_fix,full_param):
         super(alpha_nes_full, self).__init__()
 
         tf.keras.utils.set_random_seed(seed_fix)
-        self.tipos=tf.constant(tipos,dtype='int32')
-        self.ntipos=len(tipos)
-        self.type_map=type_map
+        #self.tipos=tf.constant(tipos,dtype='int32')
+        map_NN_layer=full_param['map_NN_layer']
+        number_of_NN=len(map_NN_layer)
 
-        self.N=len(type_map)
+        map_actfun=full_param['activation_function']
+        self.number_of_NN=number_of_NN
+        self.color_type_map=color_type_map
+        self.map_color_interaction=np.loadtxt(full_param['color_interaction_file']).reshape((-1,1))
 
+        self.N=len(color_type_map)
+        
+        #Atomic Finger Print Layer
         self.physics_layer=[physlay_type for physlay_type in physics_layer]
         self.lognorm_layer=[lognorlay_type for lognorlay_type in lognorm_layer]
+        #Force layer for force calculation
         self.force_layer=force_layer
 
-
+        #Dense Net layers
         if restart=='no' or restart=='only_afs':
-            self.nhl=num_layers
-            self.node=node_seq
-            self.actfun=actfun
 
-            self.nets = [tf.keras.Sequential() for el in range(self.ntipos)]
-            for ntype,net in enumerate(self.nets):
-                net.add(Input(shape=(tipos[ntype],self.physics_layer[ntype].output_dim,)))
-                if self.nhl>0:
+            self.nets = [tf.keras.Sequential() for el in range(self.number_of_NN)]
+            for index_net,net in enumerate(self.nets):
+                net.add(Input(shape=(self.N,self.physics_layer[index_net].output_dim,)))
+                if map_NN_layer[index_net]>0:
                     for k in self.node:
-                        net.add(Dense(k, activation=self.actfun))
+                        net.add(Dense(k, activation=map_actfun[index_net]))
                     net.add(Dense(output_dim))
         else:
              self.nets=[tf.keras.models.load_model(restart+'/net_model_type'+str(k))
-                       for k in range(self.ntipos)]
+                       for k in range(self.number_of_NN)]
              if restart!='all_params':
                 with open(restart+'/opt_net_weights','rb') as source:
                      weight_net=pickle.load(source)

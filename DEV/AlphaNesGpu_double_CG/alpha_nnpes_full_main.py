@@ -178,6 +178,7 @@ def make_method(full_param,model):
 with open(sys.argv[1]) as file:
     full_param = yaml.load(file, Loader=yaml.FullLoader)
 base_pattern=full_param['dataset_folder']
+"""
 try:
     tipos=np.loadtxt(base_pattern+"/type.dat",dtype='int').reshape(-1,1)
     if tipos.shape[0]>1:
@@ -193,6 +194,13 @@ try:
     N=len(type_map)
 except:
     sys.exit("alpha_nes: In the dataset folder it is expected to have a type.dat file with the code for the atom type!")
+"""
+try:
+    color_type_map=np.loadtxt(base_pattern+"/color_type_map.dat",dtype='int').reshape(-1,1)
+    N=color_type_map.shape[0]
+except:
+    sys.exit("alpha_nes: In the dataset folder it is expected to have a color_type_map.dat file with the color code for each site!")
+
 
 
 from gradient_utility.mixture import register_force_3bAFs_grad
@@ -205,8 +213,6 @@ from alphanes_models.mixture.alpha_nes_model import alpha_nes_full
 from source_routine.mixture.physics_layer_mod import physics_layer
 from source_routine.mixture.physics_layer_mod import lognorm_layer
 from source_routine.mixture.force_layer_mod import force_layer
-
-
 
 
 
@@ -326,14 +332,15 @@ except:
     alpha_bound=1.
     print("alpha_nes: alphas will be upper-bound to default",alpha_bound,sep=' ',end='\n')
 
-limit=alpha_bound
-limit3b=alpha_bound
-nt=len(tipos)
-nt_couple=int(nt+nt*(nt-1)/2)
+#nt=len(tipos)
+#nt_couple=int(nt+nt*(nt-1)/2)
 
 #Initializing params for atomic finger prints
 rng_state = np.random.get_state()
-[init_alpha2b,init_alpha3b,init_mu,initial_type_emb,new_rng_state]=init_AFs_param(restart,full_param,nt,rng_state)
+number_of_interaction=3 #intra, inert, sticky
+map_rad_afs=full_param['map_rad_afs']
+number_of_NN=len(map_rad_afs)
+[init_alpha2b,init_alpha3b,init_mu,initial_type_emb,new_rng_state]=init_AFs_param(restart,full_param,number_of_interaction,rng_state)
 np.random.set_state(new_rng_state)
 #Reading cutoff info from input file
 [rc,rad_buff,rc_ang,ang_buff,Rs]=read_cutoff_info(full_param)
@@ -342,19 +349,20 @@ np.random.set_state(new_rng_state)
 max_batch=int(np.max([buffer_stream_tr,buffer_stream_ts]))
 Descriptor_Layer=descriptor_layer(rc,rad_buff,rc_ang,ang_buff,N,box_map_tr[0],Rs,max_batch)
 #######Initialise AFS Layer
+
 Physics_Layers=[physics_layer(init_alpha2b[num_type],init_alpha3b[num_type],
                                 initial_type_emb[num_type]) for num_type
-                                in range(nt)]
+                                in range(number_of_NN)]
 ##Initialise Log layer
-Lognorm_Layers=[lognorm_layer(init_mu[num_type]) for num_type in range(nt)]
+Lognorm_Layers=[lognorm_layer(init_mu[num_type]) for num_type in range(number_of_NN)]
 ##Initialise force layer
 Force_Layer=force_layer(rad_buff,ang_buff)
 ########Define Loss
 [model_loss,val_loss,pe,pf,pb]=make_loss(full_param)
 ###Compose the model by concatenation of layers
-model=alpha_nes_full(Physics_Layers,Force_Layer,nhl,nD,actfun,1,model_loss,
-             val_loss,opt_net,opt_phys,alpha_bound,Lognorm_Layers,tipos,
-             type_map,restart,seed_par)
+model=alpha_nes_full(Physics_Layers,Force_Layer,1,model_loss,
+             val_loss,opt_net,opt_phys,alpha_bound,Lognorm_Layers,
+             color_type_map,restart,seed_par,full_param)
 [trainmeth,testmeth]=make_method(full_param,model)
 #################################################################################
 #################################################################################

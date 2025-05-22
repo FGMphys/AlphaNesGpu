@@ -34,13 +34,13 @@ map_ang_afs: {0: [20,20,20],1: [20,20,20]}
 
 
 #Net parmater
-number_of_decoding_layers: 2
-number_of_decoding_nodes: 240 240
+#number_of_decoding_layers: 2
+map_NN_layer: {0: [240,240],1: [50,50]}
 number_of_epochs: 6000
 
 batch_size: 4
 batch_size_test: 1
-activation_function: tanh
+activation_function: tanh tanh
 alpha_bound: 5.
 
 
