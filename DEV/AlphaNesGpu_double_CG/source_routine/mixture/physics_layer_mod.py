@@ -30,18 +30,21 @@ class physics_layer(tf.Module):
 
 
       @tf.function()
-      def __call__(self,x2b,x3bsupp,intmap2b,x3b,intmap3b,numtriplet,type_map):
+      def __call__(self,x2b,x3bsupp,intmap2b,x3b,intmap3b,numtriplet,color_type_map,
+      map_color_interaction,map_intra):
           self.type_emb_2b_sq=tf.square(self.type_emb_2b)
           self.type_emb_3b_sq=tf.square(self.type_emb_3b)
           self.resproj2b=self.proj2b.compute_sort_proj(x2b,intmap2b,
                                                        self.alpha2b,
                                                        self.type_emb_2b_sq,
-                                                       type_map)
+                                                       color_type_map,map_color_interaction,
+                                                       map_intra)
           self.resproj3b=self.proj3b.compute_sort_proj3body(x3b,x3bsupp,
                                                            intmap3b,
                                                            intmap2b,self.alpha3b,
                                                            self.type_emb_3b_sq,
-                                                           type_map,numtriplet)
+                                                           color_type_map,numtriplet,
+                                                           map_color_interaction,map_intra)
           self.restot=tf.concat([self.resproj2b,self.resproj3b],axis=2)
           return self.restot
       def savealphas(self,folder_ou,prefix):

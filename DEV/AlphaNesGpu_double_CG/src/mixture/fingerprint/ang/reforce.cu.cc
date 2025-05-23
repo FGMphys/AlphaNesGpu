@@ -7,13 +7,20 @@
 
 #define BLOCK_DIM 106
 
-
+int get_symmetric_pair_index(int i, int j, int ntypes) {
+  int diff = i - j;
+  int mask = diff >> 31; // 0 se diff ≥ 0, -1 se diff < 0
+  int min = j + (diff & mask);
+  int max = i - (diff & mask);
+  return min * ntypes - (min * (min + 1)) / 2 + max;
+}
 
 __global__ void angularAFs_kernel(const double* radial_descriptor,const double* angular_descriptor,
                            int nr,int na,double* three_body_AFs,int dimbat,int N_local,
                            const int* interaction_map_angular_o,const double* alpha3b_parameters,
                           int nsmooth_a,const double* type_emb3b,
-                          const int* type_map,const int* num_triplets)
+                          const int* color_type_map,const int* num_triplets,const int* map_color_interaction,
+                          const int* map_intra)
 {
 
     const int2* intmap_a=(const int2*) interaction_map_angular_o;
@@ -48,11 +55,43 @@ __global__ void angularAFs_kernel(const double* radial_descriptor,const double* 
         int actual_ang=b*N_local*na+par*na;
         int aux2=nn;
         int2 neigh=intmap_a[b*N_local*na+par*na+aux2];
-        int j_type=type_map[neigh.x];
-        int k_type=type_map[neigh.y];
+
+        int type_int_j=0;
+        int type_int_k=0;
+
+        int my_mol=map_intra[par];
+        int my_col=color_type_map[par];
+        int my_interaction=map_color_interaction[my_col];
+
+        int j_mol=map_intra[neigh.x];
+        int k_mol=map_intra[neigh.y];
+
+        if (my_mol!=j_mol){
+            int j_col=color_type_map[neigh.x];
+            if (my_interaction==j_col){
+                type_int_j=2; //binding
+            }
+            else {
+                type_int_j=1; //inert
+            }
+        }
+
+        if (my_mol!=k_mol){
+          int k_col=color_type_map[neigh.y];
+          if (my_interaction==k_col){
+              type_int_k=2; //binding
+          }
+          else {
+              type_int_k=1; //inert
+          }
+      }
+
+
+
+
+        int sum=get_symmetric_pair_index(type_int_j,type_int_k, 3);
 
         double angulardes=angular_descriptor[actual_ang+aux2];
-        int sum=j_type+k_type;
         for (int a1=0;a1<nsmooth_a;a1++){
              double alpha1=alphas[sum*nsmooth_a+a1].x;
              double alpha2=alphas[sum*nsmooth_a+a1].y;
@@ -63,7 +102,8 @@ __global__ void angularAFs_kernel(const double* radial_descriptor,const double* 
              double softmaxweight=expf(alpha1*ds[actual+j]+alpha2*ds[actual+k]);
              softmaxweight+=expf(alpha2*ds[actual+j]+alpha1*ds[actual+k]);
              softmaxweight*=expf(betaval*angulardes);
-             atomicAdd((double*)&three_body_AFs[b*nsmooth_a*N_local+par*nsmooth_a+a1],angulardes*softmaxweight*chtjy_par/2.f);
+             atomicAdd((double*)&three_body_AFs[b*nsmooth_a*N_local+par*nsmooth_a+a1],
+                        angulardes*softmaxweight*chtjy_par/2.f);
             }
               }
       }
@@ -73,7 +113,8 @@ void angularAFs_Launcher(const double* radial_descriptor,const double* angular_d
                           double* three_body_AFs,int dimbat,int N_local,
                           const int* interaction_map_angular,const double* alpha3b_parameters,
                           int nsmooth_a,const double* type_emb3b,
-                          const int* type_map,const int* num_triplets){
+                          const int* color_type_map,const int* num_triplets,const int* map_color_interaction,
+                          const int* map_intra){
 
                           dim3 dimGrid(ceil(double(dimbat*N_local*na)/double(BLOCK_DIM)),1,1);
                           dim3 dimBlock(BLOCK_DIM,1,1);
@@ -81,7 +122,7 @@ void angularAFs_Launcher(const double* radial_descriptor,const double* angular_d
                           TF_CHECK_OK(::tensorflow::GpuLaunchKernel(angularAFs_kernel,                      dimGrid, dimBlock, 0, nullptr,radial_descriptor,angular_descriptor,               nr,na,three_body_AFs,dimbat,N_local,
                            interaction_map_angular,alpha3b_parameters,
                           nsmooth_a,type_emb3b,
-                          type_map,num_triplets));
+                          color_type_map,num_triplets,map_color_interaction,map_intra));
 
                           cudaDeviceSynchronize();
                 }

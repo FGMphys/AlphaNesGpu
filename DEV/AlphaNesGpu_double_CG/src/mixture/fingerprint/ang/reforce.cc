@@ -14,15 +14,18 @@ REGISTER_OP("ComputeSortProj3body")
     .Input("interaction_map_rad: int32")
     .Input("alpha3b_parameters: double")
     .Input("type_emb3b_parameters: double")
-    .Input("type_map: int32")
+    .Input("color_type_map: int32")
     .Input("num_triplet: int32")
+    .Input("map_color_interaction: int32")
+    .Input("map_intra: int32")
     .Output("three_body_afs: double");
 
 void angularAFs_Launcher(const double* radial_descriptor,const double* angular_descriptor,int nr,int na,
                           double* three_body_AFs,int dimbat,int Nlocal,
                           const int* interaction_map_angular,const double* alpha3b_parameters,
                           int nsmooth_a,const double* type_emb3b,
-                          const int* type_map,const int* num_triplets);
+                          const int* color_type_map,const int* num_triplets,const int* map_color_interaction,
+                          const int* map_intra);
 
 void set_tensor_to_zero_double(double* tensor,int dimten);
 
@@ -39,9 +42,12 @@ class ComputeSortProj3bodyOp : public OpKernel {
     const Tensor& alpha3b_parameters_T = context->input(4);
 
     const Tensor& type_emb3b_parameters_T = context->input(5);
-    const Tensor& type_map_T = context->input(6);
+    const Tensor& color_type_map_T = context->input(6);
 
     const Tensor& num_triplet_T = context->input(7);
+
+    const Tensor& map_color_interaction_T = context->input(8);
+    const Tensor& map_intra_T = context->input(9);
 
     //flattizzo
     auto angular_descriptor =  angular_descriptor_T.flat<double>();
@@ -51,9 +57,12 @@ class ComputeSortProj3bodyOp : public OpKernel {
     auto alpha3b_parameters = alpha3b_parameters_T.flat<double>();
 
     auto type_emb3b = type_emb3b_parameters_T.flat<double>();
-    auto type_map = type_map_T.flat<int>();
+    auto color_type_map = type_map_T.flat<int>();
 
     auto num_triplet = num_triplet_T.flat<int>();
+
+    auto map_color_interaction = map_color_interaction_T.flat<int>();
+    auto map_intra = map_intra_T.flat<int>();
 
     //Prendo le dimensioni del tensore
     int dimbat = radial_descriptor_T.shape().dim_size(0);
@@ -80,7 +89,8 @@ class ComputeSortProj3bodyOp : public OpKernel {
     angularAFs_Launcher(radial_descriptor.data(),angular_descriptor.data(),nr,na,
                           angular_AFs_T->flat<double>().data(),dimbat,Nlocal,interaction_map_angular.data(),
                           alpha3b_parameters.data(),nsmooth_a,type_emb3b.data(),
-                          type_map.data(),num_triplet.data());
+                          color_type_map.data(),num_triplet.data(),map_color_interaction.data(),
+                        map_intra.data());
   }
 };
 REGISTER_KERNEL_BUILDER(Name("ComputeSortProj3body").Device(DEVICE_GPU), ComputeSortProj3bodyOp);

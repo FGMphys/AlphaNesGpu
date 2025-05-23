@@ -20,6 +20,7 @@ class alpha_nes_full(tf.Module):
         self.number_of_NN=number_of_NN
         self.color_type_map=color_type_map
         self.map_color_interaction=np.loadtxt(full_param['color_interaction_file']).reshape((-1,1))
+        self.map_intra=np.loadtxt(full_param['map_intra_file']).reshape((-1,1)).reshape((-1,1))
 
         self.N=len(color_type_map)
         
@@ -164,9 +165,9 @@ class alpha_nes_full(tf.Module):
     def full_train_e_f(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,
                      intder3bsupp,numtriplet,etrue,ftrue,pe,pf,pb):
 
-        nt=self.ntipos
+        #nt=self.ntipos
 
-
+        '''
         self.x2b=tf.split(x1,self.tipos,axis=1)
         self.x3b=tf.split(x2,self.tipos,axis=1)
         self.x3bsupp=tf.split(x3bsupp,self.tipos,axis=1)
@@ -177,10 +178,24 @@ class alpha_nes_full(tf.Module):
         self.intder3bsupp=tf.split(intder3bsupp,self.tipos,axis=1)
         self.numtriplet=tf.split(numtriplet,self.tipos,axis=1)
 
-
         self.fingerprint=[self.physics_layer[k](self.x2b[k],self.x3bsupp[k],
         self.int2b[k],self.x3b[k],self.int3b[k],self.numtriplet[k],self.type_map)
                     for k in range(nt)]
+        '''
+        self.x2b = x1
+        self.x3b = x2
+        self.x3bsupp = x3bsupp
+        self.int2b = int2b
+        self.int3b = int3b
+        self.intder2b = intder2b
+        self.intder3b = intder3b
+        self.intder3bsupp = intder3bsupp
+        self.numtriplet = numtriplet
+        
+        number_of_NN=self.number_of_NN
+        self.fingerprint=[self.physics_layer[k](self.x2b,self.x3bsupp,
+        self.int2b,self.x3b,self.int3b,self.numtriplet,self.color_type_map,self.map_color_interaction,self.map_intra)
+                    for k in range(number_of_NN)]
         self.log_norm_projdes=[self.lognorm_layer[k](finger)
                          for k,finger in enumerate(self.fingerprint)]
         self.energy=[self.nets[k](cp) for k,cp in enumerate(self.log_norm_projdes)]
@@ -191,27 +206,28 @@ class alpha_nes_full(tf.Module):
         self.totenergy=tf.reduce_mean(self.totene,axis=(-1,-2))*0.5
 
         self.grad_listed=[tf.split(self.grad_ene[k][0],[self.physics_layer[k].nalpha_r,
-                                    self.physics_layer[k].nalpha_a],axis=2) for k in range(nt)]
+                                    self.physics_layer[k].nalpha_a],axis=2) for k in range(number_of_NN)]
 
-        self.force_list=[self.force_layer(self.grad_listed[k][0],self.x2b[k],
-                                 self.intder2b[k],self.int2b[k],
+        self.force_list=[self.force_layer(self.grad_listed[k][0],self.x2b,
+                                 self.intder2b,self.int2b,
                                  self.physics_layer[k].alpha2b,
-                                 self.grad_listed[k][1],self.x3b[k],self.x3bsupp[k],
-                                 self.intder3b[k],self.intder3bsupp[k],self.int3b[k],
-                                 self.numtriplet[k],
+                                 self.grad_listed[k][1],self.x3b,self.x3bsupp,
+                                 self.intder3b,self.intder3bsupp,self.int3b,
+                                 self.numtriplet,
                                  self.physics_layer[k].alpha3b,
                                  self.physics_layer[k].type_emb_2b,
                                  self.physics_layer[k].type_emb_3b,
-                                 self.type_map,self.tipos,k) for k in range(nt)]
+                                 self.color_type_map,k,self.map_color_interaction,
+                                 self.map_intra) for k in range(number_of_NN)]
 
         self.force=tf.math.add_n(self.force_list)
 
         loss_energy=self.lossfunction(self.totenergy,etrue)
         loss_force=self.lossfunction(self.force,ftrue)
         loss_bound_2b=[tf.math.reduce_sum(self.relu_bound(self.physics_layer[k].alpha2b))
-              for k in range(nt)]
+              for k in range(number_of_NN)]
         loss_bound_3b=[tf.math.reduce_sum(self.relu_bound(self.physics_layer[k].alpha3b))
-                 for k in range(nt)]
+                 for k in range(number_of_NN)]
         loss_bound=tf.add_n(loss_bound_2b)+tf.add_n(loss_bound_3b)
 
         loss=pe*loss_energy+pb*loss_bound+pf*loss_force#+l1_loss
@@ -227,14 +243,14 @@ class alpha_nes_full(tf.Module):
         #all_net_grad=[grad_w[k] for k in range(nt)]
         #all_net_param=[self.nets[k].trainable_variables for k in range(nt)]
         grads_and_vars_net=[]
-        for k in range(nt):
+        for k in range(number_of_NN):
             grad_var_pairs = [(grad, param) for grad, param in zip(grad_w[k], self.nets[k].trainable_variables)]
             grads_and_vars_net.extend(grad_var_pairs)
         #self.opt_net.apply_gradients(grads_and_vars_net)
 #        self.opt_net.apply_gradients(zip(all_net_grad,all_net_param))
         grads_and_vars_afs = []
 
-        for k in range(nt):
+        for k in range(number_of_NN):
             # Aggiungi i gradienti per alpha2b
             grads_and_vars_afs.extend([(grad_2b[k][0], self.physics_layer[k].alpha2b)])
 
@@ -256,7 +272,7 @@ class alpha_nes_full(tf.Module):
     @tf.function()
     def full_test_e_f(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,intder3bsupp,
                      numtriplet,etrue,ftrue):
-
+        '''
         nt=self.ntipos
 
 
@@ -275,6 +291,23 @@ class alpha_nes_full(tf.Module):
         self.fingerprint=[self.physics_layer[k](self.x2b[k],self.x3bsupp[k],
         self.int2b[k],self.x3b[k],self.int3b[k],self.numtriplet[k],self.type_map)
                     for k in range(nt)]
+        '''
+        self.x2b = x1
+        self.x3b = x2
+        self.x3bsupp = x3bsupp
+        self.int2b = int2b
+        self.int3b = int3b
+        self.intder2b = intder2b
+        self.intder3b = intder3b
+        self.intder3bsupp = intder3bsupp
+        self.numtriplet = numtriplet
+        
+        number_of_NN=self.number_of_NN
+        self.fingerprint=[self.physics_layer[k](self.x2b,self.x3bsupp,
+        self.int2b,self.x3b,self.int3b,self.numtriplet,self.color_type_map,
+        self.map_color_interaction,self.map_intra)
+                    for k in range(number_of_NN)]
+
         self.log_norm_projdes=[self.lognorm_layer[k](finger)
                          for k,finger in enumerate(self.fingerprint)]
 
@@ -284,20 +317,21 @@ class alpha_nes_full(tf.Module):
         self.totene=tf.concat(self.energy,axis=1)
         self.totenergy=tf.reduce_mean(self.totene,axis=(-1,-2))*0.5
         self.grad_listed=[tf.split(self.grad_ene[k][0],[self.physics_layer[k].nalpha_r,
-                                    self.physics_layer[k].nalpha_a],axis=2) for k in range(nt)]
-
-        self.force_list=[self.force_layer(self.grad_listed[k][0],self.x2b[k],
-                                 self.intder2b[k],self.int2b[k],
+                                    self.physics_layer[k].nalpha_a],axis=2) for k in range(number_of_NN)]
+        self.force_list=[self.force_layer(self.grad_listed[k][0],self.x2b,
+                                 self.intder2b,self.int2b,
                                  self.physics_layer[k].alpha2b,
-                                 self.grad_listed[k][1],self.x3b[k],self.x3bsupp[k],
-                                 self.intder3b[k],self.intder3bsupp[k],self.int3b[k],
-                                 self.numtriplet[k],
+                                 self.grad_listed[k][1],self.x3b,self.x3bsupp,
+                                 self.intder3b,self.intder3bsupp,self.int3b,
+                                 self.numtriplet,
                                  self.physics_layer[k].alpha3b,
                                  self.physics_layer[k].type_emb_2b,
                                  self.physics_layer[k].type_emb_3b,
-                                 self.type_map,self.tipos,k) for k in range(nt)]
+                                 self.color_type_map,self.map_color_interaction,k,
+                                 self.map_intra) for k in range(number_of_NN)]
 
         self.force=tf.math.add_n(self.force_list)
+        
 
 
         loss_energy=self.val_loss(self.totenergy,etrue)

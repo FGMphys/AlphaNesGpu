@@ -197,7 +197,7 @@ except:
 """
 try:
     color_type_map=np.loadtxt(base_pattern+"/color_type_map.dat",dtype='int').reshape(-1,1)
-    N=color_type_map.shape[0]
+    Number_of_particles=color_type_map.shape[0]
 except:
     sys.exit("alpha_nes: In the dataset folder it is expected to have a color_type_map.dat file with the color code for each site!")
 
@@ -347,7 +347,7 @@ np.random.set_state(new_rng_state)
 #################INITIALISE ALL THE LAYER FOR THE MODEL ##############################
 #######Initialise Descriptor Layer###################################################
 max_batch=int(np.max([buffer_stream_tr,buffer_stream_ts]))
-Descriptor_Layer=descriptor_layer(rc,rad_buff,rc_ang,ang_buff,N,box_map_tr[0],Rs,max_batch)
+Descriptor_Layer=descriptor_layer(rc,rad_buff,rc_ang,ang_buff,Number_of_particles,box_map_tr[0],Rs,max_batch)
 #######Initialise AFS Layer
 
 Physics_Layers=[physics_layer(init_alpha2b[num_type],init_alpha3b[num_type],
