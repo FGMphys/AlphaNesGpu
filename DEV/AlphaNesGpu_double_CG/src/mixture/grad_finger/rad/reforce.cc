@@ -12,7 +12,9 @@ REGISTER_OP("ComputeTwoBodyParGrad")
     .Input("interaction_map_rad: int32")
     .Input("alpha2b_parameters: double")
     .Input("type_emb2b_parameters: double")
-    .Input("type_map: int32")
+    .Input("color_type_map: int32")
+    .Input("map_color_interaction: int32")
+    .Input("map_intra: int32")
     .Output("nextgrad_alpha2b: double")
     .Output("nextgrad_emb2b: double");
 
@@ -21,7 +23,8 @@ void alpha_dist_grad_Launcher(const double* radial_descriptor,int nr,
                        int nalpha_r,double* nextgrad_alpha2b,int dimbat,
                        int Nlocal,const int* interaction_map_rad,
                        const double* prev_grad,const double* type_emb2b,
-                       const int* type_map,double* nextgrad_emb2);
+                       const int* color_type_map,double* nextgrad_emb2,
+                       const int* map_color_interaction,const int* map_intra);
 void set_tensor_to_zero_double(double* tensor,int dimten);
 
 class ComputeTwoBodyParGradOp : public OpKernel {
@@ -35,7 +38,10 @@ class ComputeTwoBodyParGradOp : public OpKernel {
     const Tensor& intmap2b_T = context->input(2);
     const Tensor& alpha_radiale_T = context->input(3);
     const Tensor& type_emb2b_T = context->input(4);
-    const Tensor& type_map_T = context->input(5);
+    const Tensor& color_type_map_T = context->input(5);
+
+    const Tensor& map_color_interaction_T = context->input(6);
+    const Tensor& map_intra_T=context->input(7);
 
     //flattizzo
     auto prev_grad=prev_grad_T.flat<double>();
@@ -44,7 +50,10 @@ class ComputeTwoBodyParGradOp : public OpKernel {
     auto alpha2b_parameters = alpha_radiale_T.flat<double>();
 
     auto type_emb2b = type_emb2b_T.flat<double>();
-    auto type_map = type_map_T.flat<int>();
+    auto color_type_map = color_type_map_T.flat<int>();
+
+    auto map_color_interaction=map_color_interaction_T.flat<int>();
+    auto map_intra=map_intra_T.flat<int>();
 
 
     //Prendo le dimensioni del tensore
@@ -77,8 +86,9 @@ class ComputeTwoBodyParGradOp : public OpKernel {
     alpha_dist_grad_Launcher(radial_descriptor.data(),nr,alpha2b_parameters.data(),
                            nalpha_r,nextgrad_alpha2b_T->flat<double>().data(),dimbat,
                            Nlocal,interaction_map_rad.data(),
-                           prev_grad.data(),type_emb2b.data(),type_map.data(),
-                           nextgrad_emb2_T->flat<double>().data());
+                           prev_grad.data(),type_emb2b.data(),color_type_map.data(),
+                           nextgrad_emb2_T->flat<double>().data(),map_color_interaction.data(),
+                           map_intra.data());
 
   }
 };

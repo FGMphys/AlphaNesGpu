@@ -14,5 +14,6 @@ def _compute_sort_proj_3body_grad(op, grad):
     [alpha3bodygrad,grad_emb3b_afs]=compute_method(grad,op.inputs[0],op.inputs[1],
                                   op.inputs[2],op.inputs[3],
                                   op.inputs[4],op.inputs[5],
-                                  op.inputs[6],op.inputs[7])
-    return [None, None, None, None,alpha3bodygrad,grad_emb3b_afs,None,None]
+                                  op.inputs[6],op.inputs[7],
+                                  op.inputs[8],op.inputs[9])
+    return [None, None, None, None,alpha3bodygrad,grad_emb3b_afs,None,None,None,None]

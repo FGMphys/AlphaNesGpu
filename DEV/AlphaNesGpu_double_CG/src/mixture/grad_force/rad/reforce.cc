@@ -42,9 +42,10 @@ REGISTER_OP("ComputeForceRadialGrad")
     .Input("radial_descriptor: double")
     .Input("alpha2b_parameters: double")
     .Input("type_emb2b_parameters: double")
-    .Input("type_map: int32")
-    .Input("tipos: int32")
+    .Input("color_type_map: int32")
+    .Input("map_color_interaction: int32")
     .Input("actual_type: int32")
+    .Input("map_intra: int32")
     .Output("gradnet: double")
     .Output("grad_alpha2b: double")
     .Output("grad_emb2b: double");
@@ -53,9 +54,10 @@ void back_prop_grad_force2b_Launcher(const double* prevgrad,const double* radial
                            int nr,const double* alpha_radiale,int num_finger,
                            const double* desder,const int* intmap2b,
                            int dimbat,int N,int N_local,const double*netderiv,
-                           const double* type_emb2b,int nt,const int* type_map,
-                           const int* tipos,const int* actual_type,double* grad_net,
-                           double* grad_alpha2b,double* grad_emb2b);
+                           const double* type_emb2b,int nt,const int* color_type_map,
+                           const int* map_color_interaction,const int* actual_type,
+                           const int* map_intra,double* grad_net,double* grad_alpha2b,
+                           double* grad_emb2b);
 
 
 class ComputeForceRadialGradOp : public OpKernel {
@@ -72,18 +74,20 @@ class ComputeForceRadialGradOp : public OpKernel {
       const Tensor& alpha_radiale_T = context->input(5);
 
       const Tensor& type_emb2b_T = context->input(6);
-      const Tensor& type_map_T = context->input(7);
+      const Tensor& color_type_map_T = context->input(7);
 
-      const Tensor& tipos_T = context->input(8);
+      const Tensor& map_color_interaction_T = context->input(8);
       const Tensor& actual_type_T = context->input(9);
+
+      const Tensor& map_intra_T = context->input(10);
 
 
       //Grabbing some useful dimension
       int dimbat = desr_T.shape().dim_size(0);
       int nr = desr_T.shape().dim_size(2);
       int N_local=desr_T.shape().dim_size(1);
-      int N = type_map_T.shape().dim_size(0);
-      int nt = tipos_T.shape().dim_size(0);
+      int N = color_type_map_T.shape().dim_size(0);
+      int nt = alpha_radiale_T.shape().dim_size(0);
       int num_finger=alpha_radiale_T.shape().dim_size(1);
 
       //Flatting Tensors
@@ -94,8 +98,9 @@ class ComputeForceRadialGradOp : public OpKernel {
       auto radiale = desr_T.flat<double>();
       auto alpha_radiale = alpha_radiale_T.flat<double>();
       auto type_emb2b = type_emb2b_T.flat<double>();
-      auto type_map = type_map_T.flat<int>();
-      auto tipos = tipos_T.flat<int>();
+      auto color_type_map = type_map_T.flat<int>();
+      auto map_color_interaction=map_color_interaction_T.flat<int>();
+      auto map_intra=map_intra_T.flat<int>();
 
       const int* actual_type=actual_type_T.flat<int>().data();
 
@@ -131,8 +136,9 @@ class ComputeForceRadialGradOp : public OpKernel {
 
       back_prop_grad_force2b_Launcher(prevgrad.data(),radiale.data(),nr,alpha_radiale.data(),num_finger,
                            desder.data(),intmap2b.data(),dimbat,N,N_local,netderiv.data(),type_emb2b.data(),
-                           nt,type_map.data(),tipos.data(),actual_type,grad_net_T->flat<double>().data(),
-                           grad_alpha2b_T->flat<double>().data(),grad_emb2b_T->flat<double>().data());
+                           nt,color_type_map.data(),map_color_interaction.data(),actual_type,map_intra.data(),
+                           grad_net_T->flat<double>().data(),grad_alpha2b_T->flat<double>().data(),
+                           grad_emb2b_T->flat<double>().data());
 
 
   }

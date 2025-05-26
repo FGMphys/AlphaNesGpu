@@ -10,8 +10,9 @@
 
 __global__ void alphagrad_dist_kernel(const double* radial_descriptor,int nr,
 const double* alpha2b_parameters,int nalpha_r,int dimbat,int N_local,
-const int* intmap_r,const double* type_emb2b,const int* type_map,
-double* nextgrad_alpha2b, double* nextgrad_emb2b,const double* prevgrad)
+const int* intmap_r,const double* type_emb2b,const int* color_type_map,
+double* nextgrad_alpha2b, double* nextgrad_emb2b,const double* prevgrad,
+const int* map_color_interaction,const int* map_intra)
 {
 
   int t=blockIdx.x*blockDim.x+threadIdx.x;
@@ -29,7 +30,23 @@ double* nextgrad_alpha2b, double* nextgrad_emb2b,const double* prevgrad)
           int actual=b*N_local*nr+par*nr;
           double des_r_el=radial_descriptor[actual+j];
           int neighj=intmap_r[b*(N_local*(nr+1))+(nr+1)*par+1+j];
-          int cht=type_map[neighj];
+
+          int my_mol=map_intra[par];
+          int j_mol=map_intra[neighj];
+          int row_index=0;
+          if (my_mol!=j_mol){
+             int my_col=color_type_map[par];
+             int j_col=color_type_map[neighj];
+             int my_interaction=map_color_interaction[my_col];
+             if (my_interaction==j_col){
+                  row_index=2;
+             }
+             else {
+                  row_index=1;
+             }
+          }
+
+          int cht=row_index;
           int i;
           for (i=0;i<nalpha_r;i++){
               double prevgradel=prevgrad[b*nalpha_r*N_local+par*nalpha_r+i];
@@ -50,7 +67,8 @@ void alpha_dist_grad_Launcher(const double* radial_descriptor,int nr,
                       int nalpha_r,double* nextgrad_alpha2b,int dimbat,
                       int N_local,const int* interaction_map_rad,
                       const double* prevgrad,const double* type_emb2b,
-                      const int* type_map,double* nextgrad_emb2){
+                      const int* color_type_map,double* nextgrad_emb2,
+                      const int* map_color_interaction,const int* map_intra){
 
       dim3 dimGrid(ceil(double(dimbat*N_local*nr)/double(BLOCK_DIM)),1,1);
       dim3 dimBlock(BLOCK_DIM,1,1);
@@ -59,8 +77,8 @@ void alpha_dist_grad_Launcher(const double* radial_descriptor,int nr,
         ::tensorflow::GpuLaunchKernel(alphagrad_dist_kernel,
               dimGrid, dimBlock, 0, nullptr,radial_descriptor,nr,
               alpha2b_parameters,nalpha_r,dimbat,N_local,
-              interaction_map_rad,type_emb2b,type_map,nextgrad_alpha2b,
-              nextgrad_emb2,prevgrad)
+              interaction_map_rad,type_emb2b,color_type_map,nextgrad_alpha2b,
+              nextgrad_emb2,prevgrad,map_color_interaction,map_intra)
       );
 
       cudaDeviceSynchronize();
@@ -78,7 +96,8 @@ void set_tensor_to_zero_double(double* tensor,int dimten){
      int grids=ceil(double(dimten)/double(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
-     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_double_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
+     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_double_kernel,
+     dimGrid,dimBlock, 0, nullptr,tensor,dimten));
      cudaDeviceSynchronize();
      }
 #endif

@@ -16,5 +16,5 @@ def _compute_force_tripl_grad(op, grad):
                                                  op.inputs[6],op.inputs[7],
                                                  op.inputs[8],op.inputs[9],
                                                  op.inputs[10],op.inputs[11],
-                                                 op.inputs[12])
-    return [net_grad0,None,None,None,None,None,None,net_grad1,grad_emb3b_par,None,None,None,None]
+                                                 op.inputs[12],op.inputs[13])
+    return [net_grad0,None,None,None,None,None,None,net_grad1,grad_emb3b_par,None,None,None,None,None]

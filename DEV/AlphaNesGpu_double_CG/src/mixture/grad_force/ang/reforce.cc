@@ -42,10 +42,11 @@ REGISTER_OP("ComputeForceTriplGrad")
     .Input("interaction_map_ang: int32")
     .Input("alpha3b_parameters: double")
     .Input("type_emb3b_parameters: double")
-    .Input("type_map: int32")
-    .Input("tipos: int32")
+    .Input("color_type_map: int32")
+    .Input("map_color_interaction: int32")
     .Input("actual_type: int32")
     .Input("num_triplets: int32")
+    .Input("map_intra: int32")
     .Output("gradnet: double")
     .Output("gradalpha: double")
     .Output("gradck: double");
@@ -53,12 +54,12 @@ REGISTER_OP("ComputeForceTriplGrad")
     void gradforce_tripl_Launcher(const double*  prevgrad_T_d,const double*  netderiv_T_d, const double* desr_T_d,
                                       const double* desa_T_d,const double* intderiv_r_T_d,
                                       const double* intderiv_a_T_d,const int* intmap_r_T_d,
-                                      const int* intmap_a_T_d,int nr, int na, int N,
-                                      int dimbat,int num_finger,const double* type_emb3b_d,int nt,
-                                      const int* tipos_T,const int* actual_type,
+                                      const int* intmap_a_T_d,int nr, int na, int N,int nt_couple,
+                                      int dimbat,int num_finger,const double* type_emb3b_d,
+                                      const int* map_color_interaction_T,const int* actual_type,
                                       const int *num_triplets_d,const double* smooth_a_T,
-                                      const int* type_map_T_d,int prod,double* gradnet_3b_T_d,
-                                      double* grad_alpha3b_T_d,double* grad_emb3b_T_d);
+                                      const int* color_type_map_T_d,int prod,const int* map_intra_T,
+                                      double* gradnet_3b_T_d,double* grad_alpha3b_T_d,double* grad_emb3b_T_d);
 
 
 void set_tensor_to_zero_double(double* tensor,int dim);
@@ -81,10 +82,12 @@ class ComputeForceTriplGradOp : public OpKernel {
     const Tensor& type_emb3b_T = context->input(9);
     const Tensor& type_map_T = context->input(10);
 
-    const Tensor& tipos_T = context->input(11);
+    const Tensor& map_color_interaction_T = context->input(11);
     const Tensor& actual_type_T = context->input(12);
 
     const Tensor& num_triplets_T=context->input(13);
+
+    const Tensor& map_intra_T=context->input(14);
 
 
     //Grabbing dimension to allocate output
@@ -94,11 +97,11 @@ class ComputeForceTriplGradOp : public OpKernel {
 
     int na = desa_T.shape().dim_size(2);
 
-    int N = type_map_T.shape().dim_size(0);
+    int N = color_type_map_T.shape().dim_size(0);
     int Nlocal = desr_T.shape().dim_size(1);
 
-    int nt = tipos_T.shape().dim_size(0);
-    int nt_couple=nt*(nt+1)/2;
+    //int nt = .shape().dim_size(0);
+    int nt_couple=smooth_a_T.shape().dim_size(0);
 
     const int* actual_type=actual_type_T.flat<int>().data();
 
@@ -115,9 +118,10 @@ class ComputeForceTriplGradOp : public OpKernel {
     auto intmap_a_T_d=intmap_a_T.flat<int>();
     auto type_emb3b_T_d=type_emb3b_T.flat<double>();
     auto smooth_a_T_d=smooth_a_T.flat<double>();
-    auto type_map_T_d=type_map_T.flat<int>();
-    auto tipos_T_d=tipos_T.flat<int>();
+    auto color_type_map_T_d=color_type_map_T.flat<int>();
+    auto map_color_interaction_T_d=map_color_interaction_T.flat<int>();
     auto num_triplets_T_d=num_triplets_T.flat<int>();
+    auto map_intra_T_d=map_intra_T.flat<int>();
 
     // Create an output tensor for DL/DT
     Tensor* gradnet_3b_T = NULL;
@@ -151,10 +155,10 @@ class ComputeForceTriplGradOp : public OpKernel {
     int prod=dimbat*Nlocal*na;
     gradforce_tripl_Launcher(prevgrad_T_d.data(),netderiv_T_d.data(), desr_T_d.data(), desa_T_d.data(),intderiv_r_T_d.data(),intderiv_a_T_d.data(),
                         intmap_r_T_d.data(),intmap_a_T_d.data(),
-                        nr, na, N, dimbat,num_finger,type_emb3b_T_d.data(),nt,
-                        tipos_T_d.data(),
+                        nr, na, N, nt_couple,dimbat,num_finger,type_emb3b_T_d.data(),
+                        map_color_interaction_T_d.data(),
                         actual_type,num_triplets_T_d.data(),smooth_a_T_d.data(),
-                        type_map_T_d.data(),prod,gradnet_3b_T->flat<double>().data(),
+                        color_type_map_T_d.data(),prod,map_intra_T_d.data(),gradnet_3b_T->flat<double>().data(),
                         grad_alpha3b_T->flat<double>().data(),
   			grad_emb3b_T->flat<double>().data());
 

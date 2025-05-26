@@ -29,8 +29,9 @@ __global__ void back_prop_grad_force2b_kernel(const double* prevgrad,const doubl
                            int nr,const double* alpha2b,int num_finger,
                            const double* intderiv_r,const int* intmap_r,
                            int dimbat,int N,int N_local,const double*netderiv,
-                           const double* type_emb2b,int nt,const int* type_map,
-                           const int* tipos,const int* actual_type_p,double* grad_net,
+                           const double* type_emb2b,int nt,const int* color_type_map,
+                           const int* map_color_interaction,const int* actual_type_p,
+                           const int* map_intra, double* grad_net,
                            double* grad_alpha2b,double* grad_emb2b)
                             {
        int t=blockIdx.x*blockDim.x+threadIdx.x;
@@ -47,23 +48,34 @@ __global__ void back_prop_grad_force2b_kernel(const double* prevgrad,const doubl
          int par=reminder/nr;
          int j=reminder%nr;
 
-	  int nr_particle=intmap_r[b*N_local*(nr+1)+par*(nr+1)];
+	       int nr_particle=intmap_r[b*N_local*(nr+1)+par*(nr+1)];
 
          if (j<nr_particle)
         {
           int actual_type=actual_type_p[0];
           int tipos_shift=0;
 
-          for (int y=0;y<actual_type;y++){
-              tipos_shift=tipos_shift+tipos[y];
-          }
-
           int absolute_par=par+tipos_shift;
           int actual=b*N_local*nr+par*nr;
 
           int neighj=intmap_r[b*(N_local*(nr+1))+(nr+1)*par+1+j];
 
-          int ch_type=type_map[neighj];
+          int my_mol=map_intra[par];
+          int j_mol=map_intra[neighj];
+          int row_index=0;
+          if (my_mol!=j_mol){
+             int my_col=color_type_map[par];
+             int j_col=color_type_map[neighj];
+             int my_interaction=map_color_interaction[my_col];
+             if (my_interaction==j_col){
+                  row_index=2;
+             }
+             else {
+                  row_index=1;
+             }
+          }
+
+          int ch_type=row_index;
 
 
           double ds_el=ds[actual+j];
@@ -80,7 +92,7 @@ __global__ void back_prop_grad_force2b_kernel(const double* prevgrad,const doubl
 
               double alpha_el=alpha2b[num_finger*ch_type+i];
               double chpar=type_emb2b[num_finger*ch_type+i];
-              double supp1=expf(alpha_el*ds_el);
+              double supp1=exp(alpha_el*ds_el);
               double sds_deriv=supp1*(1.f+alpha_el*ds_el);
               double buff_alpha=chpar*supp1*ds_el*(2.f+alpha_el*ds_el);
 
@@ -109,8 +121,9 @@ void back_prop_grad_force2b_Launcher(const double* prevgrad,const double* radial
                            int nr,const double* alpha_radiale,int num_finger,
                            const double* desder,const int* intmap_r,
                            int dimbat,int N,int N_local,const double*netderiv,
-                           const double* type_emb2b,int nt,const int* type_map,
-                           const int* tipos,const int* actual_type,double* grad_net,
+                           const double* type_emb2b,int nt,const int* color_type_map,
+                           const int* map_color_interaction,const int* actual_type,
+                           const int* map_intra,double* grad_net,
                            double* grad_alpha2b,double* grad_emb2b){
 
               dim3 dimGrid(ceil(double(dimbat*N_local*nr)/double(BLOCK_DIM)),1,1);
@@ -121,9 +134,9 @@ void back_prop_grad_force2b_Launcher(const double* prevgrad,const double* radial
                            nr,alpha_radiale,num_finger,
                            desder,intmap_r,
                            dimbat,N,N_local,netderiv,
-                           type_emb2b,nt,type_map,
-                           tipos,actual_type,grad_net,
-                           grad_alpha2b,grad_emb2b));
+                           type_emb2b,nt,color_type_map,
+                           map_color_interaction,actual_type,map_intra,
+                           grad_net,grad_alpha2b,grad_emb2b));
 
               cudaDeviceSynchronize();
 

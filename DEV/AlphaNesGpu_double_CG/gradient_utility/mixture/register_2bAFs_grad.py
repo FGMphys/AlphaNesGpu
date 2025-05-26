@@ -12,6 +12,7 @@ def _compute_sort_proj_grad(op,grad):
     [net_grad,grad_emb2b_afs] =  compute_2b_pargrad.compute_two_body_par_grad (
                                                  grad,op.inputs[0],
                                                  op.inputs[1],op.inputs[2],
-                                                 op.inputs[3],op.inputs[4]
+                                                 op.inputs[3],op.inputs[4],
+                                                 op.inputs[5],op.inputs[6]
                                                  )
-    return [None,None,net_grad,grad_emb2b_afs,None]
+    return [None,None,net_grad,grad_emb2b_afs,None,None,None]

@@ -12,8 +12,10 @@ REGISTER_OP("ComputeSortProj3bodyGrad")
     .Input("intmap2b: int32")
     .Input("alpha3b_parameters: double")
     .Input("type_emb3b: double")
-    .Input("type_map: int32")
+    .Input("color_type_map: int32")
     .Input("num_triplets: int32")
+    .Input("map_color_interaction: int32")
+    .Input("map_intra: int32")
     .Output("alphagrad3body: double")
     .Output("nextgrad_emb3b: double");
 
@@ -22,8 +24,9 @@ void alphagrad_ang_Launcher(const double* radial_descriptor,const double* angula
                  int nr,int na,const double* prevgrad,int dimbat,
                  int Nlocal,const int* intmap3b,const double* alpha3b,
                  int nsmooth_a,double* next_alpha3b_grad,
-                 const double* type_emb3b,const int* type_map,
-                 double* next_emb3b_grad, const int* num_triplet,int nt_couple);
+                 const double* type_emb3b,const int* color_type_map,
+                 double* next_emb3b_grad, const int* num_triplet,int nt_couple,
+                 const int* map_color_interaction,const int* map_intra);
 
 void set_tensor_to_zero_double(double* tensor,int dimten);
 
@@ -41,8 +44,11 @@ class ComputeSortProj3bodyGradOp : public OpKernel {
     const Tensor& interaction_map_rad_T = context->input(4);
     const Tensor& alpha3b_parameters_T = context->input(5);
     const Tensor& type_emb3b_parameters_T = context->input(6);
-    const Tensor& type_map_T = context->input(7);
+    const Tensor& color_type_map_T = context->input(7);
     const Tensor& num_triplet_T = context->input(8);
+
+    const Tensor& map_color_interaction_T = context->input(9);
+    const Tensor& map_intra_T = context->input(10);
 
     auto prevgrad=prevgrad_T.flat<double>();
     auto angular_descriptor =  angular_descriptor_T.flat<double>();
@@ -51,8 +57,11 @@ class ComputeSortProj3bodyGradOp : public OpKernel {
     auto interaction_map_rad = interaction_map_rad_T.flat<int>();
     auto alpha3b = alpha3b_parameters_T.flat<double>();
     auto type_emb3b = type_emb3b_parameters_T.flat<double>();
-    auto type_map = type_map_T.flat<int>();
+    auto color_type_map = color_type_map_T.flat<int>();
     auto num_triplet = num_triplet_T.flat<int>();
+
+    auto map_color_interaction=map_color_interaction_T.flat<int>();
+    auto map_intra=map_intra_T.flat<int>();
 
     //Prendo le dimensioni del tensore
     int dimbat = radial_descriptor_T.shape().dim_size(0);
@@ -84,8 +93,9 @@ class ComputeSortProj3bodyGradOp : public OpKernel {
                      nr,na,prevgrad.data(),dimbat,
                      Nlocal,intmap3b.data(),alpha3b.data(),nsmooth_a,
                      next_alpha3b_grad_T->flat<double>().data(),
-                     type_emb3b.data(),type_map.data(),
-                     next_emb3b_grad_T->flat<double>().data(),num_triplet.data(),nt_couple);
+                     type_emb3b.data(),color_type_map.data(),
+                     next_emb3b_grad_T->flat<double>().data(),num_triplet.data(),nt_couple,
+                     map_color_interaction.data(),map_intra.data());
 }
 
 };
