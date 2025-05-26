@@ -57,7 +57,7 @@ class ComputeSortProj3bodyOp : public OpKernel {
     auto alpha3b_parameters = alpha3b_parameters_T.flat<double>();
 
     auto type_emb3b = type_emb3b_parameters_T.flat<double>();
-    auto color_type_map = type_map_T.flat<int>();
+    auto color_type_map = color_type_map_T.flat<int>();
 
     auto num_triplet = num_triplet_T.flat<int>();
 

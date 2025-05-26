@@ -7,7 +7,7 @@
 
 #define BLOCK_DIM 106
 
-int get_symmetric_pair_index(int i, int j, int ntypes) {
+__host__ __device__ int get_symmetric_pair_index(int i, int j, int ntypes) {
   int diff = i - j;
   int mask = diff >> 31; // 0 se diff ≥ 0, -1 se diff < 0
   int min = j + (diff & mask);
