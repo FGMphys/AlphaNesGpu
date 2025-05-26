@@ -1,0 +1,68 @@
+#yaml input file
+
+#Dataset Path
+dataset_folder: /leonardo_work/CNHPC_1576112_0/fguidare/GESB/dataset_GESB/dataset
+
+######How many frames to keep in memory simultaneoulsy
+######for descriptor calculation
+buffer_stream_dim_ts: 4 #for test (evaluate)
+buffer_stream_dim_tr: 4 #for training (evaluate+optimize)
+displ_freq: 10 ## Frequency of saving tranining loss
+
+freq_test: 4
+##Do you want to subsample your dataset? 
+subsampling: 'no' #Option: 'no' or 'xx yy' (xx yy will subsample randomly xx frames for training and yy for test)
+
+###How you want to name your model?
+model_name: 'model_log'
+
+#Do you want to restart?
+restart:  'no'  #Options: 'no' or 'all_params' or 'only_afs' or 'from_last' or 'modelname' (all_params restart both AFs and NN parameters but not the optimization process, from_last restart all params and the optmization procedure from the second-last folder with prefix specified in model_name key)
+
+afs_param_folder: #You need to specify this only if you use 'only_afs' or 'all_params' in the restart key. 
+
+#Descriptor parameter
+Rc: 6.6 #Radial cutoff
+Rs: 3.3 #Radial cutoff repulsive part
+Rc_Angular: 6.6  #Angular cutoff
+
+Radial_Buffer: 180 #Guess for the maximum number of neighbours inside Rc
+Max_Angular_Neigh: 180 #Guess for the maximum number of neighbours inside Rc_Angular
+#Attention: If the guess for the maximum number of the neighbpurs is superated the program ends 
+
+#AFs parameter
+map_rad_afs: {0: [10,10],1: [10,10]} #Dictionary for radial fingerprint
+map_ang_afs: {0: [14,14,14],1: [14,14,14]} #Dictionary for angular fingerprint
+#Dictionary uses as key the type of atoms (in this system 0 and 1, oxygen and hydrogen) and the value is the list specifying how many AFs connect the atom of type 0 with atoms of type 0 and type 1 respectively. Hence 0: [10,5] means oxygen is connected to another Oxygen by 10 radial AFs while to hydrogens by 5 radial AFs.  
+
+#Net parmater
+number_of_decoding_layers: 2 #number of hidden layer
+number_of_decoding_nodes: 240 240 #number of nodes for each layer
+number_of_epochs: 800000 #number of epochs (one epoch is when the entire training dataset has been optimizized
+activation_function: tanh #Activation function
+
+#Training parameters
+batch_size: 4 #How many frames you want to optimize together (memory balance+optimization)
+batch_size_test: 1 #How many frames you want to test together (memory balance)
+alpha_bound: 10. #Boundary for AFs parameters
+
+loss_energy_prefactor: 1. #loss prefactor
+loss_force_prefactor: 1. #loss prefactor
+
+optimizer_net: adam #Optimizer
+optimizer_phys: adam #Optimizer
+loss_method: huber #Loss function (Options: huber or MSE, validation is always MSE)
+
+type_of_training: energy+force #Options: energy or energy+force
+
+##Learning rate schedule
+#Options:
+#        1. expdec initial_learningrate final_learningrate
+#        2. cosann initial_learningrate first_decaystep t_mul m_mul alpha
+lr_dense_net: cosann 0.001 2.5 1.4 0.9 0.0000001
+lr_phys_net:  cosann 0.001 2.5 1.4 0.9 0.0000001
+#lr_dense_net: expdec 0.001 0.0000001
+#lr_phys_net:  expdec 0.001 0.0000001
+
+#Seed for all initial optimization (GPU and CPU may differ at the same seed)
+Seed: 60
