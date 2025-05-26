@@ -27,8 +27,9 @@ void init_block_dim(int buffdim){
 __global__ void computeforce_doublets_kernel(const double* netderiv,const double* des_r,const double* intderiv_r,const int* intmap_r,
             int nr,int N,int dimbat,
             int num_alpha_radiale,const double* alpha_radiale,
-            const double* type_emb2b,int nt,const int* tipos_T,
-            const int* actual_type_p,const int* type_map,double* forces2b_l,int BLOCK_DIM)
+            const double* type_emb2b,const int* actual_type_p,
+            const int* color_type_map,double* forces2b_l,
+            int BLOCK_DIM,const int* map_color_interaction,const int* map_intra)
 {
 
     int actual_type=actual_type_p[0];
@@ -63,17 +64,36 @@ __global__ void computeforce_doublets_kernel(const double* netderiv,const double
     if (t<N_local*dimbat*nr)
     {
         int nr_particle=intmap_r[b*N_local*(nr+1)+par*(nr+1)];
-	int neighj=intmap_r[b*(N_local*(nr+1))+(nr+1)*par+1+j];
+
+
         if (j<nr_particle)
         {
 
-            double des_r_el=des_r[actual+j];
-            int ch_type=type_map[neighj];
 
-            double intder_r_x=intderiv_r[b*N_local*3*nr+nr*3*par+0*nr+j];
-            double intder_r_y=intderiv_r[b*N_local*3*nr+nr*3*par+1*nr+j];
-            double intder_r_z=intderiv_r[b*N_local*3*nr+nr*3*par+2*nr+j];
-            for (int i=0; i<num_alpha_radiale;i++){
+          int neighj=intmap_r[b*(N_local*(nr+1))+(nr+1)*par+1+j];
+
+          int my_mol=map_intra[par];
+          int j_mol=map_intra[neighj];
+          int row_index=0;
+          if (my_mol!=j_mol){
+             int my_col=color_type_map[par];
+             int j_col=color_type_map[neighj];
+             int my_interaction=map_color_interaction[my_col];
+             if (my_interaction==j_col){
+                  row_index=2;
+             }
+             else {
+                  row_index=1;
+             }
+          }
+
+          double des_r_el=des_r[actual+j];
+          int ch_type=row_index;
+
+          double intder_r_x=intderiv_r[b*N_local*3*nr+nr*3*par+0*nr+j];
+          double intder_r_y=intderiv_r[b*N_local*3*nr+nr*3*par+1*nr+j];
+          double intder_r_z=intderiv_r[b*N_local*3*nr+nr*3*par+2*nr+j];
+          for (int i=0; i<num_alpha_radiale;i++){
                 double alpha_now=alpha_radiale[num_alpha_radiale*ch_type+i];
                 double chpar=type_emb2b[num_alpha_radiale*ch_type+i];
                 double sds_deriv=chpar*exp(alpha_now*des_r_el);
@@ -120,18 +140,20 @@ __global__ void computeforce_doublets_kernel(const double* netderiv,const double
 void computeforce_doublets_Launcher(const double*  netderiv, const double* des_r,
                     const double* intderiv_r,const int* intmap_r,
                     int nr, int N, int dimbat,int num_alpha_radiale,
-                    const double* alpha_radiale,const double* type_emb2b,int nt,
-                    const int* tipos_T,const int* actual_type,double* forces2b,const int* type_map,int prod)
+                    const double* alpha_radiale,const double* type_emb2b,
+                    const int* actual_type,double* forces2b,
+                    const int* color_type_map,int prod, const int* map_color_interaction,
+                    const int* map_intra)
 {
                       dim3 dimGrid(ceil(double(prod)/double(BLOCK_DIM)),1,1);
-     		      dim3 dimBlock(BLOCK_DIM,1,1);
+     		              dim3 dimBlock(BLOCK_DIM,1,1);
 
      		      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(computeforce_doublets_kernel, dimGrid, dimBlock, BLOCK_DIM*sizeof(double3), nullptr,netderiv,des_r,
                           intderiv_r,intmap_r,
                           nr,N,dimbat,
                           num_alpha_radiale,alpha_radiale,
-                          type_emb2b,nt,tipos_T,
-                          actual_type,type_map,forces2b,BLOCK_DIM));
+                          type_emb2b,actual_type,color_type_map,
+                          forces2b,BLOCK_DIM,map_color_interaction,map_intra));
 
                       cudaDeviceSynchronize();
 

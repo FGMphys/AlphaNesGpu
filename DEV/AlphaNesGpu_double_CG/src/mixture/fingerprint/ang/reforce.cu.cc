@@ -86,9 +86,6 @@ __global__ void angularAFs_kernel(const double* radial_descriptor,const double* 
           }
       }
 
-
-
-
         int sum=get_symmetric_pair_index(type_int_j,type_int_k, 3);
 
         double angulardes=angular_descriptor[actual_ang+aux2];

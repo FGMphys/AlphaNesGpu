@@ -23,7 +23,7 @@ class alpha_nes_full(tf.Module):
         self.map_intra=np.loadtxt(full_param['map_intra_file']).reshape((-1,1)).reshape((-1,1))
 
         self.N=len(color_type_map)
-        
+
         #Atomic Finger Print Layer
         self.physics_layer=[physlay_type for physlay_type in physics_layer]
         self.lognorm_layer=[lognorlay_type for lognorlay_type in lognorm_layer]
@@ -124,7 +124,7 @@ class alpha_nes_full(tf.Module):
         grads_and_vars_all = grads_and_vars_afs + grads_and_vars_net
 
         self.opt_net.apply_gradients(grads_and_vars_all)
-        
+
         self.global_step=self.global_step+1
         ######## FINE MODIFICA 19.04: SOLVE BUG ONLY FIRST HIDDEN ###########
         return loss_force+loss_energy,loss_force,loss_energy
@@ -191,7 +191,7 @@ class alpha_nes_full(tf.Module):
         self.intder3b = intder3b
         self.intder3bsupp = intder3bsupp
         self.numtriplet = numtriplet
-        
+
         number_of_NN=self.number_of_NN
         self.fingerprint=[self.physics_layer[k](self.x2b,self.x3bsupp,
         self.int2b,self.x3b,self.int3b,self.numtriplet,self.color_type_map,self.map_color_interaction,self.map_intra)
@@ -217,8 +217,8 @@ class alpha_nes_full(tf.Module):
                                  self.physics_layer[k].alpha3b,
                                  self.physics_layer[k].type_emb_2b,
                                  self.physics_layer[k].type_emb_3b,
-                                 self.color_type_map,k,self.map_color_interaction,
-                                 self.map_intra) for k in range(number_of_NN)]
+                                 self.color_type_map,self.map_color_interaction,
+                                 k,self.map_intra) for k in range(number_of_NN)]
 
         self.force=tf.math.add_n(self.force_list)
 
@@ -263,7 +263,7 @@ class alpha_nes_full(tf.Module):
         grads_and_vars_all = grads_and_vars_afs + grads_and_vars_net
 
         self.opt_net.apply_gradients(grads_and_vars_all)
-        
+
         self.global_step=self.global_step+1
         ######## FINE MODIFICA 19.04: SOLVE BUG ONLY FIRST HIDDEN ###########
 
@@ -301,7 +301,7 @@ class alpha_nes_full(tf.Module):
         self.intder3b = intder3b
         self.intder3bsupp = intder3bsupp
         self.numtriplet = numtriplet
-        
+
         number_of_NN=self.number_of_NN
         self.fingerprint=[self.physics_layer[k](self.x2b,self.x3bsupp,
         self.int2b,self.x3b,self.int3b,self.numtriplet,self.color_type_map,
@@ -331,7 +331,7 @@ class alpha_nes_full(tf.Module):
                                  self.map_intra) for k in range(number_of_NN)]
 
         self.force=tf.math.add_n(self.force_list)
-        
+
 
 
         loss_energy=self.val_loss(self.totenergy,etrue)

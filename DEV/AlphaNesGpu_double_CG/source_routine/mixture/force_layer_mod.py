@@ -72,6 +72,6 @@ class force_debug_layer(tf.Module):
                                                               self.type_emb_3b_sq,
                                                               color_type_map,map_color_interaction,
                                                               type_now,numtriplet,map_intra)
-          
+
           self.forcetot=self.force_radial+self.force_angular
           return self.forcetot,self.force_radial,self.force_angular

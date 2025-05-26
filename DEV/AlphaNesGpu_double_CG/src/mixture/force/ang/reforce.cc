@@ -46,19 +46,20 @@ REGISTER_OP("ComputeForceTripl")
     .Input("interaction_map_ang: int32")
     .Input("alpha3b_parameters: double")
     .Input("type_emb3b_parameters: double")
-    .Input("type_map: int32")
-    .Input("tipos: int32")
+    .Input("color_type_map: int32")
+    .Input("map_color_interaction: int32")
     .Input("actual_type: int32")
     .Input("num_triplets: int32")
+    .Input("map_intra: int32")
     .Output("force: double");
 
     void computeforce_tripl_Launcher(const double*  netderiv_T_d, const double* desr_T_d, const double* desa_T_d,
                         const double* intderiv_r_T_d, const double* intderiv_a_T_d,
                         const int* intmap_r_T_d,const int* intmap_a_T_d,
-                        int nr, int na, int N, int dimbat,int num_finger,const double* type_emb3b_d,int nt,
-                        const int* tipos_T,
-                        const int* actual_type,double* forces3b_T_d,const int *num_triplets_d,const double* smooth_a_T,const int* type_map_T_d,
-                        int prod);
+                        int nr, int na, int N, int dimbat,int num_finger,const double* type_emb3b_d,
+                        const int* actual_type,double* forces3b_T_d,const int *num_triplets_d,
+                        const double* smooth_a_T,const int* color_type_map_T_d,
+                        int prod, const int* map_color_interaction, const int* map_intra);
 
 void set_tensor_to_zero_double(double* tensor,int dimten);
 
@@ -77,12 +78,14 @@ class ComputeForceTriplOp : public OpKernel {
     const Tensor& smooth_a_T = context->input(7);
 
     const Tensor& type_emb3b_T = context->input(8);
-    const Tensor& type_map_T = context->input(9);
+    const Tensor& color_type_map_T = context->input(9);
 
-    const Tensor& tipos_T = context->input(10);
     const Tensor& actual_type_T = context->input(11);
 
     const Tensor& num_triplets_T=context->input(12);
+
+    const Tensor& map_color_interaction_T=context->input(10);
+    const Tensor& map_intra_T=context->input(13);
 
     //flatting the tensor
     int dimbat = netderiv_T.shape().dim_size(0);
@@ -96,8 +99,6 @@ class ComputeForceTriplOp : public OpKernel {
 
     int N = type_map_T.shape().dim_size(0);
     //int N=N_flat(0);
-
-    int nt = tipos_T.shape().dim_size(0);
 
     const int* actual_type=actual_type_T.flat<int>().data();
     //int actual_type=actual_type_T_flat(0);
@@ -117,9 +118,10 @@ class ComputeForceTriplOp : public OpKernel {
     auto intmap_a_T_d=intmap_a_T.flat<int>();
     auto type_emb3b_T_d=type_emb3b_T.flat<double>();
     auto smooth_a_T_d=smooth_a_T.flat<double>();
-    auto type_map_T_d=type_map_T.flat<int>();
-    auto tipos_T_d=tipos_T.flat<int>();
+    auto color_type_map_T_d=color_type_map_T.flat<int>();
     auto num_triplets_T_d=num_triplets_T.flat<int>();
+    auto map_color_interaction_T_d=map_color_interaction_T.flat<int>();
+    auto map_intra_T_d=map_intra_T.flat<int>();
     // Create an output tensor for forces
     Tensor* forces3b_T = NULL;
     TensorShape grad_net_shape ;
@@ -133,9 +135,11 @@ class ComputeForceTriplOp : public OpKernel {
     computeforce_tripl_Launcher(netderiv_T_d.data(), desr_T_d.data(), desa_T_d.data(),
                         intderiv_r_T_d.data(),intderiv_a_T_d.data(),
                         intmap_r_T_d.data(),intmap_a_T_d.data(),
-                        nr, na, N, dimbat,num_finger,type_emb3b_T_d.data(),nt,
-                        tipos_T_d.data(),
-                        actual_type,forces3b_T->flat<double>().data(),num_triplets_T_d.data(),smooth_a_T_d.data(),type_map_T_d.data(),prod);
+                        nr, na, N, dimbat,num_finger,type_emb3b_T_d.data(),
+                        actual_type,forces3b_T->flat<double>().data(),
+                        num_triplets_T_d.data(),smooth_a_T_d.data(),
+                        color_type_map_T_d.data(),prod,map_color_interaction_T_d.data(),
+                        map_intra_T_d.data());
 
 }
 };
