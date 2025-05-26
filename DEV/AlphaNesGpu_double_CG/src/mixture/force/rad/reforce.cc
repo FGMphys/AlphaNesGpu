@@ -80,7 +80,7 @@ class ComputeForceRadialOp : public OpKernel {
     int dimbat = netderiv_T.shape().dim_size(0);
     int nr = desr_T.shape().dim_size(2);
     int Nlocal=desr_T.shape().dim_size(1);
-    int N = type_map_T.shape().dim_size(0);
+    int N = color_type_map_T.shape().dim_size(0);
     int num_alpha_radiale=alpha_radiale_T.shape().dim_size(1);
 
     //Getting data pointer

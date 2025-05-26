@@ -38,21 +38,19 @@ void init_block_dim(int buffdim){
 __global__ void computeforce_tripl_kernel(const double*  netderiv_T, const double* desr_T, const double* desa_T,
                         const double* intderiv_r_T, const double* intderiv_a_T_l,
                         const int* intmap_r_T,const int* intmap_a_T_l,
-                        int nr, const int na, int N, int dimbat , int num_finger,const double* type_emb3b,int nt,
-                        const int* tipos_T,
+                        int nr, const int na, int N, int dimbat , int num_finger,const double* type_emb3b,
+                        
                         const int* actual_type_p,double* forces3b_T_l,const int *num_triplets,const double* smooth_a_T_l,
-                        const int* color_type_map_T_d,int BLOCK_DIM,const int* map_color_interaction,
+                        const int* color_type_map,int BLOCK_DIM,const int* map_color_interaction,
                         const int* map_intra)
 {
 
 
     int actual_type=actual_type_p[0];
-    int N_local=tipos_T[actual_type];
+    int N_local=N; 
 
     int tipos_shift=0;
-    for (int y=0;y<actual_type;y++){
-        tipos_shift=tipos_shift+tipos_T[y];
-    }
+    
     const double2* intderiv_a_T=(const double2 *)intderiv_a_T_l;
     const int2* intmap_a_T=(const int2 *) intmap_a_T_l;
     double3* forces3b_T=(double3 *)forces3b_T_l;
@@ -250,7 +248,7 @@ void computeforce_tripl_Launcher(const double*  netderiv_T_d, const double* desr
                         const double* intderiv_r_T_d, const double* intderiv_a_T_d,
                         const int* intmap_r_T_d,const int* intmap_a_T_d,
                          int nr, int na, int N, int dimbat,int num_finger,
-                         const double* type_emb3b_d,int nt,const int* tipos_T,
+                         const double* type_emb3b_d,
                          const int* actual_type,double* forces3b_T_d,const int *num_triplets_d,
                          const double* smooth_a_T,const int* color_type_map_T_d,int prod,
                          const int* map_color_interaction,const int* map_intra){
@@ -261,7 +259,7 @@ void computeforce_tripl_Launcher(const double*  netderiv_T_d, const double* desr
         intderiv_r_T_d,intderiv_a_T_d,intmap_r_T_d,
         intmap_a_T_d,nr,na,N,dimbat,
         num_finger,
-        type_emb3b_d,nt,tipos_T,
+        type_emb3b_d,
         actual_type,forces3b_T_d,num_triplets_d,smooth_a_T,color_type_map_T_d,BLOCK_DIM,
         map_color_interaction,map_intra));
 

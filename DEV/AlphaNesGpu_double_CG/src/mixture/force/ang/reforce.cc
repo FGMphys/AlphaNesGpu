@@ -97,7 +97,7 @@ class ComputeForceTriplOp : public OpKernel {
     int na = desa_T.shape().dim_size(2);
     //int na=numdes3body_flat(0);
 
-    int N = type_map_T.shape().dim_size(0);
+    int N = color_type_map_T.shape().dim_size(0);
     //int N=N_flat(0);
 
     const int* actual_type=actual_type_T.flat<int>().data();

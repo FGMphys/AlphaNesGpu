@@ -33,12 +33,9 @@ __global__ void computeforce_doublets_kernel(const double* netderiv,const double
 {
 
     int actual_type=actual_type_p[0];
-    int N_local=tipos_T[actual_type];
+    int N_local=N;
 
     int tipos_shift=0;
-    for (int y=0;y<actual_type;y++){
-        tipos_shift=tipos_shift+tipos_T[y];
-        }
 
     double3* forces2b=(double3 *)forces2b_l;
 
@@ -64,13 +61,12 @@ __global__ void computeforce_doublets_kernel(const double* netderiv,const double
     if (t<N_local*dimbat*nr)
     {
         int nr_particle=intmap_r[b*N_local*(nr+1)+par*(nr+1)];
-
+        int neighj=intmap_r[b*(N_local*(nr+1))+(nr+1)*par+1+j];
 
         if (j<nr_particle)
         {
 
 
-          int neighj=intmap_r[b*(N_local*(nr+1))+(nr+1)*par+1+j];
 
           int my_mol=map_intra[par];
           int j_mol=map_intra[neighj];
