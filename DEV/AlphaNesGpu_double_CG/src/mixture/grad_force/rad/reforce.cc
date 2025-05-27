@@ -98,7 +98,7 @@ class ComputeForceRadialGradOp : public OpKernel {
       auto radiale = desr_T.flat<double>();
       auto alpha_radiale = alpha_radiale_T.flat<double>();
       auto type_emb2b = type_emb2b_T.flat<double>();
-      auto color_type_map = type_map_T.flat<int>();
+      auto color_type_map = color_type_map_T.flat<int>();
       auto map_color_interaction=map_color_interaction_T.flat<int>();
       auto map_intra=map_intra_T.flat<int>();
 

@@ -20,7 +20,7 @@ __global__ void alphagrad_ang_kernel(const double* radial_descriptor,const doubl
                  int nr,int na,const double* prevgrad,int dimbat,
                  int N_local,const int* intmap3b,const double* alpha3b,
                  int nsmooth_a,double* next_alpha3b_grad,
-                 const double* type_emb3b,const int* type_map,
+                 const double* type_emb3b,const int* color_type_map,
                  double* next_emb3b_grad,const int* num_triplets,int req_alpha,
 		 int req_sum,const int* map_color_interaction,const int* map_intra)
 {
