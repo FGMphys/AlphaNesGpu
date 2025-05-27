@@ -196,7 +196,7 @@ except:
     sys.exit("alpha_nes: In the dataset folder it is expected to have a type.dat file with the code for the atom type!")
 """
 try:
-    color_type_map=np.loadtxt(base_pattern+"/color_type_map.dat",dtype='int').reshape(-1,1)
+    color_type_map=np.loadtxt(base_pattern+"/color_type_map.dat",dtype='int32').reshape(-1,1)
     Number_of_particles=color_type_map.shape[0]
 except:
     sys.exit("alpha_nes: In the dataset folder it is expected to have a color_type_map.dat file with the color code for each site!")
@@ -269,14 +269,6 @@ else:
 #nb=idx_str_tr.shape[1]//bs+idx_str_tr.shape[1]%bs
 nb=int(buffer_stream_tr/bs)
 
-### Building Net parameters
-actfun=full_param['activation_function']
-nhl=full_param['number_of_decoding_layers']
-if nhl>0:
-   nD=[int(k) for k in full_param['number_of_decoding_nodes'].split()]
-else:
-   nD=0
-
 #Fix precision
 tf.keras.backend.set_floatx('float64')
 
@@ -311,18 +303,12 @@ if restart_par=='no' or restart_par=='only_afs':
 
     lr_phys_param=full_param['lr_phys_net'].split()
     lr_phys=build_learning_rate(lr_phys_param,ne,nb,idx_str_tr.shape[0],'phys',0)
-    opt_phys_param=full_param['optimizer_phys'].split()
-    opt_phys=build_optimizer(opt_phys_param,lr_phys,0)
 ##else we load the internal state of optimizer at the given point of previous training
 else:
     with open(restart+'/opt_net_conf','rb') as source:
          config_net=pickle.load(source)
     opt_net=tf.keras.optimizers.Adam()
     opt_net=opt_net.from_config(config_net)
-    with open(restart+'/opt_phys_conf','rb') as source:
-         config_phys=pickle.load(source)
-    opt_phys=tf.keras.optimizers.Adam()
-    opt_phys=opt_phys.from_config(config_phys)
 
 ##Here we fix the value that prevents the explosion of the exponential
 try:
@@ -361,7 +347,7 @@ Force_Layer=force_layer(rad_buff,ang_buff)
 [model_loss,val_loss,pe,pf,pb]=make_loss(full_param)
 ###Compose the model by concatenation of layers
 model=alpha_nes_full(Physics_Layers,Force_Layer,1,model_loss,
-             val_loss,opt_net,opt_phys,alpha_bound,Lognorm_Layers,
+             val_loss,opt_net,alpha_bound,Lognorm_Layers,
              color_type_map,restart,seed_par,full_param)
 [trainmeth,testmeth]=make_method(full_param,model)
 #################################################################################
@@ -385,7 +371,7 @@ if restart_par=='no' or restart_par=='only_afs' or restart_par=='all_params':
     restart_ep=0
     os.mkdir(model_name)
     model.save_model_init(model_name)
-    for k in range(nt):
+    for k in range(number_of_NN):
        Physics_Layers[k].savealphas(model_name,"type"+str(k)+"initial_")
        Lognorm_Layers[k].savemu(model_name,"type"+str(k)+"initial_")
        accumul=0
@@ -476,7 +462,7 @@ for ep in range(restart_ep,ne):
        outfold_name=model_name+str(ep)
        model.save_model(outfold_name)
        np.savetxt(outfold_name+"/model_error",[np.sqrt(vallosstote),np.sqrt(vallosstotf)],header='RMSE_e  RMSE_f ')
-       print(accumul,ep,np.sqrt(vallosstote.numpy()),np.sqrt(vallosstotf.numpy()),losstot.numpy(),lrnow.numpy(),lrnow2.numpy(),sep=' ',end='\n',file=fileOU)
+       print(accumul,ep,np.sqrt(vallosstote.numpy()),(np.sqrt(vallosstotf.numpy())-38.223)*1000,losstot.numpy(),lrnow.numpy(),lrnow2.numpy(),sep=' ',end='\n',file=fileOU)
        print("Testing model at global step",accumul," and epoch ",ep," val_lossE ",np.sqrt(vallosstote.numpy())," val_lossF ",np.sqrt(vallosstotf.numpy())," loss_Tot ",losstot.numpy()," lr_net ",lrnow.numpy()," lr_finger ",lrnow2.numpy(),sep=' ',end='\n')
        print("We are at epoch ",ep)
        fileOU.flush()

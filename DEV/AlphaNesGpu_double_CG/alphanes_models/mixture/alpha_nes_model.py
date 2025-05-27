@@ -7,7 +7,7 @@ import pickle
 
 class alpha_nes_full(tf.Module):
     def __init__(self,physics_layer,force_layer,output_dim,lossfunction,val_loss,
-                opt_net,opt_phys,alpha_bound,lognorm_layer,color_type_map,
+                opt_net,alpha_bound,lognorm_layer,color_type_map,
                 restart,seed_fix,full_param):
         super(alpha_nes_full, self).__init__()
 
@@ -15,13 +15,13 @@ class alpha_nes_full(tf.Module):
         #self.tipos=tf.constant(tipos,dtype='int32')
         map_NN_layer=full_param['map_NN_layer']
         number_of_NN=len(map_NN_layer)
-        node_list=[NN_node for NN_node in map_NN_layer]
+        node_list=[map_NN_layer[key] for key in map_NN_layer.keys()]
 
         map_actfun=full_param['activation_function']
         self.number_of_NN=number_of_NN
         self.color_type_map=color_type_map
-        self.map_color_interaction=np.loadtxt(full_param['color_interaction_file']).reshape((-1,1))
-        self.map_intra=np.loadtxt(full_param['map_intra_file']).reshape((-1,1)).reshape((-1,1))
+        self.map_color_interaction=np.loadtxt(full_param['color_interaction_file'],dtype='int32').reshape((-1,1))
+        self.map_intra=np.loadtxt(full_param['map_intra_file'],dtype='int32').reshape((-1,1)).reshape((-1,1))
 
         self.N=len(color_type_map)
 
@@ -37,7 +37,7 @@ class alpha_nes_full(tf.Module):
             self.nets = [tf.keras.Sequential() for el in range(self.number_of_NN)]
             for index_net,net in enumerate(self.nets):
                 net.add(Input(shape=(self.N,self.physics_layer[index_net].output_dim,)))
-                if map_NN_layer[index_net]>0:
+                if len(map_NN_layer[index_net])>0:
                     for k in node_list[index_net]:
                         net.add(Dense(k, activation=map_actfun[index_net]))
                     net.add(Dense(output_dim))
@@ -48,9 +48,6 @@ class alpha_nes_full(tf.Module):
                 with open(restart+'/opt_net_weights','rb') as source:
                      weight_net=pickle.load(source)
                 self.opt_net_weights=weight_net
-                with open(restart+'/opt_phys_weights','rb') as source:
-                     weight_phys=pickle.load(source)
-                self.opt_phys_weights=weight_phys
                 #res=[self.nets[k].compile() for k in range(self.ntipos)]
         self.lossfunction=lossfunction
         self.val_loss=val_loss
@@ -60,7 +57,6 @@ class alpha_nes_full(tf.Module):
                                            negative_slope=0.0)
 
         self.opt_net=opt_net
-        self.opt_phys=opt_phys
         self.global_step=0
 
 
@@ -113,8 +109,6 @@ class alpha_nes_full(tf.Module):
         for k in range(number_of_NN):
             grad_var_pairs = [(grad, param) for grad, param in zip(grad_w[k], self.nets[k].trainable_variables)]
             grads_and_vars_net.extend(grad_var_pairs)
-        #self.opt_net.apply_gradients(grads_and_vars_net)
-#        self.opt_net.apply_gradients(zip(all_net_grad,all_net_param))
         grads_and_vars_afs = []
 
         for k in range(number_of_NN):
@@ -171,23 +165,6 @@ class alpha_nes_full(tf.Module):
     def full_train_e_f(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,
                      intder3bsupp,numtriplet,etrue,ftrue,pe,pf,pb):
 
-        #nt=self.ntipos
-
-        '''
-        self.x2b=tf.split(x1,self.tipos,axis=1)
-        self.x3b=tf.split(x2,self.tipos,axis=1)
-        self.x3bsupp=tf.split(x3bsupp,self.tipos,axis=1)
-        self.int2b=tf.split(int2b,self.tipos,axis=1)
-        self.int3b=tf.split(int3b,self.tipos,axis=1)
-        self.intder2b=tf.split(intder2b,self.tipos,axis=1)
-        self.intder3b=tf.split(intder3b,self.tipos,axis=1)
-        self.intder3bsupp=tf.split(intder3bsupp,self.tipos,axis=1)
-        self.numtriplet=tf.split(numtriplet,self.tipos,axis=1)
-
-        self.fingerprint=[self.physics_layer[k](self.x2b[k],self.x3bsupp[k],
-        self.int2b[k],self.x3b[k],self.int3b[k],self.numtriplet[k],self.type_map)
-                    for k in range(nt)]
-        '''
         self.x2b = x1
         self.x3b = x2
         self.x3bsupp = x3bsupp
@@ -236,7 +213,7 @@ class alpha_nes_full(tf.Module):
                  for k in range(number_of_NN)]
         loss_bound=tf.add_n(loss_bound_2b)+tf.add_n(loss_bound_3b)
 
-        loss=pe*loss_energy+pb*loss_bound+pf*loss_force#+l1_loss
+        loss=pe*loss_energy+pb*loss_bound+(pf*loss_force-13.206)*1000#+l1_loss
 
 
 
@@ -252,8 +229,6 @@ class alpha_nes_full(tf.Module):
         for k in range(number_of_NN):
             grad_var_pairs = [(grad, param) for grad, param in zip(grad_w[k], self.nets[k].trainable_variables)]
             grads_and_vars_net.extend(grad_var_pairs)
-        #self.opt_net.apply_gradients(grads_and_vars_net)
-#        self.opt_net.apply_gradients(zip(all_net_grad,all_net_param))
         grads_and_vars_afs = []
 
         for k in range(number_of_NN):
@@ -278,26 +253,6 @@ class alpha_nes_full(tf.Module):
     @tf.function()
     def full_test_e_f(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,intder3bsupp,
                      numtriplet,etrue,ftrue):
-        '''
-        nt=self.ntipos
-
-
-
-        self.x2b=tf.split(x1,self.tipos,axis=1)
-        self.x3b=tf.split(x2,self.tipos,axis=1)
-        self.x3bsupp=tf.split(x3bsupp,self.tipos,axis=1)
-        self.int2b=tf.split(int2b,self.tipos,axis=1)
-        self.int3b=tf.split(int3b,self.tipos,axis=1)
-        self.intder2b=tf.split(intder2b,self.tipos,axis=1)
-        self.intder3b=tf.split(intder3b,self.tipos,axis=1)
-        self.intder3bsupp=tf.split(intder3bsupp,self.tipos,axis=1)
-        self.numtriplet=tf.split(numtriplet,self.tipos,axis=1)
-
-
-        self.fingerprint=[self.physics_layer[k](self.x2b[k],self.x3bsupp[k],
-        self.int2b[k],self.x3b[k],self.int3b[k],self.numtriplet[k],self.type_map)
-                    for k in range(nt)]
-        '''
         self.x2b = x1
         self.x3b = x2
         self.x3bsupp = x3bsupp
@@ -361,26 +316,17 @@ class alpha_nes_full(tf.Module):
             np.savetxt(folder_ou+'/map_intra.dat',self.map_intra.numpy())
             with open(folder_ou+'/opt_net_weights','wb') as dest:
                  pickle.dump(self.opt_net.variables(),dest)
-            with open(folder_ou+'/opt_phys_weights','wb') as dest:
-                 pickle.dump(self.opt_phys.variables(),dest)
             with open(folder_ou+'/opt_net_conf','wb') as dest:
                  pickle.dump(self.opt_net.get_config(),dest)
-            with open(folder_ou+'/opt_phys_conf','wb') as dest:
-                 pickle.dump(self.opt_phys.get_config(),dest)
     def save_model_init(self,folder_ou):
         for k,net in enumerate(self.nets):
             net.save(folder_ou+'/init_net_model_type'+str(k),overwrite=True)
 
     def build_opt_weights(self):
-        self.opt_phys.build(self.opt_phys_weights)
         self.opt_net.build(self.opt_net_weights)
     def set_opt_weight(self):
-        self.opt_phys.set_weights(self.opt_phys_weights)
         self.opt_net.set_weights(self.opt_net_weights)
     def get_op_weigth(self):
-        print(self.opt_phys.get_config())
-        return self.opt_phys.variables(),self.opt_net.variables()
+        return self.opt_net.variables()
     def get_lrnet(self):
         return self.opt_net.learning_rate
-    def get_lrphys(self):
-        return self.opt_phys.learning_rate

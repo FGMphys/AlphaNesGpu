@@ -1,5 +1,4 @@
-
-python=/leonardo/pub/userexternal/fguidare/python_envs/tensorgpu/bin/python
+python=$5
 TF_CFLAGS=( $($python -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_compile_flags()))' 2>/dev/null ))
 TF_LFLAGS=( $($python -c 'import tensorflow as tf; print(" ".join(tf.sysconfig.get_link_flags()))' 2>/dev/null ))
 

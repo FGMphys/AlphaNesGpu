@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-root_path='/leonardo/pub/userexternal/fguidare/alphanesfromgit/AlphaNesGpu/DEV/AlphaNesGpu_double_CG'
+root_path='/home/francegm/AlphaNesGpu/DEV/AlphaNesGpu_double_CG'
 proj2b_sopath=root_path+'/src/mixture/fingerprint/rad/reforce.so'
 proj3b_sopath=root_path+'/src/mixture/fingerprint/ang/reforce.so'
 
