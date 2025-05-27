@@ -47,7 +47,7 @@ for guess in range(100):
        nt=nt+1
     else:
        guess=100
-print("Alphanes: detected ",nt," atom species system")
+print("Alphanes: detected ",nt," number of NN")
 
 
 mean=[np.loadtxt(input_model+'/type'+str(k)+'_alpha_mu.dat',dtype='float64') for k in range(nt)]
@@ -76,8 +76,10 @@ for k in range(nt):
     sh.copy(input_model+'/type'+str(k)+'_alpha_2body.dat',namemodel)
     sh.copy(input_model+'/type'+str(k)+'_alpha_3body.dat',namemodel)
     tf.saved_model.save(toexport[k], namemodel+'/model_type'+str(k),signatures=call[k])
-    if nt>1:
-        sh.copy(input_model+'/type'+str(k)+'_type_emb_2b_sq.dat',namemodel)
-        sh.copy(input_model+'/type'+str(k)+'_type_emb_3b_sq.dat',namemodel)
-        sh.copy(input_model+'/type'+str(k)+'_type_emb_2b.dat',namemodel)
-        sh.copy(input_model+'/type'+str(k)+'_type_emb_3b.dat',namemodel)
+    sh.copy(input_model+'/type'+str(k)+'_type_emb_2b_sq.dat',namemodel)
+    sh.copy(input_model+'/type'+str(k)+'_type_emb_3b_sq.dat',namemodel)
+    sh.copy(input_model+'/type'+str(k)+'_type_emb_2b.dat',namemodel)
+    sh.copy(input_model+'/type'+str(k)+'_type_emb_3b.dat',namemodel)
+    sh.copy(input_model+'/color_type_map.dat',namemodel)
+    sh.copy(input_model+'/map_color_interaction.dat',namemodel)
+    sh.copy(input_model+'/map_intra.dat',namemodel)

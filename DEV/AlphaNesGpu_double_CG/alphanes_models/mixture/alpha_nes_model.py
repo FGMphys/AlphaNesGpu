@@ -15,6 +15,7 @@ class alpha_nes_full(tf.Module):
         #self.tipos=tf.constant(tipos,dtype='int32')
         map_NN_layer=full_param['map_NN_layer']
         number_of_NN=len(map_NN_layer)
+        node_list=[NN_node for NN_node in map_NN_layer]
 
         map_actfun=full_param['activation_function']
         self.number_of_NN=number_of_NN
@@ -37,7 +38,7 @@ class alpha_nes_full(tf.Module):
             for index_net,net in enumerate(self.nets):
                 net.add(Input(shape=(self.N,self.physics_layer[index_net].output_dim,)))
                 if map_NN_layer[index_net]>0:
-                    for k in self.node:
+                    for k in node_list[index_net]:
                         net.add(Dense(k, activation=map_actfun[index_net]))
                     net.add(Dense(output_dim))
         else:
@@ -67,34 +68,39 @@ class alpha_nes_full(tf.Module):
     def full_train_e(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,
                      intder3bsupp,numtriplet,etrue,ftrue,pe,pf,pb):
 
-        nt=self.ntipos
-        self.x2b=tf.split(x1,self.tipos,axis=1)
-        self.x3b=tf.split(x2,self.tipos,axis=1)
-        self.x3bsupp=tf.split(x3bsupp,self.tipos,axis=1)
-        self.int2b=tf.split(int2b,self.tipos,axis=1)
-        self.int3b=tf.split(int3b,self.tipos,axis=1)
-        self.numtriplet=tf.split(numtriplet,self.tipos,axis=1)
+        self.x2b = x1
+        self.x3b = x2
+        self.x3bsupp = x3bsupp
+        self.int2b = int2b
+        self.int3b = int3b
+        self.numtriplet = numtriplet
 
-        self.fingerprint=[self.physics_layer[k](self.x2b[k],self.x3bsupp[k],
-        self.int2b[k],self.x3b[k],self.int3b[k],self.numtriplet[k],
-        self.type_map) for k in range(nt)]
+
+        number_of_NN=self.number_of_NN
+        self.fingerprint=[self.physics_layer[k](self.x2b,self.x3bsupp,
+        self.int2b,self.x3b,self.int3b,self.numtriplet,self.color_type_map,self.map_color_interaction,self.map_intra)
+                    for k in range(number_of_NN)]
         self.log_norm_projdes=[self.lognorm_layer[k](finger)
                          for k,finger in enumerate(self.fingerprint)]
         self.energy=[self.nets[k](cp) for k,cp in enumerate(self.log_norm_projdes)]
+        self.grad_ene=[tf.gradients(self.energy[k],cp) for k,cp in enumerate(self.fingerprint)]
+
 
         self.totene=tf.concat(self.energy,axis=1)
         self.totenergy=tf.reduce_mean(self.totene,axis=(-1,-2))*0.5
 
 
+        loss_energy=self.lossfunction(self.totenergy,etrue)
         loss_bound_2b=[tf.math.reduce_sum(self.relu_bound(self.physics_layer[k].alpha2b))
-              for k in range(nt)]
+              for k in range(number_of_NN)]
         loss_bound_3b=[tf.math.reduce_sum(self.relu_bound(self.physics_layer[k].alpha3b))
-                 for k in range(nt)]
+                 for k in range(number_of_NN)]
         loss_bound=tf.add_n(loss_bound_2b)+tf.add_n(loss_bound_3b)
 
-        loss_energy=self.lossfunction(self.totenergy,etrue)
-        loss_force=tf.constant(0.,dtype='float32')
         loss=pe*loss_energy+pb*loss_bound
+
+
+
         grad_w=[tf.gradients(loss,net.trainable_variables) for net  in  self.nets]
         grad_2b=[tf.gradients(loss,physlay.alpha2b) for physlay in self.physics_layer]
         grad_3b=[tf.gradients(loss,physlay.alpha3b) for physlay in self.physics_layer]
@@ -104,14 +110,14 @@ class alpha_nes_full(tf.Module):
         #all_net_grad=[grad_w[k] for k in range(nt)]
         #all_net_param=[self.nets[k].trainable_variables for k in range(nt)]
         grads_and_vars_net=[]
-        for k in range(nt):
+        for k in range(number_of_NN):
             grad_var_pairs = [(grad, param) for grad, param in zip(grad_w[k], self.nets[k].trainable_variables)]
             grads_and_vars_net.extend(grad_var_pairs)
         #self.opt_net.apply_gradients(grads_and_vars_net)
 #        self.opt_net.apply_gradients(zip(all_net_grad,all_net_param))
         grads_and_vars_afs = []
 
-        for k in range(nt):
+        for k in range(number_of_NN):
             # Aggiungi i gradienti per alpha2b
             grads_and_vars_afs.extend([(grad_2b[k][0], self.physics_layer[k].alpha2b)])
 
@@ -133,31 +139,31 @@ class alpha_nes_full(tf.Module):
     def full_test_e(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,intder3bsupp,
                     numtriplet,etrue,ftrue):
 
-        nt=self.ntipos
+
+        self.x2b = x1
+        self.x3b = x2
+        self.x3bsupp = x3bsupp
+        self.int2b = int2b
+        self.int3b = int3b
+        self.numtriplet = numtriplet
 
 
-
-        self.x2b=tf.split(x1,self.tipos,axis=1)
-        self.x3b=tf.split(x2,self.tipos,axis=1)
-        self.x3bsupp=tf.split(x3bsupp,self.tipos,axis=1)
-        self.int2b=tf.split(int2b,self.tipos,axis=1)
-        self.int3b=tf.split(int3b,self.tipos,axis=1)
-        self.numtriplet=tf.split(numtriplet,self.tipos,axis=1)
-
-
-        self.fingerprint=[self.physics_layer[k](self.x2b[k],self.x3bsupp[k],
-        self.int2b[k],self.x3b[k],self.int3b[k],self.numtriplet[k],self.type_map)
-                        for k in range(nt)]
+        number_of_NN=self.number_of_NN
+        self.fingerprint=[self.physics_layer[k](self.x2b,self.x3bsupp,
+        self.int2b,self.x3b,self.int3b,self.numtriplet,self.color_type_map,self.map_color_interaction,self.map_intra)
+                    for k in range(number_of_NN)]
         self.log_norm_projdes=[self.lognorm_layer[k](finger)
-                             for k,finger in enumerate(self.fingerprint)]
+                         for k,finger in enumerate(self.fingerprint)]
         self.energy=[self.nets[k](cp) for k,cp in enumerate(self.log_norm_projdes)]
+        self.grad_ene=[tf.gradients(self.energy[k],cp) for k,cp in enumerate(self.fingerprint)]
+
 
         self.totene=tf.concat(self.energy,axis=1)
         self.totenergy=tf.reduce_mean(self.totene,axis=(-1,-2))*0.5
 
 
         loss_energy=self.val_loss(self.totenergy,etrue)
-        loss_force=tf.constant(0.,dtype='float32')
+        loss_force=tf.constant(0.,dtype='float64')
         loss=loss_energy+loss_force
 
         return loss, loss_force,loss_energy
@@ -350,6 +356,9 @@ class alpha_nes_full(tf.Module):
             np.savetxt(folder_ou+'/type'+str(k)+'_type_emb_2b_sq.dat',self.physics_layer[k].type_emb_2b.numpy()**2)
             np.savetxt(folder_ou+'/type'+str(k)+'_type_emb_3b_sq.dat',self.physics_layer[k].type_emb_3b.numpy()**2)
             np.savetxt(folder_ou+'/type'+str(k)+'_alpha_mu.dat',self.lognorm_layer[k].mu.numpy())
+            np.savetxt(folder_ou+'/color_type_map.dat',self.color_type_map.numpy())
+            np.savetxt(folder_ou+'/map_color_interaction.dat',self.map_color_interaction.numpy())
+            np.savetxt(folder_ou+'/map_intra.dat',self.map_intra.numpy())
             with open(folder_ou+'/opt_net_weights','wb') as dest:
                  pickle.dump(self.opt_net.variables(),dest)
             with open(folder_ou+'/opt_phys_weights','wb') as dest:
