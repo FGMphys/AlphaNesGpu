@@ -243,7 +243,7 @@ class alpha_nes_full(tf.Module):
 
         grads_and_vars_all = grads_and_vars_afs + grads_and_vars_net
 
-        self.opt_net.apply_gradients(grads_and_vars_all)
+        #self.opt_net.apply_gradients(grads_and_vars_all)
 
         self.global_step=self.global_step+1
         ######## FINE MODIFICA 19.04: SOLVE BUG ONLY FIRST HIDDEN ###########
@@ -311,9 +311,9 @@ class alpha_nes_full(tf.Module):
             np.savetxt(folder_ou+'/type'+str(k)+'_type_emb_2b_sq.dat',self.physics_layer[k].type_emb_2b.numpy()**2)
             np.savetxt(folder_ou+'/type'+str(k)+'_type_emb_3b_sq.dat',self.physics_layer[k].type_emb_3b.numpy()**2)
             np.savetxt(folder_ou+'/type'+str(k)+'_alpha_mu.dat',self.lognorm_layer[k].mu.numpy())
-            np.savetxt(folder_ou+'/color_type_map.dat',self.color_type_map.numpy())
-            np.savetxt(folder_ou+'/map_color_interaction.dat',self.map_color_interaction.numpy())
-            np.savetxt(folder_ou+'/map_intra.dat',self.map_intra.numpy())
+            np.savetxt(folder_ou+'/color_type_map.dat',self.color_type_map)
+            np.savetxt(folder_ou+'/map_color_interaction.dat',self.map_color_interaction)
+            np.savetxt(folder_ou+'/map_intra.dat',self.map_intra)
             with open(folder_ou+'/opt_net_weights','wb') as dest:
                  pickle.dump(self.opt_net.variables(),dest)
             with open(folder_ou+'/opt_net_conf','wb') as dest:
