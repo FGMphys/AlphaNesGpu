@@ -1,9 +1,14 @@
 #!/bin/sh
 
-NVCC_PATH="/usr/local/cuda-11.2/bin/nvcc"
-GPP_PATH="/usr/bin/g++"
-CUDA_LIB64_PATH="/usr/local/cuda-11.2/lib64"
-CUDA_INCLUDE_PATH="/usr/local/cuda-11.2/include"
+NVCC_PATH=/leonardo/prod/opt/compilers/cuda/11.8/none/bin/nvcc
+GPP_PATH=/usr/bin/g++
+CUDA_INCLUDE_PATH=/leonardo/prod/opt/compilers/cuda/11.8/none/include
+CUDA_LIB64_PATH=/leonardo/prod/opt/compilers/cuda/11.8/none/lib64
+
+#NVCC_PATH="/usr/local/cuda-11.2/bin/nvcc"
+#GPP_PATH="/usr/bin/g++"
+#CUDA_LIB64_PATH="/usr/local/cuda-11.2/lib64"
+#CUDA_INCLUDE_PATH="/usr/local/cuda-11.2/include"
 
 
 actual_path=$(pwd)
@@ -16,7 +21,6 @@ sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' gradient_utility/mixtu
 sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' gradient_utility/mixture/register_force_2bAFs_grad.py
 sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' gradient_utility/mixture/register_force_3bAFs_grad.py
 
-sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' debug_mode/debug_alpha_force.py
 
 
 
