@@ -155,10 +155,10 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
                double3 alphas=smooth_a_T[sum*num_finger+req_alpha];
                double chtjk_par=type_emb3b[sum*num_finger+req_alpha];
 
-               double expbeta=expf(alphas.z*angulardes);
+               double expbeta=exp(alphas.z*angulardes);
 
-               double sim1=expf(alphas.y*radialdes_j+alphas.x*radialdes_k);
-               double sim2=expf(alphas.x*radialdes_j+alphas.y*radialdes_k);
+               double sim1=exp(alphas.y*radialdes_j+alphas.x*radialdes_k);
+               double sim2=exp(alphas.x*radialdes_j+alphas.y*radialdes_k);
                double sum_sim=sim1+sim2;
 
                delta=expbeta*(1.0f+alphas.z*angulardes)*sum_sim*0.5f;

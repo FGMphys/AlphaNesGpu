@@ -116,9 +116,9 @@ __global__ void alphagrad_ang_kernel(const double* radial_descriptor,const doubl
 
         double chtjy_par=type_emb3b[sum*nsmooth_a+a1];
         double prevgradel=prevgrad[b*nsmooth_a*N_local+par*nsmooth_a+a1];
-        double a1dja2dy=expf(alpha1*dj+alpha2*dy);
-        double a1dya2dj=expf(alpha1*dy+alpha2*dj);
-        double btjy=expf(betaval*Tjy);
+        double a1dja2dy=exp(alpha1*dj+alpha2*dy);
+        double a1dya2dj=exp(alpha1*dy+alpha2*dj);
+        double btjy=exp(betaval*Tjy);
 
 	      grad_alpha_s[threadIdx.x].x=prevgradel*chtjy_par*(a1dja2dy*dj+a1dya2dj*dy)*btjy*Tjy/2.f;
         grad_alpha_s[threadIdx.x].y=prevgradel*chtjy_par*(a1dja2dy*dy+a1dya2dj*dj)*btjy*Tjy/2.f;

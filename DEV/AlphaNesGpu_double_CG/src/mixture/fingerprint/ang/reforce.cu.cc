@@ -96,9 +96,9 @@ __global__ void angularAFs_kernel(const double* radial_descriptor,const double* 
 
              double chtjy_par=type_emb3b[sum*nsmooth_a+a1];
 
-             double softmaxweight=expf(alpha1*ds[actual+j]+alpha2*ds[actual+k]);
-             softmaxweight+=expf(alpha2*ds[actual+j]+alpha1*ds[actual+k]);
-             softmaxweight*=expf(betaval*angulardes);
+             double softmaxweight=exp(alpha1*ds[actual+j]+alpha2*ds[actual+k]);
+             softmaxweight+=exp(alpha2*ds[actual+j]+alpha1*ds[actual+k]);
+             softmaxweight*=exp(betaval*angulardes);
              atomicAdd((double*)&three_body_AFs[b*nsmooth_a*N_local+par*nsmooth_a+a1],
                         angulardes*softmaxweight*chtjy_par/2.f);
             }

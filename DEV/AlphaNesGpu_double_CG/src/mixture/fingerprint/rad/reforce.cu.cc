@@ -54,7 +54,7 @@ __global__ void radialAFs_kernel(
                 for (int i=0; i<nalpha_r;i++){
                     double alpha_now=alphas[nalpha_r*row_index+i];
                     double chpar=type_emb2b[nalpha_r*row_index+i];
-                    double softmaxweight=expf(alpha_now*des_r_el)*chpar;
+                    double softmaxweight=exp(alpha_now*des_r_el)*chpar;
 
                     atomicAdd((double*)&radial_AFs[b*nalpha_r*N_local+par*nalpha_r+i], des_r_el*softmaxweight);
                 }

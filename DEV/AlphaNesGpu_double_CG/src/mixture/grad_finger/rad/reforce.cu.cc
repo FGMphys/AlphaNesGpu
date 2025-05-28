@@ -52,10 +52,10 @@ const int* map_color_interaction,const int* map_intra)
               double prevgradel=prevgrad[b*nalpha_r*N_local+par*nalpha_r+i];
               double typew=type_emb2b[cht*nalpha_r+i];
               accumulate=des_r_el*des_r_el;
-              accumulate*=expf(alpha2b_parameters[cht*nalpha_r+i]*des_r_el)*typew*prevgradel;
+              accumulate*=exp(alpha2b_parameters[cht*nalpha_r+i]*des_r_el)*typew*prevgradel;
               atomicAdd((double*)&nextgrad_alpha2b[cht*nalpha_r+i],accumulate);
               accumulate=des_r_el;
-              accumulate*=expf(alpha2b_parameters[cht*nalpha_r+i]*des_r_el)*prevgradel;
+              accumulate*=exp(alpha2b_parameters[cht*nalpha_r+i]*des_r_el)*prevgradel;
               atomicAdd((double*)&nextgrad_emb2b[cht*nalpha_r+i],accumulate);
              }
           }

@@ -67,9 +67,9 @@ __global__ void angularAFs_kernel(const float* radial_descriptor,const float* an
 
              float chtjy_par=type_emb3b[sum*nsmooth_a+a1];
 
-             float softmaxweight=expf(alpha1*ds[actual+j]+alpha2*ds[actual+k]);
-             softmaxweight+=expf(alpha2*ds[actual+j]+alpha1*ds[actual+k]);
-             softmaxweight*=expf(betaval*angulardes);
+             float softmaxweight=exp(alpha1*ds[actual+j]+alpha2*ds[actual+k]);
+             softmaxweight+=exp(alpha2*ds[actual+j]+alpha1*ds[actual+k]);
+             softmaxweight*=exp(betaval*angulardes);
 	     local_finger[threadIdx.x]=angulardes*softmaxweight*chtjy_par/2.f;
             }
 
