@@ -242,8 +242,7 @@ class alpha_nes_full(tf.Module):
             grads_and_vars_afs.extend([(grad_mu[k][0], self.lognorm_layer[k].mu)])
 
         grads_and_vars_all = grads_and_vars_afs + grads_and_vars_net
-
-        #self.opt_net.apply_gradients(grads_and_vars_all)
+        self.opt_net.apply_gradients(grads_and_vars_all)
 
         self.global_step=self.global_step+1
         ######## FINE MODIFICA 19.04: SOLVE BUG ONLY FIRST HIDDEN ###########

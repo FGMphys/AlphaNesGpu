@@ -5,10 +5,10 @@
 #CUDA_INCLUDE_PATH=/leonardo/prod/opt/compilers/cuda/11.8/none/include
 #CUDA_LIB64_PATH=/leonardo/prod/opt/compilers/cuda/11.8/none/lib64
 
-NVCC_PATH="/usr/local/cuda-11.2/bin/nvcc"
+NVCC_PATH="/home/francegm/programmi/cuda/bin/nvcc" #11.8
 GPP_PATH="/usr/bin/g++"
-CUDA_LIB64_PATH="/usr/local/cuda-11.2/lib64"
-CUDA_INCLUDE_PATH="/usr/local/cuda-11.2/include"
+CUDA_LIB64_PATH="/home/francegm/programmi/cuda/lib64"
+CUDA_INCLUDE_PATH="/home/francegm/programmi/cuda/include"
 PYTHON_PATH=$(which python)
 echo $PYTHON_PATH
 
