@@ -71,24 +71,26 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
       {
         num_angolare[threadIdx.x].z=1;
 
-        des3bsupp[actual_pos+k]=0.5*(cosf(PI*dist_norm/range_angolare)+1);
-        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sinf(PI*dist_norm/range_angolare)*PI/range_angolare*dist.x/dist_norm;
-        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sinf(PI*dist_norm/range_angolare)*PI/range_angolare*dist.y/dist_norm;
-        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sinf(PI*dist_norm/range_angolare)*PI/range_angolare*dist.z/dist_norm;
+        des3bsupp[actual_pos+k]=0.5*(cos(PI*dist_norm/range_angolare)+1);
+        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.x/dist_norm;
+        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.y/dist_norm;
+        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.z/dist_norm;
       }
       //STEP 1: filling radial descriptor with larger cutoff
       if (dist_norm<rs){
-          descriptors[actual_pos+k]=coeffa/powf(dist_norm,pow_alpha)+coeffb/powf(dist_norm,pow_beta)+coeffc;
+          descriptors[actual_pos+k]=coeffa/pow(dist_norm/rs,pow_alpha)+coeffb/pow(dist_norm/rs,pow_beta)+coeffc;
 
-          der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=(-pow_alpha*coeffa/powf(dist_norm,pow_alpha+1.)-pow_beta*coeffb/powf(dist_norm,pow_beta+1.))*dist.x/dist_norm;
-          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=(-pow_alpha*coeffa/powf(dist_norm,pow_alpha+1.)-pow_beta*coeffb/powf(dist_norm,pow_beta+1.))*dist.y/dist_norm;
-          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=(-pow_alpha*coeffa/powf(dist_norm,pow_alpha+1.)-pow_beta*coeffb/powf(dist_norm,pow_beta+1.))*dist.z/dist_norm;
+          double der_cutoff=(-pow_alpha*coeffa/pow(dist_norm/rs,pow_alpha+1.)/rs-pow_beta*coeffb/pow(dist_norm/rs,pow_beta+1.)/rs);
+
+          der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=der_cutoff*dist.x/dist_norm;
+          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=der_cutoff*dist.y/dist_norm;
+          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=der_cutoff*dist.z/dist_norm;
       }
       else{
-        descriptors[actual_pos+k]=0.5*(cosf(PI*dist_norm/range)+1);
-        der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sinf(PI*dist_norm/range)*PI/range*dist.x/dist_norm;
-        der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sinf(PI*dist_norm/range)*PI/range*dist.y/dist_norm;
-        der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sinf(PI*dist_norm/range)*PI/range*dist.z/dist_norm;
+        descriptors[actual_pos+k]=0.5*(cos(PI*dist_norm/range)+1);
+        der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.x/dist_norm;
+        der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.y/dist_norm;
+        der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.z/dist_norm;
       }
       //STEP 2: filling interaction map for pair descriptors
       intmap2b[b*N*(radial_buffer+1)+i*(radial_buffer+1)+1+k]=with[b*radial_buffer*N+i*radial_buffer+k];
@@ -143,7 +145,7 @@ __global__ void DescriptorsAngular_kernel(double range,int radial_buffer,double 
         next_row+=na_dim-j-1;
     }
     int k=nn-prev_row+1+j;
-    
+
     intmap3b[b*N*angular_buffer+i*angular_buffer+nn].x=with[b*N*radial_buffer+i*radial_buffer+j];
     intmap3b[b*N*angular_buffer+i*angular_buffer+nn].y=with[b*N*radial_buffer+i*radial_buffer+k];
 
@@ -191,19 +193,19 @@ __global__ void DescriptorsAngular_kernel(double range,int radial_buffer,double 
     double cutoffj,cutoffk;
     double3 dcij,dcik;
 
-    cutoffj=0.5f*(1.f+cosf(PI*dist_normj/range_angolare));
-    cutoffk=0.5f*(1.f+cosf(PI*dist_normk/range_angolare));
+    cutoffj=0.5f*(1.f+cos(PI*dist_normj/range_angolare));
+    cutoffk=0.5f*(1.f+cos(PI*dist_normk/range_angolare));
 
     double tijk=0.5*(angle+1)*cutoffj*cutoffk;
 
 
-    dcij.x=-0.5f*sinf(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.x;
-    dcij.y=-0.5f*sinf(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.y;
-    dcij.z=-0.5f*sinf(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.z;
+    dcij.x=-0.5f*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.x;
+    dcij.y=-0.5f*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.y;
+    dcij.z=-0.5f*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.z;
 
-    dcik.x=-0.5f*sinf(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.x;
-    dcik.y=-0.5f*sinf(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.y;
-    dcik.z=-0.5f*sinf(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.z;
+    dcik.x=-0.5f*sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.x;
+    dcik.y=-0.5f*sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.y;
+    dcik.z=-0.5f*sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.z;
 
 
     double3 dangleij,dangleik;
@@ -265,7 +267,7 @@ void fill_angular_launcher(double R_c,int radbuff,double R_a,int angbuff,int N,
 
                 dim3 dimGrid(ceil(double(nf*N*angbuff)/double(BLOCK_DIM)),1,1);
                 dim3 dimBlock(BLOCK_DIM,1,1);
-                
+
                 TF_CHECK_OK(::tensorflow::GpuLaunchKernel(DescriptorsAngular_kernel,
                            dimGrid,dimBlock,0, nullptr,R_c,radbuff,R_a,angbuff,N,
                            inopos_d,box_d,howmany_d,with_d,

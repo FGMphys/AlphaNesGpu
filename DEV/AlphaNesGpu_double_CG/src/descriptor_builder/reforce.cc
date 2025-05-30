@@ -58,27 +58,19 @@ void save_cutoff(double rc){
 }
 void construct_repulsion(){
     double alpha=1.;
-    double beta=-30.;
+    double beta=-3.;
     Pow_alpha=alpha;
     Pow_beta=beta;
     double rs=Rs;
     double rc=R_c;
     double f=0.5*(cos(PI*rs/rc)+1);
     double f1=-0.5*PI/rc*sin(PI*rs/rc);
-    double f2_red=-0.5*SQR(PI/rc)*cos(PI*rs/rc)*SQR(rs);
-    double gamma_red=1./(alpha-beta)*alpha-1;
-    double delta_red=1./(alpha-beta)*(f*(alpha-beta)-f1*rs-f*alpha);
-    double eta_red=-alpha/(alpha-beta);
-    double epsilon_red=1./(alpha-beta)*(rs*f1+alpha*f);
-    double c2_red=alpha*(alpha+1)*delta_red+beta*(beta+1)*epsilon_red;
-    double c1_red=alpha*(alpha+1)*gamma_red+beta*(beta+1)*eta_red;
-    coeffC=(f2_red-c2_red)/c1_red;
-    double eta=-alpha*Power(rs,beta)/(alpha-beta);
-    double epsilon=Power(rs,beta)/(alpha-beta)*(rs*f1+alpha*f);
-    coeffB=eta*coeffC+epsilon;
-    double gamma=Power(rs,alpha)/(alpha-beta)*alpha-Power(rs,alpha);
-    double delta=Power(rs,alpha)/(alpha-beta)*(f*(alpha-beta)-f1*rs-f*alpha);
-    coeffA=gamma*coeffC+delta;
+    double f2=-0.5*SQR(PI/rc)*cos(PI*rs/rc);
+
+    coeffA=(f2*SQR(rs)-coeffB*beta*(beta+1))/(alpha*(alpha+1));
+    coeffB=(f1*rs+f2*SQR(rs)/(alpha+1))*(alpha+1)/beta/(beta-alpha);
+    coeffC=f-coeffA-coeffB;
+
     save_cutoff(rc);
 
 }
@@ -102,7 +94,7 @@ void construct_descriptor(const double* box,int N,int max_batch){
 	  int nf=max_batch;
 	  Full_pos=(double*)calloc(nf*N*3,sizeof(double));
 	  Full_box=(double*)calloc(nf*6,sizeof(double));
-          
+
 	  cudaMalloc(&howmany_d,nf*N*sizeof(int));
           cudaMalloc(&with_d,nf*N*Radbuff*sizeof(int));
           cudaMalloc(&nowinopos_d,nf*N*3*sizeof(double));
@@ -158,7 +150,7 @@ REGISTER_OP("ConstructDescriptorsLight")
            const Tensor& box_T = context->input(4);
            const Tensor& rs_T = context->input(5);
            const Tensor& ra_T = context->input(6);
-           const Tensor& max_batch_T = context->input(7); 
+           const Tensor& max_batch_T = context->input(7);
 
            auto rs_T_flat=rs_T.flat<double>();
            Rs=rs_T_flat(0);
