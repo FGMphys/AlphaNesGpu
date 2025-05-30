@@ -48,7 +48,7 @@ void save_cutoff(double rc){
   for (int k=0;k<1000;k++){
     x=x+dx;
     if (x<Rs){
-      fprintf(newfile,"%g %g\n",x,coeffA/Power(x,Pow_alpha)+coeffB/Power(x,Pow_beta)+coeffC);
+      fprintf(newfile,"%g %g\n",x,coeffA/Power(x/Rs,Pow_alpha)+coeffB/Power(x/Rs,Pow_beta)+coeffC);
     }
     else{
       fprintf(newfile,"%g %g\n",x,0.5*(1+cos(PI*x/rc)));
@@ -67,8 +67,8 @@ void construct_repulsion(){
     double f1=-0.5*PI/rc*sin(PI*rs/rc);
     double f2=-0.5*SQR(PI/rc)*cos(PI*rs/rc);
 
-    coeffA=(f2*SQR(rs)-coeffB*beta*(beta+1))/(alpha*(alpha+1));
     coeffB=(f1*rs+f2*SQR(rs)/(alpha+1))*(alpha+1)/beta/(beta-alpha);
+    coeffA=(f2*SQR(rs)-coeffB*beta*(beta+1))/(alpha*(alpha+1));
     coeffC=f-coeffA-coeffB;
 
     save_cutoff(rc);
