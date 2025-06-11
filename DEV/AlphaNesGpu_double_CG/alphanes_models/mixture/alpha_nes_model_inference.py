@@ -15,9 +15,9 @@ class alpha_nes_full_inference(tf.Module):
           super(alpha_nes_full_inference, self).__init__()
           self.max_batch=1
           self.number_of_NN=np.loadtxt(modelname+'/number_of_nn.dat',dtype='int32')
-          self.color_type_map=np.loadtxt(modelname+'/color_type_map.dat',dtype='int32')
-          self.map_color_interaction=np.loadtxt(modelname+'/map_color_interaction.dat',dtype='int32')
-          self.map_intra=np.loadtxt(modelname+'/map_intra.dat',dtype='int32')
+          self.color_type_map=np.loadtxt(modelname+'/color_type_map.dat',dtype='int32').reshape((-1))
+          self.map_color_interaction=np.loadtxt(modelname+'/map_color_interaction.dat',dtype='int32').reshape((-1,1))
+          self.map_intra=np.loadtxt(modelname+'/map_intra.dat',dtype='int32').reshape((-1,1))
           self.cutoff_info=np.loadtxt(modelname+'/cutoff_info')
           self.rc=float(self.cutoff_info[0,0])
           self.rad_buff=int(self.cutoff_info[0,1])
@@ -37,8 +37,8 @@ class alpha_nes_full_inference(tf.Module):
 
           self.descriptor_layer=descriptor_layer(self.rc,self.rad_buff,self.rc_ang,self.ang_buff,self.N,self.boxinit,self.rs,self.max_batch)
 
-          init_alpha2b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_2body.dat',dtype='float64').reshape((self.ntipos,-1)) for k in range(self.number_of_NN)]
-          init_alpha3b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_3body.dat',dtype='float64').reshape((self.nt_couple,-1)) for k in range(self.number_of_NN)]
+          init_alpha2b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_2body.dat',dtype='float64').reshape((3,-1)) for k in range(self.number_of_NN)]
+          init_alpha3b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_3body.dat',dtype='float64').reshape((6,-1)) for k in range(self.number_of_NN)]
 
           initial_type_emb2b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_2b.dat',dtype='float64') for k in range(self.number_of_NN)]
           initial_type_emb3b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_3b.dat',dtype='float64') for k in range(self.number_of_NN)]
@@ -75,17 +75,15 @@ class alpha_nes_full_inference(tf.Module):
           self.fingerprint=[self.physics_layer[k](self.x2b,self.x3bsupp,
           self.int2b,self.x3b,self.int3b,self.numtriplet,self.color_type_map,self.map_color_interaction,self.map_intra)
                       for k in range(number_of_NN)]
-          self.log_norm_projdes=[self.lognorm_layer[k](finger)
-                           for k,finger in enumerate(self.fingerprint)]
-          self.energy=[self.nets[k](cp) for k,cp in enumerate(self.log_norm_projdes)]
-          self.grad_ene=[tf.gradients(self.energy[k],cp) for k,cp in enumerate(self.fingerprint)]
-
+          self.outmodel=[self.nets[k].testmodel(fingers) for k,fingers in enumerate(self.fingerprint)]
+          self.energy=[self.outmodel[k][0] for k in range(self.number_of_NN)]
 
           self.totene=tf.concat(self.energy,axis=1)
-          self.totenergy=tf.reduce_mean(self.totene,axis=(-1,-2))*0.5
+          self.totenergy=tf.reduce_sum(self.totene,axis=(-1))
 
-          self.grad_listed=[tf.split(self.grad_ene[k][0],[self.physics_layer[k].nalpha_r,
-                                      self.physics_layer[k].nalpha_a],axis=2) for k in range(number_of_NN)]
+
+          self.grad_listed=[tf.split(self.outmodel[k][1],[self.physics_layer[k].nalpha_r,
+                                      self.physics_layer[k].nalpha_a],axis=-1) for k in range(self.number_of_NN)]
 
           self.force_list=[self.force_layer(self.grad_listed[k][0],self.x2b,
                                    self.intder2b,self.int2b,
@@ -97,7 +95,7 @@ class alpha_nes_full_inference(tf.Module):
                                    self.physics_layer[k].type_emb_2b,
                                    self.physics_layer[k].type_emb_3b,
                                    self.color_type_map,self.map_color_interaction,
-                                   k,self.map_intra) for k in range(number_of_NN)]
+                                   k,self.map_intra) for k in range(self.number_of_NN)]
 
           self.force=tf.math.add_n(self.force_list)
 
