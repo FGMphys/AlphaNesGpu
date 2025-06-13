@@ -58,7 +58,7 @@ void save_cutoff(double rc){
 }
 void construct_repulsion(){
     double alpha=1.;
-    double beta=-3.;
+    double beta=-30.;
     Pow_alpha=alpha;
     Pow_beta=beta;
     double rs=Rs;
