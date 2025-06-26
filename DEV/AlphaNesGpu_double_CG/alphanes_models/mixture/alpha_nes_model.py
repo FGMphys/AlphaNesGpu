@@ -42,12 +42,14 @@ class alpha_nes_full(tf.Module):
                         net.add(Dense(k, activation=map_actfun[index_net]))
                     net.add(Dense(output_dim))
         else:
+             print("alpha_nes: parameters of NN loaded from ",restart)
              self.nets=[tf.keras.models.load_model(restart+'/net_model_type'+str(k))
                        for k in range(self.number_of_NN)]
-             if restart!='all_params':
+             if full_param['restart']!='all_params':
                 with open(restart+'/opt_net_weights','rb') as source:
                      weight_net=pickle.load(source)
                 self.opt_net_weights=weight_net
+                print("alpha_nes: State of optimizer has been loaded from ",restart)
                 #res=[self.nets[k].compile() for k in range(self.ntipos)]
         self.lossfunction=lossfunction
         self.val_loss=val_loss
@@ -243,7 +245,6 @@ class alpha_nes_full(tf.Module):
 
         grads_and_vars_all = grads_and_vars_afs + grads_and_vars_net
         self.opt_net.apply_gradients(grads_and_vars_all)
-
         self.global_step=self.global_step+1
         ######## FINE MODIFICA 19.04: SOLVE BUG ONLY FIRST HIDDEN ###########
 

@@ -284,17 +284,21 @@ try:
         restart_par=folders[-2]
         print("alpha_nes: Training will restart from last previous state ",restart_par)
     elif restart_par=='only_afs':
-        print("alpha_nes: AFs will be initialised by user. Be sure to have defined afs_param_folder key.")
+        print("alpha_nes: AFs will be initialised by user. Be sure to have defined params_folder key.")
+    elif restart_par=='all_params':
+        print("alpha_nes: AFs and NN parameters will be initialised by user. Be sure to have defined params_folder key.")
+        restart_par=full_param['params_folder']
     else:
         restart_par='no'
         print("alpha_nes: Not indicated or not existing restart folder. It will be begun a new run")
 except:
     restart_par='no'
-    print("alpha_nes: Not indicated or not existing restart folder. It will be begun a new run")
+    print("alpha_nes: Not indicated a correct restart command or not existing restart folder. It will be begun a new run")
 restart=restart_par
 
 ##If we are not restarting, we initialiaze the optimizer and the learning rate
-if restart_par=='no' or restart_par=='only_afs':
+if restart_par in ['no','only_afs','all_params']:
+    print("alpha_nes: Not previous optimizer state point will be loaded since restart_par ",restart_par," has been selected")
     lr_net_param=full_param['lr_dense_net'].split()
     lr_net=build_learning_rate(lr_net_param,ne,nb,idx_str_tr.shape[0],'net',0)
 
@@ -367,10 +371,11 @@ else:
    lr_file=open("lr_step.dat",'w')
 
 model_name=full_param['model_name']
-if restart_par=='no' or restart_par=='only_afs' or restart_par=='all_params':
+if full_param['restart']  in ['no','only_afs','all_params']:
     restart_ep=0
     os.mkdir(model_name)
     model.save_model_init(model_name)
+    print("alpha_nes: Optimizer state will be initialized from zero")
     for k in range(number_of_NN):
        Physics_Layers[k].savealphas(model_name,"type"+str(k)+"initial_")
        Lognorm_Layers[k].savemu(model_name,"type"+str(k)+"initial_")

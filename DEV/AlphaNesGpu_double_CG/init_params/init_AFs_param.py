@@ -76,7 +76,7 @@ def init_AFs_param(restart,full_param,number_of_interaction,seed_par):
     else :
         map_rad_afs=full_param['map_rad_afs']
         number_of_NN=len(map_rad_afs)
-        afs_param=full_param['afs_param_folder']
+        afs_param=full_param['params_folder']
         init_mu=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_mu.dat',dtype='float64') for k in range(number_of_NN)]
         init_alpha2b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_2body.dat',dtype='float64').reshape((number_of_interaction,-1)) for k in range(number_of_NN)]
         init_alpha3b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_3body.dat',dtype='float64').reshape((nt_couple_interaction,-1)) for k in range(number_of_NN)]
