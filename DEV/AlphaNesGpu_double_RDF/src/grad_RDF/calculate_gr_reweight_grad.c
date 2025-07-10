@@ -36,9 +36,11 @@ void grFree(grstruct *gr);
 
 void grPrint(grstruct *gr,FILE *p_file);
 void grSave(grstruct *gr,FILE *p_file);
-void compute_rdf(const double* energy,const double* position,const double* box_glob, int nf, int N,
+
+
+void compute_gradrdf(const double* energy,const double* position,const double* box_glob, int nf, int N,
     const double* new_energy,const int* type_pair,const int* type,
-    const int* type_map,const double* binsize,const double* betarewe,double* RDF){
+    const int* type_map,const double* binsize,const double* betarewe,double* gradRDF,const double* prev_grad){
 
 
 
@@ -106,27 +108,22 @@ void compute_rdf(const double* energy,const double* position,const double* box_g
         memcpy(box,&box_glob[i*6],6*sizeof(double));
         from_car_to_int(ipos,&position[i*N*3],N,box);
         double delta_E=(-new_energy[i]+energy[i])*betarewe[0];
-		     //printf("%lf\n",delta_E);	
-			grSample(gr,ipos,numparticles,box,type_map,nt,nt2,type,delta_E);
+		     //printf("%lf\n",delta_E);
+			grSamplegrad(gr,gradRDF,ipos,numparticles,box,type_map,nt,nt2,type,delta_E,nf,i);
 
 			}
 
 
-	grAverage(gr,type[nt2],box);
-	int steppy=0;
-	char filename[100];
-	sprintf(filename,"gr_%d_%d_rewe_step_%d.dat",nt,nt2,steppy);
-	FILE *pfile=fopen(filename,"w");
-	grSave(gr,pfile);
-
-        for (i=0;i<(gr->dimh);i++)
-         {
-                 double r=(gr->bin)*(i+0.5);
-
-                 RDF[i]=gr->histogram[i];
-         }
+	grAverageGrad(gr,gradRDF,type[nt2],box,nf,beta);
+	//Sotto routine per salvare gr ad ogni step di ottimizzazione
+	//int steppy=0;
+	//char filename[100];
+	//sprintf(filename,"gr_%d_%d_rewe_step_%d.dat",nt,nt2,steppy);
+	//FILE *pfile=fopen(filename,"w");
+	//grSave(gr,pfile);
+	//fclose(pfile);
 	grFree(gr);
-	fclose(pfile);
+
 }
 
 grstruct* grConstruct(double binsize,double range)
@@ -174,12 +171,14 @@ void from_car_to_int(vector* ipos,const double* positions,int numparticle,double
       }
 };
 
-void grSample(grstruct *gr,vector *pos,int numparticles,double Box[],const int* type_map,int nt,int nt2,const int* type,double delta_E)
+void grSamplegrad(grstruct *gr, double* gradRDF,vector *pos,int numparticles,double Box[],
+	const int* type_map,int nt,int nt2,const int* type,double delta_E,int nf,int actual_frame)
 {
 
 	gr->nsamples++;
 
 	int i;
+	int fr=actual_frame;
 	int j;
 	vector olddist,dist;
 	double dist2;
@@ -213,8 +212,9 @@ void grSample(grstruct *gr,vector *pos,int numparticles,double Box[],const int* 
 			{
 
 				hpos=(int)(dist2/gr->bin);
-
-				gr->histogram[hpos]+=two_over_density*exp(-delta_E);
+        double element=two_over_density*exp(-delta_E)/nf/numparticles/gr->volume_shell[hpos];
+				gradRDF[nf*hpos+fr]=element;
+				gr->histogram[hpos]+=element;
 			}
 		}
 		}
@@ -222,50 +222,32 @@ void grSample(grstruct *gr,vector *pos,int numparticles,double Box[],const int* 
     }
 }
 
-void grAverage(grstruct *gr,int numparticles,double box[])
+void grAverageGrad(grstruct gr*,double* gradRDF,int numparticles,double box[],int nf
+                   double beta)
 {
 	int i;
+  int frac=rint(0.2*gr->dimh);
+  double Norma=0.;
+  for (i=gr->dimh-frac;i<gr->dimh;i++)
+  {
+          Norma+=gr->histogram[i]/frac;
+  }
 
-	for (i=0;i<(gr->dimh);i++)
-	{
-		(gr->histogram[i])=(gr->histogram[i])/( (gr->nsamples)*numparticles*gr->volume_shell[i]);
-	}
-        //Normalizzo imponendo che l'ultimo r sia tale che g(r)=1
-        /*for (i=0;i<(gr->dimh);i++)
-        {
-                (gr->histogram[i])=(gr->histogram[i])/gr->histogram[gr->dimh-1];
-        }
-        */
-        //normalizzo imponendo che le ultime oscillazioni siano attorno a uno
-        int frac=rint(0.2*gr->dimh);
-        double mean_last_frac=0.;
-        for (i=gr->dimh-frac;i<gr->dimh;i++)
-        {
-                mean_last_frac+=(gr->histogram[i])/frac;
-        }
-        printf("norm fact %lf\n",mean_last_frac);
-       	for (i=0;i<(gr->dimh);i++)
-        {
-                (gr->histogram[i])*=1/mean_last_frac;
-        }
-/*
-        double newneigh=0;
-        for (i=0;i<(gr->dimh);i++)
-        {
-                newneigh+=(gr->histogram[i])*((gr->bin)*(i+0.5))*((gr->bin)*(i+0.5))*4*M_PI*(gr->bin);
-        }
-        double coeff=1/(newneigh)*(box[0]*box[3]*box[5]);
-        for (i=0;i<(gr->dimh);i++)
-        {
-                (gr->histogram[i])=(gr->histogram[i])*coeff;
-        }
-        double newneigh=0;
-        for (i=0;i<(gr->dimh);i++)
-        {
-                newneigh+=(gr->histogram[i])*((gr->bin)*(i+0.5))*((gr->bin)*(i+0.5))*4*M_PI*(gr->bin)*numparticles/(box[0]*box[3]*box[5]);
-        }
-        printf("\nNew number of neighbors %lf\n",newneigh);
-*/
+	double K=1/Norma;
+  //printf("norm fact %lf\n",mean_last_frac);
+
+	for (int fr=0;fr>nf;fr++){
+		    double helpis=0.;
+				for (int j=gr->dimh-frac;j<gr->dimh;j++)
+				{
+					helpis+=gradRDF[nf*j+fr]/frac;
+				}
+				for (i=0;i<gr->dimh;i++)
+			  {
+				   gradRDF[nf*i+fr]=-beta*gradRDF[nf*i+fr]*K+K*K*beta*helpis;
+				 }
+
+	    }
 
 }
 

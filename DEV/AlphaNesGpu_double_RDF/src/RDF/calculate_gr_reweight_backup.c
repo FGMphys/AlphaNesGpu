@@ -156,7 +156,7 @@ int main(int argc,char *argv[])
             Nfromtipos+=type[k];
 
         printf("\nNumber particles, %d number types %d!\n",Nfromtipos,numtypes[0]);
-        fflush(stdout);	
+        fflush(stdout);
 	readType(type_map,Nfromtipos);
 
 	old_numparticles=0;
@@ -202,25 +202,25 @@ int main(int argc,char *argv[])
 		for (i=0;i<num_files;i++)
 			{
 			readPositions(configuration_files[i],pos,&step,&numparticles,box,ibox);
-	                double delta_E=delta_E_arr[i];	
+	                double delta_E=delta_E_arr[i];
 			grSample(gr,pos,numparticles,box,type_map,nt,nt2,type,delta_E);
-		
+
 			}
-        
+
 
 	char filename[100];
         sprintf(filename,"gr_%d_%d_rewe.dat",nt,nt2);
-	FILE *pfile=fopen(filename,"w");	
-        
+	FILE *pfile=fopen(filename,"w");
+
 	printf("\nAveraging\n");
 	grAverage(gr,type[nt2],box);
         printf("Saving\n");
         grSave(gr,pfile);
-	
+
 	grFree(gr);
 	fclose(pfile);
 	}
-        }	
+        }
 	logClose();
 
 	return 0;
@@ -256,15 +256,15 @@ grstruct* grConstruct(double binsize,double range)
 
 void grSample(grstruct *gr,vector *pos,int numparticles,double Box[],int* type_map,int nt,int nt2,int* type,double delta_E)
 {
-	
+
 	gr->nsamples++;
-	
+
 	int i;
 	int j;
 	vector olddist,dist;
 	double dist2;
 	int hpos;
-	
+
 	// attenzione la densita' potrebbe cambiare tra i diversi file
 	// e quindi la campioniamo direttamente
 	double two_over_density=2.*(Box[0]*Box[3]*Box[5])/(double)type[nt2];
@@ -273,26 +273,26 @@ void grSample(grstruct *gr,vector *pos,int numparticles,double Box[],int* type_m
 
 		for (j=i+1;j<numparticles;j++)
 		{
-		        if (type_map[j]==nt2){	
+		        if (type_map[j]==nt2){
 			olddist.x=pos[i].x-pos[j].x;
 			olddist.y=pos[i].y-pos[j].y;
 			olddist.z=pos[i].z-pos[j].z;
-			
+
 			olddist.x-=rint(olddist.x);
 			olddist.y-=rint(olddist.y);
 			olddist.z-=rint(olddist.z);
-			
+
 			dist.x=Box[0]*olddist.x+Box[1]*olddist.y+Box[2]*olddist.z;
 			dist.y=Box[3]*olddist.y+Box[4]*olddist.z;
 			dist.z=Box[5]*olddist.z;
-			
+
 			dist2=sqrt(SQR(dist.x)+SQR(dist.y)+SQR(dist.z));
-			
+
 			if (dist2<(gr->range))
 			{
-				
+
 				hpos=(int)(dist2/gr->bin);
-				
+
 				gr->histogram[hpos]+=two_over_density*exp(-delta_E);
 			}
 		}
@@ -304,7 +304,7 @@ void grSample(grstruct *gr,vector *pos,int numparticles,double Box[],int* type_m
 void grAverage(grstruct *gr,int numparticles,double box[])
 {
 	int i;
-        
+
 	for (i=0;i<(gr->dimh);i++)
 	{
 		(gr->histogram[i])=(gr->histogram[i])/( (gr->nsamples)*numparticles*gr->volume_shell[i]);
@@ -335,7 +335,7 @@ void grAverage(grstruct *gr,int numparticles,double box[])
         }
         double coeff=1/(newneigh)*(box[0]*box[3]*box[5]);
         for (i=0;i<(gr->dimh);i++)
-        {       
+        {
                 (gr->histogram[i])=(gr->histogram[i])*coeff;
         }
 */
@@ -344,9 +344,9 @@ void grAverage(grstruct *gr,int numparticles,double box[])
         {
                 newneigh+=(gr->histogram[i])*((gr->bin)*(i+0.5))*((gr->bin)*(i+0.5))*4*M_PI*(gr->bin)*numparticles/(box[0]*box[3]*box[5]);
         }
-        printf("\nNew number of neighbors %lf\n",newneigh);
+        //printf("\nNew number of neighbors %lf\n",newneigh);
 
-        
+
 }
 
 void grPrint(grstruct *gr,FILE *p_file)
@@ -367,7 +367,7 @@ void grPrint(grstruct *gr,FILE *p_file)
  {
          int i;
          double r;
-         
+
          for (i=0;i<(gr->dimh);i++)
          {
                  r=(gr->bin)*(i+0.5);
