@@ -466,7 +466,7 @@ for ep in range(restart_ep,ne):
        outfold_name=model_name+str(ep)
        model.save_model(outfold_name)
        np.savetxt(outfold_name+"/model_error",[np.sqrt(vallosstote),np.sqrt(vallosstotf)],header='RMSE_e  RMSE_f ')
-       print(accumul,ep,np.sqrt(vallosstote.numpy()),(np.sqrt(vallosstotf.numpy())-38.223)*1000,losstot.numpy(),lrnow.numpy(),sep=' ',end='\n',file=fileOU)
+       print(accumul,ep,np.sqrt(vallosstote.numpy()),(np.sqrt(vallosstotf.numpy())),losstot.numpy(),lrnow.numpy(),sep=' ',end='\n',file=fileOU)
        print("Testing model at global step",accumul," and epoch ",ep," val_lossE ",np.sqrt(vallosstote.numpy())," val_lossF ",np.sqrt(vallosstotf.numpy())," loss_Tot ",losstot.numpy()," lr_net ",lrnow.numpy(),sep=' ',end='\n')
        print("We are at epoch ",ep)
        fileOU.flush()

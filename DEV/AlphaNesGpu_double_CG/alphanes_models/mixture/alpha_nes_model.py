@@ -215,7 +215,7 @@ class alpha_nes_full(tf.Module):
                  for k in range(number_of_NN)]
         loss_bound=tf.add_n(loss_bound_2b)+tf.add_n(loss_bound_3b)
 
-        loss=pe*loss_energy+pb*loss_bound+(pf*loss_force-13.206)*1000#+l1_loss
+        loss=pe*loss_energy+pb*loss_bound+pf*loss_force#+l1_loss
 
 
 

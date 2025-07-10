@@ -111,4 +111,3 @@ def init_AFs_param(restart,full_param,number_of_interaction,seed_par):
         print("alpha_nes:      ",nalpha_a_arr[k,0],"        ",nalpha_a_arr[k,1])
 
     return init_alpha2b,init_alpha3b,init_mu,initial_type_emb,np.random.get_state()
-breakpoint()
