@@ -297,7 +297,7 @@ except:
 restart=restart_par
 
 ##If we are not restarting, we initialiaze the optimizer and the learning rate
-if restart_par in ['no','only_afs','all_params']:
+if full_param['restart'] in ['no','only_afs','all_params']:
     print("alpha_nes: Not previous optimizer state point will be loaded since restart_par ",restart_par," has been selected")
     lr_net_param=full_param['lr_dense_net'].split()
     lr_net=build_learning_rate(lr_net_param,ne,nb,idx_str_tr.shape[0],'net',0)
@@ -330,7 +330,7 @@ rng_state = np.random.get_state()
 number_of_interaction=3 #intra, inert, sticky
 map_rad_afs=full_param['map_rad_afs']
 number_of_NN=len(map_rad_afs)
-[init_alpha2b,init_alpha3b,init_mu,initial_type_emb,new_rng_state]=init_AFs_param(restart,full_param,number_of_interaction,rng_state)
+[init_alpha2b,init_alpha3b,init_mu,initial_type_emb,new_rng_state]=init_AFs_param(restart_par,full_param,number_of_interaction,rng_state)
 np.random.set_state(new_rng_state)
 #Reading cutoff info from input file
 [rc,rad_buff,rc_ang,ang_buff,Rs]=read_cutoff_info(full_param)
