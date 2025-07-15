@@ -67,35 +67,59 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
       dist_norm=sqrt(SQR(dist.x)+SQR(dist.y)+SQR(dist.z));
 
       int actual_pos=b*N*radial_buffer+i*radial_buffer;
+
+      int same=map_intra_d[i]-map_intra_d[j];
       //STEP 0: filling the radial part with the smaller angular cut-off
-      if (dist_norm<range_angolare)
+      if (same==0){
+        if (dist_norm<range_angolare)
+        {
+          num_angolare[threadIdx.x].z=1;
+
+          des3bsupp[actual_pos+k]=0.5*(cos(PI*dist_norm/range_angolare)+1);
+          der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.x/dist_norm;
+          der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.y/dist_norm;
+          der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.z/dist_norm;
+        }
+        //STEP 1: filling radial descriptor with larger cutoff
+        if (dist_norm<rs){
+            descriptors[actual_pos+k]=coeffa/pow(dist_norm/rs,pow_alpha)+coeffb/pow(dist_norm/rs,pow_beta)+coeffc;
+
+            double der_cutoff=(-pow_alpha*coeffa/pow(dist_norm/rs,pow_alpha+1.)/rs-pow_beta*coeffb/pow(dist_norm/rs,pow_beta+1.)/rs);
+
+            der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=der_cutoff*dist.x/dist_norm;
+            der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=der_cutoff*dist.y/dist_norm;
+            der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=der_cutoff*dist.z/dist_norm;
+        }
+        else{
+          descriptors[actual_pos+k]=0.5*(cos(PI*dist_norm/range)+1);
+          der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.x/dist_norm;
+          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.y/dist_norm;
+          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.z/dist_norm;
+        }
+        //STEP 2: filling interaction map for pair descriptors
+        intmap2b[b*N*(radial_buffer+1)+i*(radial_buffer+1)+1+k]=with[b*radial_buffer*N+i*radial_buffer+k];
+    }
+    else {
+      if (dist_norm<Rs_inter)
       {
         num_angolare[threadIdx.x].z=1;
 
-        des3bsupp[actual_pos+k]=0.5*(cos(PI*dist_norm/range_angolare)+1);
-        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.x/dist_norm;
-        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.y/dist_norm;
-        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.z/dist_norm;
+        des3bsupp[actual_pos+k]=0.5*(cos(PI*dist_norm/Rs_inter)+1);
+        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sin(PI*dist_norm/Rs_inter)*PI/Rs_inter*dist.x/dist_norm;
+        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/Rs_inter)*PI/Rs_inter*dist.y/dist_norm;
+        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/Rs_inter)*PI/Rs_inter*dist.z/dist_norm;
       }
       //STEP 1: filling radial descriptor with larger cutoff
-      if (dist_norm<rs){
-          descriptors[actual_pos+k]=coeffa/pow(dist_norm/rs,pow_alpha)+coeffb/pow(dist_norm/rs,pow_beta)+coeffc;
 
-          double der_cutoff=(-pow_alpha*coeffa/pow(dist_norm/rs,pow_alpha+1.)/rs-pow_beta*coeffb/pow(dist_norm/rs,pow_beta+1.)/rs);
+      descriptors[actual_pos+k]=0.5*(cos(PI*dist_norm/Rc_inter)+1);
+      der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sin(PI*dist_norm/Rc_inter)*PI/Rc_inter*dist.x/dist_norm;
+      der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/Rc_inter)*PI/Rc_inter*dist.y/dist_norm;
+      der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/Rc_inter)*PI/Rc_inter*dist.z/dist_norm;
 
-          der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=der_cutoff*dist.x/dist_norm;
-          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=der_cutoff*dist.y/dist_norm;
-          der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=der_cutoff*dist.z/dist_norm;
-      }
-      else{
-        descriptors[actual_pos+k]=0.5*(cos(PI*dist_norm/range)+1);
-        der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.x/dist_norm;
-        der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.y/dist_norm;
-        der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.z/dist_norm;
-      }
       //STEP 2: filling interaction map for pair descriptors
       intmap2b[b*N*(radial_buffer+1)+i*(radial_buffer+1)+1+k]=with[b*radial_buffer*N+i*radial_buffer+k];
 
+    }
     }
   }
 
@@ -151,7 +175,6 @@ __global__ void DescriptorsAngular_kernel(double range,int radial_buffer,double 
     intmap3b[b*N*angular_buffer+i*angular_buffer+nn].y=with[b*N*radial_buffer+i*radial_buffer+k];
 
 
-
     vector olddist;
 
     vector distj, distk;
@@ -160,6 +183,9 @@ __global__ void DescriptorsAngular_kernel(double range,int radial_buffer,double 
 
     int j_who=with[b*N*radial_buffer+i*radial_buffer+j];
     int k_who=with[b*N*radial_buffer+i*radial_buffer+k];
+
+    int samex=map_intra_d[i]-map_intra_d[j_who];
+    int samey=map_intra_d[i]-map_intra_d[k_who];
 
     olddist.x=coor[b*N+i].x-coor[b*N+j_who].x;
     olddist.y=coor[b*N+i].y-coor[b*N+j_who].y;
@@ -193,32 +219,77 @@ __global__ void DescriptorsAngular_kernel(double range,int radial_buffer,double 
     //Here we implement a cosine cutoff
     double cutoffj,cutoffk;
     double3 dcij,dcik;
+    if (samex==0 && samey==0){
+        cutoffj=0.5f*(1.f+cos(PI*dist_normj/range_angolare));
+        cutoffk=0.5f*(1.f+cos(PI*dist_normk/range_angolare));
 
-    cutoffj=0.5f*(1.f+cos(PI*dist_normj/range_angolare));
-    cutoffk=0.5f*(1.f+cos(PI*dist_normk/range_angolare));
-
-    double tijk=0.5*(angle+1)*cutoffj*cutoffk;
-
-
-    dcij.x=-0.5f*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.x;
-    dcij.y=-0.5f*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.y;
-    dcij.z=-0.5f*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.z;
-
-    dcik.x=-0.5f*sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.x;
-    dcik.y=-0.5f*sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.y;
-    dcik.z=-0.5f*sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.z;
+        double tijk=0.5*(angle+1)*cutoffj*cutoffk;
 
 
-    double3 dangleij,dangleik;
+        dcij.x=-0.5f*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.x;
+        dcij.y=-0.5f*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.y;
+        dcij.z=-0.5f*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.z;
 
-    dangleij.x = 0.5 * (SQR(dist_normj) * distk.x - distj.x * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
-    dangleij.y = 0.5 * (SQR(dist_normj) * distk.y - distj.y * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
-    dangleij.z = 0.5 * (SQR(dist_normj) * distk.z - distj.z * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
+        dcik.x=-0.5f*sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.x;
+        dcik.y=-0.5f*sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.y;
+        dcik.z=-0.5f*sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.z;
 
-    dangleik.x = 0.5 * (SQR(dist_normk) * distj.x - distk.x * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
-    dangleik.y = 0.5 * (SQR(dist_normk) * distj.y - distk.y * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
-    dangleik.z = 0.5 * (SQR(dist_normk) * distj.z - distk.z * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
 
+        double3 dangleij,dangleik;
+
+        dangleij.x = 0.5 * (SQR(dist_normj) * distk.x - distj.x * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
+        dangleij.y = 0.5 * (SQR(dist_normj) * distk.y - distj.y * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
+        dangleij.z = 0.5 * (SQR(dist_normj) * distk.z - distj.z * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
+
+        dangleik.x = 0.5 * (SQR(dist_normk) * distj.x - distk.x * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
+        dangleik.y = 0.5 * (SQR(dist_normk) * distj.y - distk.y * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
+        dangleik.z = 0.5 * (SQR(dist_normk) * distj.z - distk.z * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
+    }
+    else {
+        if (dist_normj<Rs_inter && dist_normk < Rs_inter){
+            if (samex!=0) {
+            cutoffj=0.5f*(1.f+cos(PI*dist_normj/Rs_inter));
+
+            dcij.x=-0.5f*sin(PI*dist_normj/Rs_inter)*PI/Rs_inter/dist_normj*distj.x;
+            dcij.y=-0.5f*sin(PI*dist_normj/Rs_inter)*PI/Rs_inter/dist_normj*distj.y;
+            dcij.z=-0.5f*sin(PI*dist_normj/Rs_inter)*PI/Rs_inter/dist_normj*distj.z;
+          }
+          else{
+            cutoffj=0.5f*(1.f+cos(PI*dist_normj/range_angolare));
+
+            dcij.x=-0.5f*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.x;
+            dcij.y=-0.5f*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.y;
+            dcij.z=-0.5f*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.z;
+          }
+            if (samey!=0){
+            cutoffk=0.5f*(1.f+cos(PI*dist_normk/Rs_inter));
+
+            dcik.x=-0.5f*sin(PI*dist_normk/Rs_inter)*PI/Rs_inter/dist_normk*distk.x;
+            dcik.y=-0.5f*sin(PI*dist_normk/Rs_inter)*PI/Rs_inter/dist_normk*distk.y;
+            dcik.z=-0.5f*sin(PI*dist_normk/Rs_inter)*PI/Rs_inter/dist_normk*distk.z;
+          }
+          else{
+            cutoffk=0.5f*(1.f+cos(PI*dist_normk/range_angolare));
+
+            dcik.x=-0.5f*sin(PI*dist_normk/Rs_inter)*PI/range_angolare/dist_normk*distk.x;
+            dcik.y=-0.5f*sin(PI*dist_normk/Rs_inter)*PI/range_angolare/dist_normk*distk.y;
+            dcik.z=-0.5f*sin(PI*dist_normk/Rs_inter)*PI/range_angolare/dist_normk*distk.z;
+          }
+
+            double tijk=0.5*(angle+1)*cutoffj*cutoffk;
+
+
+            double3 dangleij,dangleik;
+
+            dangleij.x = 0.5 * (SQR(dist_normj) * distk.x - distj.x * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
+            dangleij.y = 0.5 * (SQR(dist_normj) * distk.y - distj.y * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
+            dangleij.z = 0.5 * (SQR(dist_normj) * distk.z - distj.z * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
+
+            dangleik.x = 0.5 * (SQR(dist_normk) * distj.x - distk.x * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
+            dangleik.y = 0.5 * (SQR(dist_normk) * distj.y - distk.y * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
+            dangleik.z = 0.5 * (SQR(dist_normk) * distj.z - distk.z * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
+      }
+    }
     int na=angular_buffer;
     der3b[b*N*na*3+i*na*3+na*0+nn].x=dangleij.x*cutoffj*cutoffk+0.5*(angle+1)*dcij.x*cutoffk;
     der3b[b*N*na*3+i*na*3+na*0+nn].y=dangleik.x*cutoffj*cutoffk+0.5*(angle+1)*cutoffj*dcik.x;
