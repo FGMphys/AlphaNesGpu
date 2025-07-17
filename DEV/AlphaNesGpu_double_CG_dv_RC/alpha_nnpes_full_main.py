@@ -236,6 +236,7 @@ except:
 #Read dataset map on disk
 [e_map_tr,f_map_tr,pos_map_tr,box_map_tr]=make_dataset_stream(base_pattern,'training')
 [e_map_ts,f_map_ts,pos_map_ts,box_map_ts]=make_dataset_stream(base_pattern,'test')
+map_intra=np.loadtxt(full_param['map_intra_file'],dtype='int32')
 ###Check dimension of dataset
 check_along_frames([e_map_tr,f_map_tr,pos_map_tr,box_map_tr],0)
 check_along_frames([e_map_ts,f_map_ts,pos_map_ts,box_map_ts],0)
