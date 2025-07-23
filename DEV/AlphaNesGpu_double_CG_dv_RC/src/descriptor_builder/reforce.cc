@@ -22,8 +22,11 @@
 #define Power(x,n) (pow(x,n))
 
 static int Radbuff,Angbuff;
-static double R_c,Rs,R_a,coeffA,coeffB,coeffC,Pow_alpha,Pow_beta;
-static double Rs_inter,Rc_inter;
+static double R_c,Rs,R_a,Pow_alpha,Pow_beta;
+static double Rs_inter,Rc_inter,Ra_inter;
+
+static double Rc_celle;
+static double coeffA_intra,coeffB_intra,coeffC_intra,coeffA_inter,coeffB_inter,coeffC_inter;
 
 static double box[6],Inobox[6];
 static vector* Nowinopos;
@@ -41,15 +44,15 @@ static double *nowinopos_d;
 
 
 
-void save_cutoff(double rc){
+void save_cutoff_intra(double rc){
   FILE *newfile;
-  newfile=fopen("cutoff_curve.dat","w");
+  newfile=fopen("cutoff_curve_intra.dat","w");
   double dx=rc/1000.;
   double x=0;
   for (int k=0;k<1000;k++){
     x=x+dx;
     if (x<Rs){
-      fprintf(newfile,"%g %g\n",x,coeffA/Power(x/Rs,Pow_alpha)+coeffB/Power(x/Rs,Pow_beta)+coeffC);
+      fprintf(newfile,"%g %g\n",x,coeffA_intra/Power(x/Rs,Pow_alpha)+coeffB_intra/Power(x/Rs,Pow_beta)+coeffC_intra);
     }
     else{
       fprintf(newfile,"%g %g\n",x,0.5*(1+cos(PI*x/rc)));
@@ -57,7 +60,26 @@ void save_cutoff(double rc){
 }
    fclose(newfile);
 }
-void construct_repulsion(){
+
+
+void save_cutoff_inter(double rc){
+  FILE *newfile;
+  newfile=fopen("cutoff_curve_inter.dat","w");
+  double dx=rc/1000.;
+  double x=0;
+  for (int k=0;k<1000;k++){
+    x=x+dx;
+    if (x<Rs_inter){
+      fprintf(newfile,"%g %g\n",x,coeffA_inter/Power(x/Rs_inter,Pow_alpha)+coeffB_inter/Power(x/Rs_inter,Pow_beta)+coeffC_inter);
+    }
+    else{
+      fprintf(newfile,"%g %g\n",x,0.5*(1+cos(PI*x/rc)));
+  }
+}
+   fclose(newfile);
+}
+
+void construct_repulsion_intra(){
     double alpha=1.;
     double beta=-30.;
     Pow_alpha=alpha;
@@ -68,11 +90,32 @@ void construct_repulsion(){
     double f1=-0.5*PI/rc*sin(PI*rs/rc);
     double f2=-0.5*SQR(PI/rc)*cos(PI*rs/rc);
 
-    coeffB=(f1*rs+f2*SQR(rs)/(alpha+1))*(alpha+1)/beta/(beta-alpha);
-    coeffA=(f2*SQR(rs)-coeffB*beta*(beta+1))/(alpha*(alpha+1));
-    coeffC=f-coeffA-coeffB;
+    coeffB_intra=(f1*rs+f2*SQR(rs)/(alpha+1))*(alpha+1)/beta/(beta-alpha);
+    coeffA_intra=(f2*SQR(rs)-coeffB_intra*beta*(beta+1))/(alpha*(alpha+1));
+    coeffC_intra=f-coeffA_intra-coeffB_intra;
 
-    save_cutoff(rc);
+    save_cutoff_intra(rc);
+
+}
+
+
+
+void construct_repulsion_inter(){
+    double alpha=1.;
+    double beta=-30.;
+    Pow_alpha=alpha;
+    Pow_beta=beta;
+    double rs=Rs_inter;
+    double rc=Rc_inter;
+    double f=0.5*(cos(PI*rs/rc)+1);
+    double f1=-0.5*PI/rc*sin(PI*rs/rc);
+    double f2=-0.5*SQR(PI/rc)*cos(PI*rs/rc);
+
+    coeffB_inter=(f1*rs+f2*SQR(rs)/(alpha+1))*(alpha+1)/beta/(beta-alpha);
+    coeffA_inter=(f2*SQR(rs)-coeffB_inter*beta*(beta+1))/(alpha*(alpha+1));
+    coeffC_inter=f-coeffA_inter-coeffB_inter;
+
+    save_cutoff_inter(rc);
 
 }
 
@@ -85,10 +128,10 @@ void construct_descriptor(const double* box,int N,int max_batch){
           Inobox[4]=-box[4]/(box[3]*box[5]);
           Inobox[5]=1./box[5];
 
-          Cells=getList(box,R_c,N);
+          Cells=getList(box,Rc_celle,N);
 
           // INTERACTION MAPS
-          Ime=createInteractionMap(N,Radbuff);
+          Ime=+(N,Radbuff);
           //Memory for reticular positions
           Nowinopos=(vector*)calloc(N,sizeof(vector));
 	  //Memory to copy input on CPU
@@ -109,15 +152,17 @@ void construct_descriptor(const double* box,int N,int max_batch){
                        double* descriptor_d,int* intmap2b_d,double* der2b_d,
                        double* des3bsupp_d,
                        double* der3bsupp_d, int nf,int* numtriplet_d,
-                       double rs, double coeffa,double coeffb,double coeffc,double pow_alpha, double pow_beta,
-                      int Rs_inter,int Rc_inter,int* map_intra_d);
+                       double rs, double coeffa_intra,double coeffb_intra,double coeffc_intra,
+                       double coeffa_inter,double coeffb_inter,double coeffc_inter,
+                       double pow_alpha, double pow_beta,
+                      int Rs_inter,int Rc_inter,int* map_intra_d,double Ra_inter);
  void fill_angular_launcher(double R_c,int radbuff,double R_a,int angbuff,int N,
                        double* inopos_d,const double* box_d,
                        int *howmany_d,int *with_d,
                        double* ang_descr_d,int* intmap3b_d,
                        double* des3bsupp_d,double* der3b_d,
                        double* der3bsupp_d, int nf,int* numtriplet_d,
-                       int Rs_inter,int Rc_inter, int* map_intra_d);
+                       int Rs_inter,int Rc_inter, int* map_intra_d,double Ra_inter);
 
 void set_tensor_to_zero_int(int* tensor,int dimten);
 
@@ -138,6 +183,7 @@ REGISTER_OP("ConstructDescriptorsLight")
     .Input("max_batch: int32")
     .Input("rs_inter: double")
     .Input("rc_inter: double")
+    .Input("ra_inter: double")
     .Output("exitcode: int32");
 
  class ConstructDescriptorsLightOp : public OpKernel {
@@ -159,6 +205,7 @@ REGISTER_OP("ConstructDescriptorsLight")
 
            const Tensor& rs_inter_T = context->input(9);
            const Tensor& rc_inter_T = context->input(10);
+           const Tensor& ra_inter_T = context->input(11);
 
            auto rs_T_flat=rs_T.flat<double>();
            Rs=rs_T_flat(0);
@@ -177,15 +224,26 @@ REGISTER_OP("ConstructDescriptorsLight")
 
            auto Rs_inter_flat = rs_inter_T.flat<double>();
            auto Rc_inter_flat = rc_inter_T.flat<double>();
-
+           auto Ra_inter_flat = ra_inter_T.flat<double>();
+          
+           if (Rc_inter>R_c){
+              Rc_celle=Rc_inter;
+              printf("\nAlpha_nes: Found intra-range < inter-range, cell cut-off is %lf \n",Rc_celle);
+           }
+            else{
+              Rc_celle=R_c;
+              printf("\nAlpha_nes: Found intra-range > inter-range, cell cut-off is %lf \n",Rc_celle);
+            }
 
            Rs_inter= Rs_inter_flat(0);
            Rc_inter = Rc_inter_flat(0);
+           Ra_inter=Ra_inter_flat(0);
 
-	   int numpar=numpar_T.flat<int>()(0);
+	         int numpar=numpar_T.flat<int>()(0);
            int max_batch=max_batch_T.flat<int>()(0);
-           printf("\nAlpha_nes: Descriptor constructor found Rc %f\n",R_c);
-	   printf("          Ra %f Rs %f Radbuff %d Angbuff %d max_batch %d N_max %d\n",R_a,Rs,Radbuff,Angbuff,max_batch,numpar);
+           printf("\nAlpha_nes: Descriptor constructor found Rc_intra %f\n",R_c);
+	   printf("          Rs_intra %f Ra_intra %f Rc_inter %f Rs_inter %f Ra_inter %f\n",Rs,R_a,Rc_inter,Rs_inter,Ra_inter);
+     printf("Radbuff %d Angbuff %d max_batch %d N_max %d\n",Radbuff,Angbuff,max_batch,numpar);
            construct_repulsion();
            construct_descriptor(box_T.flat<double>().data(),numpar,max_batch);
          }
@@ -259,9 +317,9 @@ class ComputeDescriptorsLightOp : public OpKernel {
       }
 
       // calcolo delle celle e dei neighbour list
-      fullUpdateList(Cells,Nowinopos,N,&Full_box[ii*6],R_c);
+      fullUpdateList(Cells,Nowinopos,N,&Full_box[ii*6],Rc_celle);
       resetInteractionMap(Ime);
-      calculateInteractionMapWithCutoffDistanceOrdered(Cells,Ime,Nowinopos,&Full_box[ii*6],R_c);
+      calculateInteractionMapWithCutoffDistanceOrdered(Cells,Ime,Nowinopos,&Full_box[ii*6],Rc_celle);
 
       cudaMemcpy(howmany_d+ii*N,Ime->howmany,N*sizeof(int),cudaMemcpyHostToDevice);
       cudaMemcpy(with_d+ii*N*Radbuff,Ime->with[0],N*Radbuff*sizeof(int),cudaMemcpyHostToDevice);
@@ -393,8 +451,10 @@ class ComputeDescriptorsLightOp : public OpKernel {
                       rad_descr_d,intmap2b_d,der2b_d,
                       des3bsupp_d,
                       der3bsupp_d,nf,numtriplet_d,
-                      Rs,coeffA,coeffB,coeffC,Pow_alpha,Pow_beta,Rs_inter,
-                      Rc_inter,map_intra_d_flat.data());
+                      Rs,coeffA_intra,coeffB_intra,coeffC_intra,
+                      coeffA_inter,coeffB_inter,coeffC_inter,
+                      Pow_alpha,Pow_beta,Rs_inter,Rc_inter,
+                      map_intra_d_flat.data(),Ra_inter);
     //cudaMemset(code_ret_d,sizeof(int),0);
     //check_max_launcher(numtriplet_d,N*nf,Angbuff,code_ret_d);
     //cudaMemcpy(code_ret,code_ret_d,sizeof(int),cudaMemcpyDeviceToHost);
@@ -405,7 +465,7 @@ class ComputeDescriptorsLightOp : public OpKernel {
     fill_angular_launcher(R_c, Radbuff, R_a, Angbuff, N, nowinopos_d,
 		         nowbox, howmany_d, with_d, ang_descr_d,
 			 intmap3b_d, des3bsupp_d, der3b_d, der3bsupp_d,
-			 nf, numtriplet_d,Rs_inter,Rc_inter,map_intra_d_flat.data());
+			 nf, numtriplet_d,map_intra_d_flat.data(),Ra_inter);
      }
 
 

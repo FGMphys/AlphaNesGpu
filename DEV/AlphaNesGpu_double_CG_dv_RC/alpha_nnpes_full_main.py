@@ -109,15 +109,16 @@ def make_typemap(tipos):
 def read_cutoff_info(full_param):
     rs=float(full_param['Rs'])
     rc=float(full_param['Rc'])
-    rc_ang_inter=float(full_param['Rc_Angular_Inter'])
     rc_inter=float(full_param['Rc_Inter'])
+    rs_inter=float(full_param['Rs_Inter'])
+    ra_inter=float(full_param['Rc_Angular_Inter'])
     rad_buff=int(full_param['Radial_Buffer'])
     rc_ang=float(full_param['Rc_Angular'])
     maxneigh=int(full_param['Max_Angular_Neigh'])
     ang_buff=int(maxneigh*(maxneigh-1)/2)
     print("alpha_nes: Rc ",rc," Radial_Buffer ",rad_buff," Rc_Angular ",
            rc_ang,"Angular_Buffer ",ang_buff,"Hard cut-off ",rs)
-    return [rc,rad_buff,rc_ang,ang_buff,rs,rs_inter,rc_ang_inter,rc_inter]
+    return [rc,rad_buff,rc_ang,ang_buff,rs,rs_inter,rs_inter,rc_inter,ra_inter]
 
 def order_folder(x):
     try:
@@ -336,11 +337,11 @@ number_of_NN=len(map_rad_afs)
 [init_alpha2b,init_alpha3b,init_mu,initial_type_emb,new_rng_state]=init_AFs_param(restart_par,full_param,number_of_interaction,rng_state)
 np.random.set_state(new_rng_state)
 #Reading cutoff info from input file
-[rc,rad_buff,rc_ang,ang_buff,Rs,rc_ang_inter,rc_inter]=read_cutoff_info(full_param)
+[rc,rad_buff,rc_ang,ang_buff,Rs,rs_inter,rc_inter,ra_inter]=read_cutoff_info(full_param)
 #################INITIALISE ALL THE LAYER FOR THE MODEL ##############################
 #######Initialise Descriptor Layer###################################################
 max_batch=int(np.max([buffer_stream_tr,buffer_stream_ts]))
-Descriptor_Layer=descriptor_layer(rc,rad_buff,rc_ang,ang_buff,Number_of_particles,box_map_tr[0],Rs,max_batch,rc_ang_inter,rc_inter)
+Descriptor_Layer=descriptor_layer(rc,rad_buff,rc_ang,ang_buff,Number_of_particles,box_map_tr[0],Rs,max_batch,rs_inter,rc_inter,ra_inter)
 #######Initialise AFS Layer
 
 Physics_Layers=[physics_layer(init_alpha2b[num_type],init_alpha3b[num_type],
