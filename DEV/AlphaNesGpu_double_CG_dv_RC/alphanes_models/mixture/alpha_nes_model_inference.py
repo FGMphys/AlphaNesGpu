@@ -24,6 +24,9 @@ class alpha_nes_full_inference(tf.Module):
           self.rc_ang=float(self.cutoff_info[1,0])
           self.ang_buff=int(self.cutoff_info[1,1])
           self.rs=self.cutoff_info[2,0]
+          self.rc_inter=float(self.cutoff_info[3,0])
+          self.ra_inter=float(self.cutoff_info[4,0])
+          self.rs_inter=float(self.cutoff_info[5,0])
           self.boxinit=np.array([12.,0.,0.,12.,0.,12.],dtype='float64')
           self.N=len(self.color_type_map)
           print("Model 4")
@@ -31,11 +34,11 @@ class alpha_nes_full_inference(tf.Module):
           print("Alpha_inference: Found ",self.N," atoms")
           print("Alpha_inference: Found ",self.rad_buff," for radial buffer")
           print("Alpha_inference: Found ",self.ang_buff," for angular buffer")
-          print("Alpha_inference: Found ",self.rc," for cutoff 2body")
-          print("Alpha_inference: Found ",self.rc_ang," for cutoff 3body")
-          print("Alpha_inference: Found ",self.rs," for hard cutoff")
+          print("Alpha_inference: Found ",self.rc,self.rc_inter," for intra and inter radial cutoff")
+          print("Alpha_inference: Found ",self.rc_ang,self.ra_inter," for intra and inter angular cutoff")
+          print("Alpha_inference: Found ",self.rs,self.rs_inter," for intra and inter hard cutoff")
 
-          self.descriptor_layer=descriptor_layer(self.rc,self.rad_buff,self.rc_ang,self.ang_buff,self.N,self.boxinit,self.rs,self.max_batch)
+          self.descriptor_layer=descriptor_layer(self.rc,self.rad_buff,self.rc_ang,self.ang_buff,self.N,self.boxinit,self.rs,self.max_batch,self.rs_inter,self.rc_inter,self.ra_inter)
 
           init_alpha2b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_2body.dat',dtype='float64').reshape((3,-1)) for k in range(self.number_of_NN)]
           init_alpha3b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_3body.dat',dtype='float64').reshape((6,-1)) for k in range(self.number_of_NN)]
@@ -59,7 +62,7 @@ class alpha_nes_full_inference(tf.Module):
 
           [x1,x2,x3bsupp,
         int2b,int3b,intder2b,
-        intder3b,intder3bsupp,numtriplet]=self.descriptor_layer(pos,box)
+        intder3b,intder3bsupp,numtriplet]=self.descriptor_layer(pos,box,self.map_intra)
 
           self.x2b = x1
           self.x3b = x2

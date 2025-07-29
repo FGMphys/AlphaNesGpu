@@ -131,7 +131,7 @@ void construct_descriptor(const double* box,int N,int max_batch){
           Cells=getList(box,Rc_celle,N);
 
           // INTERACTION MAPS
-          Ime=+(N,Radbuff);
+          Ime=createInteractionMap(N,Radbuff);
           //Memory for reticular positions
           Nowinopos=(vector*)calloc(N,sizeof(vector));
 	  //Memory to copy input on CPU
@@ -155,14 +155,14 @@ void construct_descriptor(const double* box,int N,int max_batch){
                        double rs, double coeffa_intra,double coeffb_intra,double coeffc_intra,
                        double coeffa_inter,double coeffb_inter,double coeffc_inter,
                        double pow_alpha, double pow_beta,
-                      int Rs_inter,int Rc_inter,int* map_intra_d,double Ra_inter);
+                      double Rs_inter,double Rc_inter,const int* map_intra_d,double Ra_inter);
  void fill_angular_launcher(double R_c,int radbuff,double R_a,int angbuff,int N,
                        double* inopos_d,const double* box_d,
                        int *howmany_d,int *with_d,
                        double* ang_descr_d,int* intmap3b_d,
                        double* des3bsupp_d,double* der3b_d,
                        double* der3bsupp_d, int nf,int* numtriplet_d,
-                       int Rs_inter,int Rc_inter, int* map_intra_d,double Ra_inter);
+                       const int* map_intra_d,double Ra_inter);
 
 void set_tensor_to_zero_int(int* tensor,int dimten);
 
@@ -203,9 +203,9 @@ REGISTER_OP("ConstructDescriptorsLight")
            const Tensor& ra_T = context->input(6);
            const Tensor& max_batch_T = context->input(7);
 
-           const Tensor& rs_inter_T = context->input(9);
-           const Tensor& rc_inter_T = context->input(10);
-           const Tensor& ra_inter_T = context->input(11);
+           const Tensor& rs_inter_T = context->input(8);
+           const Tensor& rc_inter_T = context->input(9);
+           const Tensor& ra_inter_T = context->input(10);
 
            auto rs_T_flat=rs_T.flat<double>();
            Rs=rs_T_flat(0);
@@ -244,7 +244,8 @@ REGISTER_OP("ConstructDescriptorsLight")
            printf("\nAlpha_nes: Descriptor constructor found Rc_intra %f\n",R_c);
 	   printf("          Rs_intra %f Ra_intra %f Rc_inter %f Rs_inter %f Ra_inter %f\n",Rs,R_a,Rc_inter,Rs_inter,Ra_inter);
      printf("Radbuff %d Angbuff %d max_batch %d N_max %d\n",Radbuff,Angbuff,max_batch,numpar);
-           construct_repulsion();
+           construct_repulsion_intra();
+	   construct_repulsion_inter();
            construct_descriptor(box_T.flat<double>().data(),numpar,max_batch);
          }
     };
@@ -348,6 +349,7 @@ class ComputeDescriptorsLightOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(0,raddescr_shape,
                                                      &raddescr_tensor));
 
+    set_tensor_to_zero_double(raddescr_tensor->flat<double>().data(),nf*N*Radbuff);
     // Create an output tensor
     Tensor* angdescr_tensor = NULL;
     TensorShape angdescr_shape;
@@ -367,6 +369,7 @@ class ComputeDescriptorsLightOp : public OpKernel {
     des3bsupp_shape.AddDim (Radbuff);
     OP_REQUIRES_OK(context, context->allocate_output(2,des3bsupp_shape,
                                                      &des3bsupp_tensor));
+    set_tensor_to_zero_double(des3bsupp_tensor->flat<double>().data(),nf*N*Radbuff);
     ///////////////INTMAP2B///////////////
     // Create an output tensor
     Tensor* intmap2b_tensor = NULL;
@@ -399,6 +402,8 @@ class ComputeDescriptorsLightOp : public OpKernel {
     der2b_shape.AddDim (Radbuff);
     OP_REQUIRES_OK(context, context->allocate_output(5,der2b_shape,
                                                      &der2b_tensor));
+
+    set_tensor_to_zero_double(der2b_tensor->flat<double>().data(),nf*N*3*Radbuff);
     /////////////////////////////
     ///////////////DER3B///////////////
     // Create an output tensor
@@ -411,7 +416,7 @@ class ComputeDescriptorsLightOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(6,der3b_shape,
                                                      &der3b_tensor));
 
-
+    set_tensor_to_zero_double(der3b_tensor->flat<double>().data(),nf*N*3*2*Angbuff);
     /////////////////////////////
     ///////////////DER3B_SUPP///////////////
     // Create an output tensor
@@ -423,7 +428,7 @@ class ComputeDescriptorsLightOp : public OpKernel {
     der3bsupp_shape.AddDim (Radbuff);
     OP_REQUIRES_OK(context, context->allocate_output(7,der3bsupp_shape,
                                                      &der3bsupp_tensor));
-
+    set_tensor_to_zero_double(der3bsupp_tensor->flat<double>().data(),nf*N*3*Radbuff);
     // Create an output tensor
     Tensor* numtriplet_tensor = NULL;
     TensorShape numtriplet_shape;
@@ -466,7 +471,9 @@ class ComputeDescriptorsLightOp : public OpKernel {
 		         nowbox, howmany_d, with_d, ang_descr_d,
 			 intmap3b_d, des3bsupp_d, der3b_d, der3bsupp_d,
 			 nf, numtriplet_d,map_intra_d_flat.data(),Ra_inter);
-     }
+    
+ 
+  }
 
 
 

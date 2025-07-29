@@ -115,24 +115,24 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
       if (dist_norm<Rs_inter){
             descriptors[actual_pos+k]=coeffa_inter/pow(dist_norm/Rs_inter,pow_alpha)+coeffb_inter/pow(dist_norm/Rs_inter,pow_beta)+coeffc_inter;
 
-            double der_cutoff=(-pow_alpha*coeffa_inter/pow(dist_norm/Rs_inter,pow_alpha+1.)/rs-pow_beta*coeffb_inter/pow(dist_norm/Rs_inter,pow_beta+1.)/Rs_inter);
+            double der_cutoff=(-pow_alpha*coeffa_inter/pow(dist_norm/Rs_inter,pow_alpha+1.)/Rs_inter-pow_beta*coeffb_inter/pow(dist_norm/Rs_inter,pow_beta+1.)/Rs_inter);
 
             der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=der_cutoff*dist.x/dist_norm;
             der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=der_cutoff*dist.y/dist_norm;
             der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=der_cutoff*dist.z/dist_norm;
-        }
-        else{
+            //ADD neighboirs to interaction map only if inside RC_inter
+      intmap2b[b*N*(radial_buffer+1)+i*(radial_buffer+1)+1+k]=with[b*radial_buffer*N+i*radial_buffer+k];  
+      }
+        else if (dist_norm<Rc_inter){
 
       descriptors[actual_pos+k]=0.5*(cos(PI*dist_norm/Rc_inter)+1);
       der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sin(PI*dist_norm/Rc_inter)*PI/Rc_inter*dist.x/dist_norm;
       der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/Rc_inter)*PI/Rc_inter*dist.y/dist_norm;
       der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/Rc_inter)*PI/Rc_inter*dist.z/dist_norm;
-
-      //STEP 2: filling interaction map for pair descriptors
+      //ADD neighboirs to interaction map only if inside RC_inter
       intmap2b[b*N*(radial_buffer+1)+i*(radial_buffer+1)+1+k]=with[b*radial_buffer*N+i*radial_buffer+k];
         }
 
-    }
     }
   }
 
@@ -145,7 +145,7 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
         atomicAdd((int*)&(numtriplet[num_angolare[i].x*N+num_angolare[i].y]),num_angolare[i].z);
       }
   }
-
+  }
 }
 
 __global__ void DescriptorsAngular_kernel(double range,int radial_buffer,double range_angolare,int angular_buffer,int N,
@@ -153,7 +153,7 @@ __global__ void DescriptorsAngular_kernel(double range,int radial_buffer,double 
                       int *howmany,int *with,
                       double* descriptors,int* intmap3b_l,
                       double* des3bsupp,double* der3b_l,
-                      double* der3bsupp, int nf,int* numtriplet,int* map_intra_d,double Ra_inter)
+                      double* der3bsupp, int nf,int* numtriplet,const int* map_intra_d,double Ra_inter)
 {
   int t=blockIdx.x*blockDim.x+threadIdx.x;
 
@@ -248,6 +248,7 @@ __global__ void DescriptorsAngular_kernel(double range,int radial_buffer,double 
         range_angolare_k=Ra_inter;
     }
 
+  //QUESTO IF NON SERVE GIA CONTROLLO QUANDO CREA NUMTRIPLET
     if (dist_normj<range_angolare_j && dist_normk<range_angolare_k){
 
         cutoffj=0.5f*(1.f+cos(PI*dist_normj/range_angolare_j));

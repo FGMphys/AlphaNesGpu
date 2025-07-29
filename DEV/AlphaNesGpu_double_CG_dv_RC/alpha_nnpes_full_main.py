@@ -118,7 +118,9 @@ def read_cutoff_info(full_param):
     ang_buff=int(maxneigh*(maxneigh-1)/2)
     print("alpha_nes: Rc ",rc," Radial_Buffer ",rad_buff," Rc_Angular ",
            rc_ang,"Angular_Buffer ",ang_buff,"Hard cut-off ",rs)
-    return [rc,rad_buff,rc_ang,ang_buff,rs,rs_inter,rs_inter,rc_inter,ra_inter]
+    print("alpha_nes: Rc_Inter ",rc_inter," Rc_Angular_Inter ",
+           ra_inter,"Hard cut-off Inter ",rs_inter)
+    return [rc,rad_buff,rc_ang,ang_buff,rs,rs_inter,rc_inter,ra_inter]
 
 def order_folder(x):
     try:

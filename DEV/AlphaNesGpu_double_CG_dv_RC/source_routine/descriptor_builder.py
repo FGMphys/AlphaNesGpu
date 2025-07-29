@@ -7,23 +7,26 @@ import sys
 
 
 
-root_path='/home/francegm/AlphaNesGpu/DEV/AlphaNesGpu_double_CG'
+root_path='/home/francegm/AlphaNesGpu/DEV/AlphaNesGpu_double_CG_dv_RC'
 descriptor_sopath=root_path+'/src/descriptor_builder/reforce.so'
 
 class descriptor_layer(tf.Module):
       def __init__(self,rc,rad_buff,rc_ang,ang_buff,N,box_example,Rs,maxbatch,
-                   rc_ang_inter,rc_inter):
+                   rs_inter,rc_inter,ra_inter):
           super(descriptor_layer, self).__init__()
 
           self.descriptor_op=tf.load_op_library(descriptor_sopath)
           self.Rs=Rs
-          res=self.descriptor_op.construct_descriptors_light(rc,rad_buff,ang_buff,N,box_example,self.Rs,rc_ang,maxbatch,rc_ang_inter,rc_inter)
+          res=self.descriptor_op.construct_descriptors_light(rc,rad_buff,ang_buff,N,box_example,Rs,rc_ang,maxbatch,rs_inter,rc_inter,ra_inter)
           self.rc=rc
           self.rad_buff=rad_buff
           self.rc_ang=rc_ang
           self.ang_buff=ang_buff
           self.N=N
           self.box_example=box_example
+          self.rs_inter=rs_inter
+          self.rc_inter=rc_inter
+          self.ra_inter=ra_inter
 
 
       #@tf.function()
