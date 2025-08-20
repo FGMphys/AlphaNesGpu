@@ -72,6 +72,7 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
       int same=map_intra_d[i]-map_intra_d[j];
       //STEP 0: filling the radial part with the smaller angular cut-off
       if (same==0){
+        //Angular intra neighbours
         if (dist_norm<range_angolare)
         {
           num_angolare[threadIdx.x].z=1;
@@ -86,7 +87,6 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
             descriptors[actual_pos+k]=coeffa_intra/pow(dist_norm/rs,pow_alpha)+coeffb_intra/pow(dist_norm/rs,pow_beta)+coeffc_intra;
 
             double der_cutoff=(-pow_alpha*coeffa_intra/pow(dist_norm/rs,pow_alpha+1.)/rs-pow_beta*coeffb_intra/pow(dist_norm/rs,pow_beta+1.)/rs);
-
             der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=der_cutoff*dist.x/dist_norm;
             der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=der_cutoff*dist.y/dist_norm;
             der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=der_cutoff*dist.z/dist_norm;
@@ -97,20 +97,21 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
           der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.y/dist_norm;
           der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.z/dist_norm;
         }
-        //STEP 2: filling interaction map for pair descriptors
+
         intmap2b[b*N*(radial_buffer+1)+i*(radial_buffer+1)+1+k]=with[b*radial_buffer*N+i*radial_buffer+k];
     }
     else {
+      //Adding inter-neighbours (also if outside the inter cutoff) to allign the atom counting in following step
+      intmap2b[b*N*(radial_buffer+1)+i*(radial_buffer+1)+1+k]=with[b*radial_buffer*N+i*radial_buffer+k];
+      if (dist_norm<range_angolare)
+         num_angolare[threadIdx.x].z=1;
       if (dist_norm<Ra_inter)
       {
-        num_angolare[threadIdx.x].z=1;
-
         des3bsupp[actual_pos+k]=0.5*(cos(PI*dist_norm/Ra_inter)+1);
         der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sin(PI*dist_norm/Ra_inter)*PI/Ra_inter*dist.x/dist_norm;
         der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/Ra_inter)*PI/Ra_inter*dist.y/dist_norm;
         der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/Ra_inter)*PI/Ra_inter*dist.z/dist_norm;
       }
-      //STEP 1: filling radial descriptor with larger cutoff
 
       if (dist_norm<Rs_inter){
             descriptors[actual_pos+k]=coeffa_inter/pow(dist_norm/Rs_inter,pow_alpha)+coeffb_inter/pow(dist_norm/Rs_inter,pow_beta)+coeffc_inter;
@@ -120,17 +121,13 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
             der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=der_cutoff*dist.x/dist_norm;
             der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=der_cutoff*dist.y/dist_norm;
             der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=der_cutoff*dist.z/dist_norm;
-            //ADD neighboirs to interaction map only if inside RC_inter
-      intmap2b[b*N*(radial_buffer+1)+i*(radial_buffer+1)+1+k]=with[b*radial_buffer*N+i*radial_buffer+k];  
       }
-        else if (dist_norm<Rc_inter){
+      else if (dist_norm<Rc_inter){
 
       descriptors[actual_pos+k]=0.5*(cos(PI*dist_norm/Rc_inter)+1);
       der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sin(PI*dist_norm/Rc_inter)*PI/Rc_inter*dist.x/dist_norm;
       der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/Rc_inter)*PI/Rc_inter*dist.y/dist_norm;
       der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/Rc_inter)*PI/Rc_inter*dist.z/dist_norm;
-      //ADD neighboirs to interaction map only if inside RC_inter
-      intmap2b[b*N*(radial_buffer+1)+i*(radial_buffer+1)+1+k]=with[b*radial_buffer*N+i*radial_buffer+k];
         }
 
     }
@@ -275,8 +272,8 @@ __global__ void DescriptorsAngular_kernel(double range,int radial_buffer,double 
         dangleik.x = 0.5 * (SQR(dist_normk) * distj.x - distk.x * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
         dangleik.y = 0.5 * (SQR(dist_normk) * distj.y - distk.y * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
         dangleik.z = 0.5 * (SQR(dist_normk) * distj.z - distk.z * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normk * dist_normk* dist_normk * dist_normj);
-    
-    
+
+
     int na=angular_buffer;
     der3b[b*N*na*3+i*na*3+na*0+nn].x=dangleij.x*cutoffj*cutoffk+0.5*(angle+1)*dcij.x*cutoffk;
     der3b[b*N*na*3+i*na*3+na*0+nn].y=dangleik.x*cutoffj*cutoffk+0.5*(angle+1)*cutoffj*dcik.x;
