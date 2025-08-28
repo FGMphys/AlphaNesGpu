@@ -19,23 +19,22 @@ model_name: 'model_log'
 #Do you want to restart?
 restart:  'no'  #Options: 'no' or 'all_params' or 'only_afs' or 'from_last' or 'modelname' (all_params restart both AFs and NN parameters but not the optimization process, from_last restart all params and the optmization procedure from the second-last folder with prefix specified in model_name key)
 
-afs_param_folder: #You need to specify this only if you use 'only_afs' or 'all_params' in the restart key.
+afs_param_folder: #You need to specify this only if you use 'only_afs' or 'all_params' in the restart key. 
 
 #Descriptor parameter
-Rc: 20 #Radial cutoff
-Rs: 10 #Radial cutoff repulsive part
-Rc_Angular: 20  #Angular cutoff
-
-##optional
-Rc_Inter: 10
-Rc_Angular_Inter: 10
-
+Rc: 50. #Radial cutoff
+Rs: 25 #Radial cutoff repulsive part
+Rc_Angular: 50.  #Angular cutoff
+Rc_Inter: 20.
+Rc_Angular_Inter: 20.
+Rs_Inter: 10.
 Radial_Buffer: 24 #Guess for the maximum number of neighbours inside Rc
 Max_Angular_Neigh: 24 #Guess for the maximum number of neighbours inside Rc_Angular
-#Attention: If the guess for the maximum number of the neighbpurs is superated the program ends
+#Attention: If the guess for the maximum number of the neighbpurs is superated the program ends 
+
 #AFs parameter
 map_rad_afs: {0: [0,0,10] } #Dictionary for radial fingerprint
-map_ang_afs: {0: [0,0,10,0,10,0]} #Dictionary for angular fingerprint
+map_ang_afs: {0: [0,0,5,0,0,0]} #Dictionary for angular fingerprint
 #Dictionary uses as key the type of atoms (in this system 0 and 1, oxygen and hydrogen) and the value is the list specifying how many AFs connect the atom of type 0 with atoms of type 0 and type 1 respectively. Hence 0: [10,5] means oxygen is connected to another Oxygen by 10 radial AFs while to hydrogens by 5 radial AFs.  
 
 #Net parmater
@@ -60,6 +59,7 @@ optimizer_phys: adam #Optimizer
 loss_method: huber #Loss function (Options: huber or MSE, validation is always MSE)
 
 type_of_training: energy+force #Options: energy or energy+force
+
 ##Learning rate schedule
 #Options:
 #        1. expdec initial_learningrate final_learningrate
