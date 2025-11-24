@@ -1,4 +1,4 @@
-# alpha_nes
+STAF Deep Neural Network Potential
 This repository contains the scripts to run the training of the Neural Network Potential presented in DOI: 10.1063/5.0139245 plus its extension to atom mixture.
 The following python packages are required to run the training program:
 
