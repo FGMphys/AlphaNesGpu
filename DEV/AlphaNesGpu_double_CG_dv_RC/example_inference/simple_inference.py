@@ -3,7 +3,7 @@ import numpy as np
 import tensorflow as tf
 import os
 import sys
-abspath=os.path.abspath('/home/francegm/AlphaNesGpu_local')
+abspath=os.path.abspath('PUT HERE ABSOLUTE PATH TO PROGRAM FOLDER')
 sys.path.append(abspath)
 from alphanes_models.mixture.alpha_nes_model_inference_full import alpha_nes_full_inference
 
