@@ -13,7 +13,7 @@ print("alpha_nes: Inference of NEW CG model")
 class alpha_nes_full_inference(tf.Module):
       def __init__(self,modelname):
           super(alpha_nes_full_inference, self).__init__()
-          self.max_batch=1
+          self.max_batch=40
           self.number_of_NN=np.loadtxt(modelname+'/number_of_nn.dat',dtype='int32')
           self.color_type_map=np.loadtxt(modelname+'/color_type_map.dat',dtype='int32').reshape((-1))
           self.map_color_interaction=np.loadtxt(modelname+'/map_color_interaction.dat',dtype='int32').reshape((-1,1))
@@ -56,11 +56,13 @@ class alpha_nes_full_inference(tf.Module):
 
       #@tf.function()
       def full_test(self,pos,box):
-
+          if pos.shape[0]>self.max_batch:
+             raise ValueError(
+            f"Max batch is 40: {pos.shape[0]} > {self.max_batch}"
+        )
           [x1,x2,x3bsupp,
         int2b,int3b,intder2b,
         intder3b,intder3bsupp,numtriplet]=self.descriptor_layer(pos,box)
-
           self.x2b = x1
           self.x3b = x2
           self.x3bsupp = x3bsupp
