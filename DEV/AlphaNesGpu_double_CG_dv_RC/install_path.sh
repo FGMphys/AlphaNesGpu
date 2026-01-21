@@ -1,17 +1,16 @@
 #!/bin/sh
 
-NVCC_PATH=/leonardo/prod/opt/compilers/cuda/11.8/none/bin/nvcc
-GPP_PATH=/usr/bin/g++
-CUDA_INCLUDE_PATH=/leonardo/prod/opt/compilers/cuda/11.8/none/include
-CUDA_LIB64_PATH=/leonardo/prod/opt/compilers/cuda/11.8/none/lib64
-
-#NVCC_PATH="/home/francegm/programmi/cuda/bin/nvcc" #11.8
+#NVCC_PATH="/usr/local/cuda-11.2/bin/nvcc"
 #GPP_PATH="/usr/bin/g++"
-#CUDA_LIB64_PATH="/home/francegm/programmi/cuda/lib64"
-#CUDA_INCLUDE_PATH="/home/francegm/programmi/cuda/include"
-PYTHON_PATH=/leonardo/pub/userexternal/fguidare/python_envs/tensorgpu/bin/python #$(which python)
-echo $PYTHON_PATH
+#CUDA_LIB64_PATH="/usr/local/cuda-11.2/lib64"
+#CUDA_INCLUDE_PATH="/usr/local/cuda-11.2/include"
 
+NVCC_PATH="/home/francegm/programmi/cuda/bin/nvcc" #11.8
+GPP_PATH="/usr/bin/g++"
+CUDA_LIB64_PATH="/home/francegm/programmi/cuda/lib64"
+CUDA_INCLUDE_PATH="/home/francegm/programmi/cuda/include"
+PYTHON_PATH="/home/francegm/miniconda3/envs/tensorgpu/bin/python"
+COMPCAP=$($PYTHON_PATH get_compcap.py)
 actual_path=$(pwd)
 
 sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' source_routine/descriptor_builder.py
@@ -28,7 +27,8 @@ sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' gradient_utility/mixtu
 cd src
 cd descriptor_builder
 echo Compiling Descriptors
-bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH $PYTHON_PATH
+rm *.o *.so
+bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH $PYTHON_PATH $COMPCAP
 cd ../..
 
 cd src/mixture
@@ -37,11 +37,13 @@ for folder in $(ls -d *)
 do
 echo Compiling folder $folder radial 
 cd $folder'/rad'
-bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH $PYTHON_PATH
+rm *.o *.so
+bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH $PYTHON_PATH $COMPCAP
 cd ../..
 echo Compiling folder $folder radial
 cd $folder'/ang'
-bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH $PYTHON_PATH
+rm *.o *.so
+bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH $PYTHON_PATH $COMPCAP
 cd ../..
 done
 

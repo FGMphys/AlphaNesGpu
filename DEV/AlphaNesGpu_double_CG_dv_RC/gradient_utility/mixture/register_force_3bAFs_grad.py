@@ -4,7 +4,7 @@ from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import sparse_ops
 
-root_path='/leonardo/pub/userexternal/fguidare/alphanesfromgit/AlphaNesGpu/DEV/AlphaNesGpu_double_CG_dv_RC'
+root_path='/home/francegm/AlphaNesGpu/DEV/AlphaNesGpu_double_CG_dv_RC'
 compforcegradtripl_module = tf.load_op_library(root_path+'/src/mixture/grad_force/ang/reforce.so')
 
 @ops.RegisterGradient("ComputeForceTripl")

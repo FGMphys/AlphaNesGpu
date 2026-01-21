@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-root_path='/leonardo/pub/userexternal/fguidare/alphanesfromgit/AlphaNesGpu/DEV/AlphaNesGpu_double_CG_dv_RC'
+root_path='/home/francegm/AlphaNesGpu/DEV/AlphaNesGpu_double_CG_dv_RC'
 force2b_sopath=root_path+'/src/mixture/force/rad/reforce.so'
 force3b_sopath=root_path+'/src/mixture/force/ang/reforce.so'
 
