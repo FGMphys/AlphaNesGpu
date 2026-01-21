@@ -43,14 +43,15 @@ contain the GPU implementations for **single** and **double precision**, respect
 
 Inside each folder you will find:
 
-* `install_path.sh` (Linux)
+* `install_path.sh` 
 
 
 Edit the script to correctly set:
 
 * g++ compiler path
 * CUDA compiler path
-* CUDA libraries path
+* CUDA libraries directory path
+* CUDA include directory path
 * Python path
 
 Then run:
@@ -157,7 +158,7 @@ The results include quantitative error metrics on the test dataset.
 
 The `DEV/` folder contains experimental and under-development models, including:
 
-* Neural Network Coarse-Graining (NN-CG) model (to be presented in a forthcoming publication)
+* Neural Network Coarse-Graining (NN-CG) model
 * A model for training directly from radial distribution functions
 
 These components are **experimental** and subject to change.
@@ -177,12 +178,12 @@ DOI: 10.1063/5.0139245
 
 ## License
 
-Specify the license here (e.g., MIT, GPL, BSD).
+BSD 3-Clause License
 
 ---
 
 ## Contact
 
-For questions or collaborations, please open an issue or contact the authors directly.
+For questions or collaborations, please open an issue or contact the authors directly francesco.guidarellimattioli@gmail.com
 
 
