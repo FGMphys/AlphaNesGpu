@@ -22,23 +22,15 @@ The code also includes an extension to **atomic mixtures**. The framework is des
 
 ### Requirements
 
-The following Python packages are required:
+The installation requires a compatible version fo tensorflow, CUDA and CUDNN. We test to type of congifuration 
 
-* **TensorFlow** (GPU version recommended)
-* **PyYAML**
+* TensroflowGPU 2.14 Python 3.9-3.11 CUDA 11.8 CUDNN 8.7
+* TensorlowGPU 2.11 Python 3.7-3.10 CUDA 11.2 CUDNN 8.1
 
-> ⚠️ Note: the original implementation was developed with TensorFlow 2.8. Newer versions may work but are not fully guaranteed.
+CUDA and CUDNN package can be downloaded directly from the NVIDIA archive (https://developer.nvidia.com/cuda-toolkit-archive, https://developer.nvidia.com/cudnn-archive).
+Tensorflow can be downloaded with command python3 -m pip install 'tensorflow[and-cuda]' inside a conda or another virtual environment.
+The input file reading requires the pyyaml package and it can be installed by pip install pyyaml inside the env.
 
-### Recommended setup (Conda)
-
-It is recommended to create a dedicated Conda environment:
-
-```bash
-conda create -n staf_nnp python=3.9
-conda activate staf_nnp
-conda install tensorflow-gpu==2.14
-conda install pyyaml
-```
 
 ### CUDA compilation
 
