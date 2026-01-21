@@ -7,7 +7,7 @@ import sys
 
 
 
-root_path='/home/francegm/AlphaNesGpu/DEV/AlphaNesGpu_double_CG_dv_RC'
+root_path='/leonardo/pub/userexternal/fguidare/alphanesfromgit/AlphaNesGpu/DEV/AlphaNesGpu_double_CG_dv_RC'
 descriptor_sopath=root_path+'/src/descriptor_builder/reforce.so'
 
 class descriptor_layer(tf.Module):

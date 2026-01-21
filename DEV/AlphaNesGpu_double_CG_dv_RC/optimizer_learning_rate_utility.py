@@ -68,7 +68,13 @@ def build_optimizer(param,lr_built,num_call):
            epsilon=float(param[1])
        except:
            epsilon=1e-07
-       opt_built=tfopt.Adam(learning_rate=lr_built,epsilon=epsilon)
+       try:
+           clipv=float(param[2])
+           print("alpha_nes: The optimizer has a clip for gradient at ",clipv)
+       except:
+           clipv=None
+           print("alpha_nes: The optimizer has not clip for gradient, consider if spiking loss")
+       opt_built=tfopt.Adam(learning_rate=lr_built,epsilon=epsilon,clipnorm=clipv)
        if num_call==0:
            print("alpha_nes: The optimizer is Adam.",sep=' ',end='\n')
            print("alpha_nes: epsilon is set to ",epsilon,sep=' ',end='\n')
