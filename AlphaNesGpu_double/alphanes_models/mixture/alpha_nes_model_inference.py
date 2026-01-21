@@ -24,7 +24,7 @@ def make_typemap(tipos):
 class alpha_nes_full_inference(tf.Module):
       def __init__(self,modelname):
           super(alpha_nes_full_inference, self).__init__()
-          self.max_batch=1
+          self.max_batch=40
           self.tipos=tf.constant(np.loadtxt(modelname+'/type.dat').reshape((-1,)),dtype='int32')
           try:
               self.ntipos=len(self.tipos)
@@ -80,6 +80,10 @@ class alpha_nes_full_inference(tf.Module):
       #@tf.function()
       def full_test(self,pos,box):
 
+          if pos.shape[0] > self.max_batch:
+             raise ValueError(
+                   f"Batch troppo grande: {pos.shape[0]} > {self.max_batch}"
+                   )
           [x1,x2,x3bsupp,
         int2b,int3b,intder2b,
         intder3b,intder3bsupp,numtriplet]=self.descriptor_layer(pos,box)

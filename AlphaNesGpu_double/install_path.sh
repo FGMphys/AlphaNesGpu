@@ -9,6 +9,7 @@ NVCC_PATH="/home/francegm/programmi/cuda/bin/nvcc" #11.8
 GPP_PATH="/usr/bin/g++"
 CUDA_LIB64_PATH="/home/francegm/programmi/cuda/lib64"
 CUDA_INCLUDE_PATH="/home/francegm/programmi/cuda/include"
+PYTHON_PATH="/home/francegm/miniconda3/envs/tensorgpu/bin/python"
 
 actual_path=$(pwd)
 
@@ -27,7 +28,8 @@ sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' debug_mode/debug_alpha
 cd src
 cd descriptor_builder
 echo Compiling Descriptors
-bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH
+rm *.o *.so
+bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH $PYTHON_PATH
 cd ../..
 
 cd src/mixture
@@ -36,11 +38,13 @@ for folder in $(ls -d *)
 do
 echo Compiling folder $folder radial 
 cd $folder'/rad'
-bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH
+rm *.o *.so
+bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH $PYTHON_PATH
 cd ../..
 echo Compiling folder $folder radial
 cd $folder'/ang'
-bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH
+rm *.o *.so
+bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH $PYTHON_PATH
 cd ../..
 done
 
