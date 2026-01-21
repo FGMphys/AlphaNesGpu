@@ -1,29 +1,196 @@
 # STAF Deep Neural Network Potential
-This repository contains the scripts to run the training of the Neural Network Potential presented in DOI: 10.1063/5.0139245 plus its extension to atom mixture.
-The following python packages are required to run the training program:
 
-1. Tensorflow==2.8 (and its dependency)
-2. pyyaml
+This repository contains scripts to train the **STAF Deep Neural Network Potential (DNNP)** introduced in:
 
-It may be useful to create a conda environment, then activate and thus run
+> DOI: **10.1063/5.0139245**
 
-1. conda install tensorflowGpu==2.14
-2. conda install pyyaml
+The code also includes an extension to **atomic mixtures**. The framework is designed to train neural-network-based interatomic potentials and to evaluate energy and force predictions.
 
-In the AlphaNesGpu_float and AlphaNesGpu_double folder there are two files to install the paths -install_path.sh for linux and install_path_mac.sh for mac- respectively for the single and double precision version.
-The install scripts should be edited with proper path to CUDA compiler and libraries. The installation should confirm the compilation of the *cu.cc source files in the src folder.
+---
 
-Once the paths are written correctly and the source files are built, it is possible to run the training by 
+## Features
 
-"python alpha_nnpes_full_main.py input.yaml"
+* Training of deep neural network interatomic potentials
+* Support for single and double precision (GPU)
+* Extension to atomic mixtures
+* Energy and force inference
+* Dataset generation from raw molecular dynamics data
 
-The file input.yaml is the configuration file to fix the parameters of the training.
+---
 
-The dataset should prepared including trajectory, box, energy and force quantities. The script "make_dataset_from_raw.py" can be used to build the dataset (training and test) starting from raw data.
+## Installation
 
-Once the model is trained, it can be possible to compute energy and force error by running 
-"python alpha_nnpes_full_inference_main.py input_inference.yaml" 
-The input_inference.yaml is a configuration file for the inference run.
+### Requirements
 
-The DEV folder contains the under developing model for Neural Network Coarse Graining model that will be presented soon in a separate paper and another model to train from radial distribution function. 
+The following Python packages are required:
+
+* **TensorFlow** (GPU version recommended)
+* **PyYAML**
+
+> ⚠️ Note: the original implementation was developed with TensorFlow 2.8. Newer versions may work but are not fully guaranteed.
+
+### Recommended setup (Conda)
+
+It is recommended to create a dedicated Conda environment:
+
+```bash
+conda create -n staf_nnp python=3.9
+conda activate staf_nnp
+conda install tensorflow-gpu==2.14
+conda install pyyaml
+```
+
+### CUDA compilation
+
+The folders:
+
+* `AlphaNesGpu_float`
+* `AlphaNesGpu_double`
+
+contain the GPU implementations for **single** and **double precision**, respectively.
+
+Inside each folder you will find:
+
+* `install_path.sh` (Linux)
+
+
+Edit the script to correctly set:
+
+* g++ compiler path
+* CUDA compiler path
+* CUDA libraries path
+* Python path
+
+Then run:
+
+```bash
+bash install_path.sh
+```
+
+A successful installation will compile the `*.cu.cc` source files located in the `src/` directory.
+
+---
+
+## Dataset Preparation
+
+The training dataset must include:
+
+* Atomic trajectories
+* Simulation box information
+* Energies
+* Forces
+
+To generate the dataset from raw data, use:
+
+```bash
+python make_dataset_from_raw.py
+```
+
+This script searchs pos.dat, force.dat, box.dat and energy.dat files organized with one row for frames and it takes a seed as the only command line input for the split process of the dataset. Finally it creates the training and test datasets in the required internal format.
+
+---
+
+## Input Configuration Files
+
+The training and inference processes are fully controlled through YAML configuration files.
+
+### Training input (`input.yaml`)
+
+Typical parameters include:
+
+* **model**
+
+  * network architecture
+  * activation functions
+  * precision (float / double)
+
+* **training**
+
+  * number of epochs
+  * batch size
+  * learning rate
+  * optimizer settings
+
+* **data**
+
+  * path to dataset
+  * training / validation split
+
+* **loss**
+
+  * energy weight
+  * force weight
+
+> 📌 Refer to the example `input.yaml` provided in the repository for the full list of available parameters.
+
+### Inference input (`input_inference.yaml`)
+
+The inference configuration defines:
+
+* trained model path
+* dataset for evaluation
+* output options for energy and force errors
+
+---
+
+## Running a Training Example
+
+Once the environment is configured and the dataset is prepared, a training can be started with:
+
+```bash
+python alpha_nnpes_full_main.py input.yaml
+```
+
+During training, the code will:
+
+* read the dataset
+* train the neural network potential
+* save checkpoints and final model parameters
+
+---
+
+## Running Inference
+
+After training, energy and force errors can be computed using:
+
+```bash
+python alpha_nnpes_full_inference_main.py input_inference.yaml
+```
+
+The results include quantitative error metrics on the test dataset.
+
+---
+
+## Development Models
+
+The `DEV/` folder contains experimental and under-development models, including:
+
+* Neural Network Coarse-Graining (NN-CG) model (to be presented in a forthcoming publication)
+* A model for training directly from radial distribution functions
+
+These components are **experimental** and subject to change.
+
+---
+
+## Citation
+
+If you use this code in your research, please cite:
+
+```
+Author(s), Journal, Year
+DOI: 10.1063/5.0139245
+```
+
+---
+
+## License
+
+Specify the license here (e.g., MIT, GPL, BSD).
+
+---
+
+## Contact
+
+For questions or collaborations, please open an issue or contact the authors directly.
+
 
