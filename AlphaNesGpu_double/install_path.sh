@@ -1,10 +1,14 @@
 #!/bin/sh
 
-NVCC_PATH="/usr/local/cuda-11.2/bin/nvcc"
-GPP_PATH="/usr/bin/g++"
-CUDA_LIB64_PATH="/usr/local/cuda-11.2/lib64"
-CUDA_INCLUDE_PATH="/usr/local/cuda-11.2/include"
+#NVCC_PATH="/usr/local/cuda-11.2/bin/nvcc"
+#GPP_PATH="/usr/bin/g++"
+#CUDA_LIB64_PATH="/usr/local/cuda-11.2/lib64"
+#CUDA_INCLUDE_PATH="/usr/local/cuda-11.2/include"
 
+NVCC_PATH="/home/francegm/programmi/cuda/bin/nvcc" #11.8
+GPP_PATH="/usr/bin/g++"
+CUDA_LIB64_PATH="/home/francegm/programmi/cuda/lib64"
+CUDA_INCLUDE_PATH="/home/francegm/programmi/cuda/include"
 
 actual_path=$(pwd)
 
