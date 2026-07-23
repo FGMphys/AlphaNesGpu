@@ -1,12 +1,21 @@
 #!/bin/sh
 
-NVCC_PATH="put here full path to nvcc compiler"
-GPP_PATH="put here full path to g++ compiler"
-CUDA_LIB64_PATH="put here full path to cuda/lib64"
-CUDA_INCLUDE_PATH="put here full path to cuda/include"
-
-
+NVCC_PATH="/home/francegm/programmi/cuda/bin/nvcc" #11.8
+GPP_PATH="/usr/bin/g++"
+CUDA_LIB64_PATH="/home/francegm/programmi/cuda/lib64"
+CUDA_INCLUDE_PATH="/home/francegm/programmi/cuda/include"
+# Prefer repo-local .venv if present
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
+  PYTHON_PATH="$REPO_ROOT/.venv/bin/python"
+else
+  PYTHON_PATH="/home/francegm/miniconda3/envs/tensorgpu/bin/python"
+fi
+COMPCAP=$($PYTHON_PATH get_compcap.py)
 actual_path=$(pwd)
+
+# Ensure bare `python` in legacy compila.sh resolves to the same interpreter
+export PATH="$(dirname "$PYTHON_PATH"):$PATH"
 
 sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' source_routine/descriptor_builder.py
 sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' source_routine/mixture/physics_layer_mod.py
@@ -18,10 +27,12 @@ sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' gradient_utility/mixtu
 
 
 
+
 cd src
 cd descriptor_builder
 echo Compiling Descriptors
-bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH
+rm -f *.o *.so
+bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH $PYTHON_PATH $COMPCAP
 cd ../..
 
 cd src/mixture
@@ -30,12 +41,14 @@ for folder in $(ls -d *)
 do
 echo Compiling folder $folder radial 
 cd $folder'/rad'
-bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH
+rm -f *.o *.so
+bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH $PYTHON_PATH $COMPCAP
 cd ../..
-echo Compiling folder $folder radial
+echo Compiling folder $folder angular
 cd $folder'/ang'
-bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH
+rm -f *.o *.so
+bash compila.sh $NVCC_PATH $GPP_PATH $CUDA_LIB64_PATH $CUDA_INCLUDE_PATH $PYTHON_PATH $COMPCAP
 cd ../..
 done
 
-cd ..
+cd ../..

@@ -367,10 +367,26 @@ if restart_par!='no' and restart_par!='only_afs':
    lr_file=open("lr_step.dat",'a')
 else:
    fileOU=open('lcurve.out','w')
-   print("#RMSE_e   #RMSE_f   #Loss_Tot   #lr_phys #lr_net\n",file=fileOU)
+   # xmgrace: xmgrace -nxy lcurve.out
+   print("# STAF epoch validation curve (test-set RMSE + training loss)", file=fileOU)
+   print("# Columns: step RMSE_e RMSE_f Loss_Tot lr_net lr_phys epoch", file=fileOU)
+   print("# Plot: xmgrace -nxy lcurve.out", file=fileOU)
+   print("@    title \"STAF validation curve\"", file=fileOU)
+   print("@    xaxis  label \"Global step\"", file=fileOU)
+   print("@    yaxis  label \"RMSE / Loss\"", file=fileOU)
+   print("@    s0 legend \"RMSE_e (test)\"", file=fileOU)
+   print("@    s1 legend \"RMSE_f (test)\"", file=fileOU)
+   print("@    s2 legend \"Loss_Tot (train)\"", file=fileOU)
+   print("@    s3 legend \"lr_net\"", file=fileOU)
+   print("@    s4 legend \"lr_phys\"", file=fileOU)
+   print("@    s5 legend \"epoch\"", file=fileOU)
    out_time=open("time_story.dat",'w')
    print("#Time per epoch training  #Time per epoch test\n",file=out_time)
    lr_file=open("lr_step.dat",'w')
+   print("# STAF learning-rate schedule (net)", file=lr_file)
+   print("# Columns: lr_net", file=lr_file)
+   print("@    title \"STAF lr_net\"", file=lr_file)
+   print("@    s0 legend \"lr_net\"", file=lr_file)
 
 model_name=full_param['model_name']
 if restart_par=='no' or restart_par=='only_afs' or restart_par=='all_params':
@@ -396,6 +412,16 @@ else:
 
 
 lcurve_notmean=open('lcurve_notmean','w')
+# xmgrace: xmgrace -nxy lcurve_notmean
+print("# STAF per-batch losses (not epoch-averaged)", file=lcurve_notmean)
+print("# Columns: step Loss_E Loss_F Loss_Bound", file=lcurve_notmean)
+print("# Plot: xmgrace -nxy lcurve_notmean", file=lcurve_notmean)
+print("@    title \"STAF batch losses (lcurve_notmean)\"", file=lcurve_notmean)
+print("@    xaxis  label \"Global step\"", file=lcurve_notmean)
+print("@    yaxis  label \"Batch loss\"", file=lcurve_notmean)
+print("@    s0 legend \"Loss_E\"", file=lcurve_notmean)
+print("@    s1 legend \"Loss_F\"", file=lcurve_notmean)
+print("@    s2 legend \"Loss_Bound\"", file=lcurve_notmean)
 try:
    displ_freq=int(full_param['displ_freq'])
 except:
@@ -429,11 +455,11 @@ for ep in range(restart_ep,ne):
             [loss,losse,loss_bound,lossf]=trainmeth(raddescr[k*bs:(k+1)*bs],angdescr[k*bs:(k+1)*bs],des3bsupp[k*bs:(k+1)*bs],intmap2b[k*bs:(k+1)*bs],intder2b[k*bs:(k+1)*bs],intmap3b[k*bs:(k+1)*bs],intder3b[k*bs:(k+1)*bs],intder3bsupp[k*bs:(k+1)*bs],numtriplet[k*bs:(k+1)*bs],e_map_tr[el][k*bs:(k+1)*bs],f_map_tr[el][k*bs:(k+1)*bs],pe,pf,pb)
             lrnow=model.get_lrnet()
             lrnow2=model.get_lrphys()
-            print(losse.numpy(),lossf.numpy(),loss_bound.numpy(),file=lcurve_notmean)
+            accumul=accumul+1
+            print(accumul,losse.numpy(),lossf.numpy(),loss_bound.numpy(),file=lcurve_notmean)
             lcurve_notmean.flush()
             lr_file.write(str(lrnow.numpy())+'\n')
             lr_file.flush()
-            accumul=accumul+1
             loss_buffer+=loss
         losstot+=loss_buffer
         if accumul%displ_freq==0:
@@ -468,7 +494,7 @@ for ep in range(restart_ep,ne):
        outfold_name=model_name+str(ep)
        model.save_model(outfold_name)
        np.savetxt(outfold_name+"/model_error",[np.sqrt(vallosstote),np.sqrt(vallosstotf)],header='RMSE_e  RMSE_f ')
-       print(accumul,ep,np.sqrt(vallosstote.numpy()),np.sqrt(vallosstotf.numpy()),losstot.numpy(),lrnow.numpy(),lrnow2.numpy(),sep=' ',end='\n',file=fileOU)
+       print(accumul,np.sqrt(vallosstote.numpy()),np.sqrt(vallosstotf.numpy()),losstot.numpy(),lrnow.numpy(),lrnow2.numpy(),ep,sep=' ',end='\n',file=fileOU)
        print("Testing model at global step",accumul," and epoch ",ep," val_lossE ",np.sqrt(vallosstote.numpy())," val_lossF ",np.sqrt(vallosstotf.numpy())," loss_Tot ",losstot.numpy()," lr_net ",lrnow.numpy()," lr_finger ",lrnow2.numpy(),sep=' ',end='\n')
        print("We are at epoch ",ep)
        fileOU.flush()

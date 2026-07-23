@@ -9,9 +9,16 @@ NVCC_PATH="/home/francegm/programmi/cuda/bin/nvcc" #11.8
 GPP_PATH="/usr/bin/g++"
 CUDA_LIB64_PATH="/home/francegm/programmi/cuda/lib64"
 CUDA_INCLUDE_PATH="/home/francegm/programmi/cuda/include"
-PYTHON_PATH="/home/francegm/miniconda3/envs/tensorgpu/bin/python"
+# Prefer repo-local .venv if present
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+if [ -x "$REPO_ROOT/.venv/bin/python" ]; then
+  PYTHON_PATH="$REPO_ROOT/.venv/bin/python"
+else
+  PYTHON_PATH="/home/francegm/miniconda3/envs/tensorgpu/bin/python"
+fi
 COMPCAP=$($PYTHON_PATH get_compcap.py)
 actual_path=$(pwd)
+export PATH="$(dirname "$PYTHON_PATH"):$PATH"
 
 sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' source_routine/descriptor_builder.py
 sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' source_routine/mixture/physics_layer_mod.py

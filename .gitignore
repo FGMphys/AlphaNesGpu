@@ -1,3 +1,33 @@
-# Ignora tutti i file con estensione .so e .o nelle cartelle e sottocartelle
+# Build artifacts
 **/*.so
 **/*.o
+
+# Python
+**/__pycache__/
+**/*.py[cod]
+**/*.egg-info/
+.Python
+
+# Local virtualenv (do not commit)
+.venv/
+venv/
+env/
+
+# Test run outputs and converted datasets (keep type.dat / yaml tracked)
+test/**/dataset/**/*.npy
+test/**/model_log*/
+test/run_*/lcurve*
+test/run_*/*.out
+test/run_*/type_map.dat
+test/run_*/cutoff_curve.dat
+test/run_*/lr_step.dat
+test/run_*/time_story*.dat
+test/run_*/shuffle_dataset_vec
+**/*.npy
+
+# Editor / OS
+.DS_Store
+*.swp
+*~
+.idea/
+.vscode/

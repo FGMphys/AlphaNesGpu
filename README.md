@@ -1,189 +1,27 @@
-# STAF Deep Neural Network Potential
+# STAF
 
-This repository contains scripts to train the **STAF Deep Neural Network Potential (DNNP)** introduced in:
+**STAF** — Soft Two-body Angular Fingerprint deep neural network potential for water and biomolecular systems.
+
+![STAF neural potential](assets/staf_hero.png)
 
 > DOI: **10.1063/5.0139245**
 
-The code also includes an extension to **atomic mixtures**. The framework is designed to train neural-network-based interatomic potentials and to evaluate energy and force predictions.
+GPU implementations for single and double precision live in `AlphaNesGpu_float` and `AlphaNesGpu_double`. Experimental models are under `DEV/`.
 
----
-
-## Features
-
-* Training of deep neural network interatomic potentials
-* Support for single and double precision (GPU)
-* Extension to atomic mixtures
-* Energy and force inference
-* Dataset generation from raw molecular dynamics data
-
----
-
-## Installation
-
-### Requirements
-
-The installation requires a compatible version fo tensorflow, CUDA and CUDNN. We test to type of congifuration 
-
-* TensroflowGPU 2.14 Python 3.9-3.11 CUDA 11.8 CUDNN 8.7
-* TensorlowGPU 2.11 Python 3.7-3.10 CUDA 11.2 CUDNN 8.1
-
-CUDA and CUDNN package can be downloaded directly from the NVIDIA archive (https://developer.nvidia.com/cuda-toolkit-archive, https://developer.nvidia.com/cudnn-archive).
-Tensorflow can be downloaded with command python3 -m pip install 'tensorflow[and-cuda]' inside a conda or another virtual environment.
-The input file reading requires the pyyaml package and it can be installed by pip install pyyaml inside the env.
-
-
-### CUDA compilation
-
-The folders:
-
-* `AlphaNesGpu_float`
-* `AlphaNesGpu_double`
-
-contain the GPU implementations for **single** and **double precision**, respectively.
-
-Inside each folder you will find:
-
-* `install_path.sh` 
-
-
-Edit the script to correctly set:
-
-* g++ compiler path
-* CUDA compiler path
-* CUDA libraries directory path
-* CUDA include directory path
-* Python path
-
-Then run:
-
-```bash
-bash install_path.sh
-```
-
-A successful installation will compile the `*.cu.cc` source files located in the `src/` directory.
-
----
-
-## Dataset Preparation
-
-The training dataset must include:
-
-* Atomic trajectories
-* Simulation box information
-* Energies
-* Forces
-
-To generate the dataset from raw data, use:
-
-```bash
-python make_dataset_from_raw.py
-```
-
-This script searchs pos.dat, force.dat, box.dat and energy.dat files organized with one row for frames and it takes a seed as the only command line input for the split process of the dataset. Finally it creates the training and test datasets in the required internal format.
-
----
-
-## Input Configuration Files
-
-The training and inference processes are fully controlled through YAML configuration files.
-
-### Training input (`input.yaml`)
-
-Typical parameters include:
-
-* **model**
-
-  * network architecture
-  * activation functions
-  * precision (float / double)
-
-* **training**
-
-  * number of epochs
-  * batch size
-  * learning rate
-  * optimizer settings
-
-* **data**
-
-  * path to dataset
-  * training / validation split
-
-* **loss**
-
-  * energy weight
-  * force weight
-
-> 📌 Refer to the example `input.yaml` provided in the repository for the full list of available parameters.
-
-### Inference input (`input_inference.yaml`)
-
-The inference configuration defines:
-
-* trained model path
-* dataset for evaluation
-* output options for energy and force errors
-
----
-
-## Running a Training Example
-
-Once the environment is configured and the dataset is prepared, a training can be started with:
-
-```bash
-python alpha_nnpes_full_main.py input.yaml
-```
-
-During training, the code will:
-
-* read the dataset
-* train the neural network potential
-* save checkpoints and final model parameters
-
----
-
-## Running Inference
-
-After training, energy and force errors can be computed using:
-
-```bash
-python alpha_nnpes_full_inference_main.py input_inference.yaml
-```
-
-The results include quantitative error metrics on the test dataset.
-
----
-
-## Development Models
-
-The `DEV/` folder contains experimental and under-development models, including:
-
-* Neural Network Coarse-Graining (NN-CG) model
-* A model for training directly from radial distribution functions
-
-These components are **experimental** and subject to change.
-
----
+Usage and installation docs will be rewritten as the repository is reorganized.
 
 ## Citation
 
-If you use this code in your research, please cite:
+If you use this code, please cite:
 
 ```
-Author(s), Journal, Year
 DOI: 10.1063/5.0139245
 ```
-
----
 
 ## License
 
 BSD 3-Clause License
 
----
-
 ## Contact
 
-For questions or collaborations, please open an issue or contact the authors directly francesco.guidarellimattioli@gmail.com
-
-
+francesco.guidarellimattioli@gmail.com
