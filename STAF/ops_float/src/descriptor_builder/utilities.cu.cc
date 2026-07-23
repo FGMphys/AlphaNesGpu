@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <math.h>
 #include "vector.h"
+#include "staf_real.h"
 //#include "log.h"
 #include "utilities.h"
 
@@ -79,14 +80,14 @@ int insertionSortNoDuplicates(int *v,int *length,int num)
 }
 
 
-int insertionSort_dist2(int *number,int num_el,float *dist2,float dist2_el,int *length)
+int insertionSort_dist2(int *number,int num_el,real *dist2,real dist2_el,int *length)
 {
 	int l=*length;
 	number[l]=num_el;
 	dist2[l]=dist2_el;
 	while ((l>0) && (dist2[l]<dist2[l-1]))
 	{
-		float buffer_dist2;
+		real buffer_dist2;
 		buffer_dist2=dist2[l];
 		dist2[l]=dist2[l-1];
 		dist2[l-1]=buffer_dist2;

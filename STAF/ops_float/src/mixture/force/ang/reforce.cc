@@ -1,6 +1,7 @@
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/shape_inference.h"
 #include "tensorflow/core/framework/op_kernel.h"
+#include "staf_real.h"
 //#include <cuda.h>
 using namespace tensorflow;
 
@@ -37,30 +38,30 @@ REGISTER_OP("InitForceTripl")
 
 
 REGISTER_OP("ComputeForceTripl")
-    .Input("netderiv: float")
-    .Input("radial_descriptor: float")
-    .Input("angular_descriptor: float")
-    .Input("descriptor_derivative_rad: float")
-    .Input("descriptor_derivative_ang: float")
+    .Input("netderiv: " STAF_TF_DTYPE)
+    .Input("radial_descriptor: " STAF_TF_DTYPE)
+    .Input("angular_descriptor: " STAF_TF_DTYPE)
+    .Input("descriptor_derivative_rad: " STAF_TF_DTYPE)
+    .Input("descriptor_derivative_ang: " STAF_TF_DTYPE)
     .Input("interaction_map_rad: int32")
     .Input("interaction_map_ang: int32")
-    .Input("alpha3b_parameters: float")
-    .Input("type_emb3b_parameters: float")
+    .Input("alpha3b_parameters: " STAF_TF_DTYPE)
+    .Input("type_emb3b_parameters: " STAF_TF_DTYPE)
     .Input("type_map: int32")
     .Input("tipos: int32")
     .Input("actual_type: int32")
     .Input("num_triplets: int32")
-    .Output("force: float");
+    .Output("force: " STAF_TF_DTYPE);
 
-    void computeforce_tripl_Launcher(const float*  netderiv_T_d, const float* desr_T_d, const float* desa_T_d,
-                        const float* intderiv_r_T_d, const float* intderiv_a_T_d,
+    void computeforce_tripl_Launcher(const real*  netderiv_T_d, const real* desr_T_d, const real* desa_T_d,
+                        const real* intderiv_r_T_d, const real* intderiv_a_T_d,
                         const int* intmap_r_T_d,const int* intmap_a_T_d,
-                        int nr, int na, int N, int dimbat,int num_finger,const float* type_emb3b_d,int nt,
+                        int nr, int na, int N, int dimbat,int num_finger,const real* type_emb3b_d,int nt,
                         const int* tipos_T,
-                        const int* actual_type,float* forces3b_T_d,const int *num_triplets_d,const float* smooth_a_T,const int* type_map_T_d,
+                        const int* actual_type,real* forces3b_T_d,const int *num_triplets_d,const real* smooth_a_T,const int* type_map_T_d,
                         int prod);
 
-void set_tensor_to_zero_float(float* tensor,int dimten);
+void set_tensor_to_zero_float(real* tensor,int dimten);
 
 class ComputeForceTriplOp : public OpKernel {
  public:
@@ -108,15 +109,15 @@ class ComputeForceTriplOp : public OpKernel {
 
 
     //Arrays read
-    auto netderiv_T_d=netderiv_T.flat<float>();
-    auto desr_T_d= desr_T.flat<float>();
-    auto desa_T_d= desa_T.flat<float>();
-    auto intderiv_r_T_d=intderiv_r_T.flat<float>();
-    auto intderiv_a_T_d=intderiv_a_T.flat<float>();
+    auto netderiv_T_d=netderiv_T.flat<real>();
+    auto desr_T_d= desr_T.flat<real>();
+    auto desa_T_d= desa_T.flat<real>();
+    auto intderiv_r_T_d=intderiv_r_T.flat<real>();
+    auto intderiv_a_T_d=intderiv_a_T.flat<real>();
     auto intmap_r_T_d=intmap_r_T.flat<int>();
     auto intmap_a_T_d=intmap_a_T.flat<int>();
-    auto type_emb3b_T_d=type_emb3b_T.flat<float>();
-    auto smooth_a_T_d=smooth_a_T.flat<float>();
+    auto type_emb3b_T_d=type_emb3b_T.flat<real>();
+    auto smooth_a_T_d=smooth_a_T.flat<real>();
     auto type_map_T_d=type_map_T.flat<int>();
     auto tipos_T_d=tipos_T.flat<int>();
     auto num_triplets_T_d=num_triplets_T.flat<int>();
@@ -128,14 +129,14 @@ class ComputeForceTriplOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(0, grad_net_shape,
                                                      &forces3b_T));
 
-    set_tensor_to_zero_float(forces3b_T->flat<float>().data(),dimbat*3*N);
+    set_tensor_to_zero_float(forces3b_T->flat<real>().data(),dimbat*3*N);
     int prod=netderiv_T.shape().dim_size(0)*netderiv_T.shape().dim_size(1)*desa_T.shape().dim_size(2);//dimbat*Nlocal*na
     computeforce_tripl_Launcher(netderiv_T_d.data(), desr_T_d.data(), desa_T_d.data(),
                         intderiv_r_T_d.data(),intderiv_a_T_d.data(),
                         intmap_r_T_d.data(),intmap_a_T_d.data(),
                         nr, na, N, dimbat,num_finger,type_emb3b_T_d.data(),nt,
                         tipos_T_d.data(),
-                        actual_type,forces3b_T->flat<float>().data(),num_triplets_T_d.data(),smooth_a_T_d.data(),type_map_T_d.data(),prod);
+                        actual_type,forces3b_T->flat<real>().data(),num_triplets_T_d.data(),smooth_a_T_d.data(),type_map_T_d.data(),prod);
 
 }
 };

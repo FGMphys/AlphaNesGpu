@@ -1,6 +1,7 @@
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/shape_inference.h"
 #include "tensorflow/core/framework/op_kernel.h"
+#include "staf_real.h"
 
 
 
@@ -8,23 +9,23 @@
 using namespace tensorflow;
 
 REGISTER_OP("ComputeSortProj3body")
-    .Input("angular_descriptor: double")
-    .Input("radial_descriptor: double")
+    .Input("angular_descriptor: " STAF_TF_DTYPE)
+    .Input("radial_descriptor: " STAF_TF_DTYPE)
     .Input("interaction_map_angular: int32")
     .Input("interaction_map_rad: int32")
-    .Input("alpha3b_parameters: double")
-    .Input("type_emb3b_parameters: double")
+    .Input("alpha3b_parameters: " STAF_TF_DTYPE)
+    .Input("type_emb3b_parameters: " STAF_TF_DTYPE)
     .Input("type_map: int32")
     .Input("num_triplet: int32")
-    .Output("three_body_afs: double");
+    .Output("three_body_afs: " STAF_TF_DTYPE);
 
-void angularAFs_Launcher(const double* radial_descriptor,const double* angular_descriptor,int nr,int na,
-                          double* three_body_AFs,int dimbat,int Nlocal,
-                          const int* interaction_map_angular,const double* alpha3b_parameters,
-                          int nsmooth_a,const double* type_emb3b,
+void angularAFs_Launcher(const real* radial_descriptor,const real* angular_descriptor,int nr,int na,
+                          real* three_body_AFs,int dimbat,int Nlocal,
+                          const int* interaction_map_angular,const real* alpha3b_parameters,
+                          int nsmooth_a,const real* type_emb3b,
                           const int* type_map,const int* num_triplets);
 
-void set_tensor_to_zero_double(double* tensor,int dimten);
+void set_tensor_to_zero_double(real* tensor,int dimten);
 
 class ComputeSortProj3bodyOp : public OpKernel {
  public:
@@ -44,13 +45,13 @@ class ComputeSortProj3bodyOp : public OpKernel {
     const Tensor& num_triplet_T = context->input(7);
 
     //flattizzo
-    auto angular_descriptor =  angular_descriptor_T.flat<double>();
-    auto radial_descriptor = radial_descriptor_T.flat<double>();
+    auto angular_descriptor =  angular_descriptor_T.flat<real>();
+    auto radial_descriptor = radial_descriptor_T.flat<real>();
     auto interaction_map_angular = interaction_map_angular_T.flat<int>();
     auto interaction_map_rad = interaction_map_rad_T.flat<int>();
-    auto alpha3b_parameters = alpha3b_parameters_T.flat<double>();
+    auto alpha3b_parameters = alpha3b_parameters_T.flat<real>();
 
-    auto type_emb3b = type_emb3b_parameters_T.flat<double>();
+    auto type_emb3b = type_emb3b_parameters_T.flat<real>();
     auto type_map = type_map_T.flat<int>();
 
     auto num_triplet = num_triplet_T.flat<int>();
@@ -74,11 +75,11 @@ class ComputeSortProj3bodyOp : public OpKernel {
     angular_AFs_shape.AddDim (nsmooth_a);
     OP_REQUIRES_OK(context, context->allocate_output(0, angular_AFs_shape,
                                                      &angular_AFs_T));
-    set_tensor_to_zero_double(angular_AFs_T->flat<double>().data(),dimbat*Nlocal*nsmooth_a);
+    set_tensor_to_zero_double(angular_AFs_T->flat<real>().data(),dimbat*Nlocal*nsmooth_a);
 
     //Computing three-body atomic-fingerprints
     angularAFs_Launcher(radial_descriptor.data(),angular_descriptor.data(),nr,na,
-                          angular_AFs_T->flat<double>().data(),dimbat,Nlocal,interaction_map_angular.data(),
+                          angular_AFs_T->flat<real>().data(),dimbat,Nlocal,interaction_map_angular.data(),
                           alpha3b_parameters.data(),nsmooth_a,type_emb3b.data(),
                           type_map.data(),num_triplet.data());
   }

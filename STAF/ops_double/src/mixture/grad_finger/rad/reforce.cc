@@ -2,27 +2,28 @@
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/shape_inference.h"
 #include "tensorflow/core/framework/op_kernel.h"
+#include "staf_real.h"
 
 
 using namespace tensorflow;
 
 REGISTER_OP("ComputeTwoBodyParGrad")
-    .Input("prev_grad: double")
-    .Input("radial_descriptor: double")
+    .Input("prev_grad: " STAF_TF_DTYPE)
+    .Input("radial_descriptor: " STAF_TF_DTYPE)
     .Input("interaction_map_rad: int32")
-    .Input("alpha2b_parameters: double")
-    .Input("type_emb2b_parameters: double")
+    .Input("alpha2b_parameters: " STAF_TF_DTYPE)
+    .Input("type_emb2b_parameters: " STAF_TF_DTYPE)
     .Input("type_map: int32")
-    .Output("nextgrad_alpha2b: double")
-    .Output("nextgrad_emb2b: double");
+    .Output("nextgrad_alpha2b: " STAF_TF_DTYPE)
+    .Output("nextgrad_emb2b: " STAF_TF_DTYPE);
 
-void alpha_dist_grad_Launcher(const double* radial_descriptor,int nr,
-                       const double* alpha2b_parameters,
-                       int nalpha_r,double* nextgrad_alpha2b,int dimbat,
+void alpha_dist_grad_Launcher(const real* radial_descriptor,int nr,
+                       const real* alpha2b_parameters,
+                       int nalpha_r,real* nextgrad_alpha2b,int dimbat,
                        int Nlocal,const int* interaction_map_rad,
-                       const double* prev_grad,const double* type_emb2b,
-                       const int* type_map,double* nextgrad_emb2);
-void set_tensor_to_zero_double(double* tensor,int dimten);
+                       const real* prev_grad,const real* type_emb2b,
+                       const int* type_map,real* nextgrad_emb2);
+void set_tensor_to_zero_double(real* tensor,int dimten);
 
 class ComputeTwoBodyParGradOp : public OpKernel {
  public:
@@ -38,12 +39,12 @@ class ComputeTwoBodyParGradOp : public OpKernel {
     const Tensor& type_map_T = context->input(5);
 
     //flattizzo
-    auto prev_grad=prev_grad_T.flat<double>();
-    auto radial_descriptor = radiale_T.flat<double>();
+    auto prev_grad=prev_grad_T.flat<real>();
+    auto radial_descriptor = radiale_T.flat<real>();
     auto interaction_map_rad = intmap2b_T.flat<int>();
-    auto alpha2b_parameters = alpha_radiale_T.flat<double>();
+    auto alpha2b_parameters = alpha_radiale_T.flat<real>();
 
-    auto type_emb2b = type_emb2b_T.flat<double>();
+    auto type_emb2b = type_emb2b_T.flat<real>();
     auto type_map = type_map_T.flat<int>();
 
 
@@ -63,7 +64,7 @@ class ComputeTwoBodyParGradOp : public OpKernel {
     grad_net_shape.AddDim (nalpha_r);
     OP_REQUIRES_OK(context, context->allocate_output(0, grad_net_shape,
                                                      &nextgrad_alpha2b_T));
-    set_tensor_to_zero_double(nextgrad_alpha2b_T->flat<double>().data(),nt*nalpha_r);
+    set_tensor_to_zero_double(nextgrad_alpha2b_T->flat<real>().data(),nt*nalpha_r);
 
     //Create output tensor for backprob of embedding 2b params
     Tensor* nextgrad_emb2_T = NULL;
@@ -72,13 +73,13 @@ class ComputeTwoBodyParGradOp : public OpKernel {
     grad_net_shape2.AddDim (nalpha_r);
     OP_REQUIRES_OK(context, context->allocate_output(1, grad_net_shape2,
                                                      &nextgrad_emb2_T));
-    set_tensor_to_zero_double(nextgrad_emb2_T->flat<double>().data(),nt*nalpha_r);
+    set_tensor_to_zero_double(nextgrad_emb2_T->flat<real>().data(),nt*nalpha_r);
 
     alpha_dist_grad_Launcher(radial_descriptor.data(),nr,alpha2b_parameters.data(),
-                           nalpha_r,nextgrad_alpha2b_T->flat<double>().data(),dimbat,
+                           nalpha_r,nextgrad_alpha2b_T->flat<real>().data(),dimbat,
                            Nlocal,interaction_map_rad.data(),
                            prev_grad.data(),type_emb2b.data(),type_map.data(),
-                           nextgrad_emb2_T->flat<double>().data());
+                           nextgrad_emb2_T->flat<real>().data());
 
   }
 };

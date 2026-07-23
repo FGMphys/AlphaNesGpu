@@ -1,31 +1,32 @@
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/shape_inference.h"
 #include "tensorflow/core/framework/op_kernel.h"
+#include "staf_real.h"
 
 using namespace tensorflow;
 
 REGISTER_OP("ComputeSortProj3bodyGrad")
-    .Input("previous_gradient: float")
-    .Input("angular_desciptors: float")
-    .Input("radial_descriptors: float")
+    .Input("previous_gradient: " STAF_TF_DTYPE)
+    .Input("angular_desciptors: " STAF_TF_DTYPE)
+    .Input("radial_descriptors: " STAF_TF_DTYPE)
     .Input("intmap3b: int32")
     .Input("intmap2b: int32")
-    .Input("alpha3b_parameters: float")
-    .Input("type_emb3b: float")
+    .Input("alpha3b_parameters: " STAF_TF_DTYPE)
+    .Input("type_emb3b: " STAF_TF_DTYPE)
     .Input("type_map: int32")
     .Input("num_triplets: int32")
-    .Output("alphagrad3body: float")
-    .Output("nextgrad_emb3b: float");
+    .Output("alphagrad3body: " STAF_TF_DTYPE)
+    .Output("nextgrad_emb3b: " STAF_TF_DTYPE);
 
 
-void alphagrad_ang_Launcher(const float* radial_descriptor,const float* angular_descriptor,
-                 int nr,int na,const float* prevgrad,int dimbat,
-                 int Nlocal,const int* intmap3b,const float* alpha3b,
-                 int nsmooth_a,float* next_alpha3b_grad,
-                 const float* type_emb3b,const int* type_map,
-                 float* next_emb3b_grad, const int* num_triplet,int nt_couple);
+void alphagrad_ang_Launcher(const real* radial_descriptor,const real* angular_descriptor,
+                 int nr,int na,const real* prevgrad,int dimbat,
+                 int Nlocal,const int* intmap3b,const real* alpha3b,
+                 int nsmooth_a,real* next_alpha3b_grad,
+                 const real* type_emb3b,const int* type_map,
+                 real* next_emb3b_grad, const int* num_triplet,int nt_couple);
 
-void set_tensor_to_zero_float(float* tensor,int dimten);
+void set_tensor_to_zero_float(real* tensor,int dimten);
 
 
 class ComputeSortProj3bodyGradOp : public OpKernel {
@@ -44,13 +45,13 @@ class ComputeSortProj3bodyGradOp : public OpKernel {
     const Tensor& type_map_T = context->input(7);
     const Tensor& num_triplet_T = context->input(8);
 
-    auto prevgrad=prevgrad_T.flat<float>();
-    auto angular_descriptor =  angular_descriptor_T.flat<float>();
-    auto radial_descriptor = radial_descriptor_T.flat<float>();
+    auto prevgrad=prevgrad_T.flat<real>();
+    auto angular_descriptor =  angular_descriptor_T.flat<real>();
+    auto radial_descriptor = radial_descriptor_T.flat<real>();
     auto intmap3b = interaction_map_angular_T.flat<int>();
     auto interaction_map_rad = interaction_map_rad_T.flat<int>();
-    auto alpha3b = alpha3b_parameters_T.flat<float>();
-    auto type_emb3b = type_emb3b_parameters_T.flat<float>();
+    auto alpha3b = alpha3b_parameters_T.flat<real>();
+    auto type_emb3b = type_emb3b_parameters_T.flat<real>();
     auto type_map = type_map_T.flat<int>();
     auto num_triplet = num_triplet_T.flat<int>();
 
@@ -69,7 +70,7 @@ class ComputeSortProj3bodyGradOp : public OpKernel {
     grad_net_shape.AddDim (nsmooth_a*3);
     OP_REQUIRES_OK(context, context->allocate_output(0, grad_net_shape,
                                                      &next_alpha3b_grad_T));
-    set_tensor_to_zero_float(next_alpha3b_grad_T->flat<float>().data(),nt_couple*nsmooth_a*3);
+    set_tensor_to_zero_float(next_alpha3b_grad_T->flat<real>().data(),nt_couple*nsmooth_a*3);
 
     // Create an output for gradient wrt embedding 3b
     Tensor* next_emb3b_grad_T = NULL;
@@ -78,14 +79,14 @@ class ComputeSortProj3bodyGradOp : public OpKernel {
     grad_net_shape2.AddDim (nsmooth_a);
     OP_REQUIRES_OK(context, context->allocate_output(1, grad_net_shape2,
                                                      &next_emb3b_grad_T));
-    set_tensor_to_zero_float(next_emb3b_grad_T->flat<float>().data(),nt_couple*nsmooth_a);
+    set_tensor_to_zero_float(next_emb3b_grad_T->flat<real>().data(),nt_couple*nsmooth_a);
 
     alphagrad_ang_Launcher(radial_descriptor.data(),angular_descriptor.data(),
                      nr,na,prevgrad.data(),dimbat,
                      Nlocal,intmap3b.data(),alpha3b.data(),nsmooth_a,
-                     next_alpha3b_grad_T->flat<float>().data(),
+                     next_alpha3b_grad_T->flat<real>().data(),
                      type_emb3b.data(),type_map.data(),
-                     next_emb3b_grad_T->flat<float>().data(),num_triplet.data(),nt_couple);
+                     next_emb3b_grad_T->flat<real>().data(),num_triplet.data(),nt_couple);
 }
 
 };

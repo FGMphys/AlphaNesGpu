@@ -2,6 +2,7 @@
 #include "tensorflow/core/framework/shape_inference.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include <iostream>
+#include "staf_real.h"
 
 using namespace tensorflow;
 
@@ -32,30 +33,30 @@ REGISTER_OP("InitGradForceRadial")
       };
       REGISTER_KERNEL_BUILDER(Name("InitGradForceRadial").Device(DEVICE_CPU), InitGradForceRadialOp);
 
-void set_tensor_to_zero_float(float* tensor_data,int dimension);
+void set_tensor_to_zero_float(real* tensor_data,int dimension);
 
 REGISTER_OP("ComputeForceRadialGrad")
-    .Input("prevgrad: float")
-    .Input("netderiv: float")
-    .Input("descriptor_derivative_rad: float")
+    .Input("prevgrad: " STAF_TF_DTYPE)
+    .Input("netderiv: " STAF_TF_DTYPE)
+    .Input("descriptor_derivative_rad: " STAF_TF_DTYPE)
     .Input("interaction_map_rad: int32")
-    .Input("radial_descriptor: float")
-    .Input("alpha2b_parameters: float")
-    .Input("type_emb2b_parameters: float")
+    .Input("radial_descriptor: " STAF_TF_DTYPE)
+    .Input("alpha2b_parameters: " STAF_TF_DTYPE)
+    .Input("type_emb2b_parameters: " STAF_TF_DTYPE)
     .Input("type_map: int32")
     .Input("tipos: int32")
     .Input("actual_type: int32")
-    .Output("gradnet: float")
-    .Output("grad_alpha2b: float")
-    .Output("grad_emb2b: float");
+    .Output("gradnet: " STAF_TF_DTYPE)
+    .Output("grad_alpha2b: " STAF_TF_DTYPE)
+    .Output("grad_emb2b: " STAF_TF_DTYPE);
 
-void back_prop_grad_force2b_Launcher(const float* prevgrad,const float* radiale,
-                           int nr,const float* alpha_radiale,int num_finger,
-                           const float* desder,const int* intmap2b,
-                           int dimbat,int N,int N_local,const float*netderiv,
-                           const float* type_emb2b,int nt,const int* type_map,
-                           const int* tipos,const int* actual_type,float* grad_net,
-                           float* grad_alpha2b,float* grad_emb2b);
+void back_prop_grad_force2b_Launcher(const real* prevgrad,const real* radiale,
+                           int nr,const real* alpha_radiale,int num_finger,
+                           const real* desder,const int* intmap2b,
+                           int dimbat,int N,int N_local,const real*netderiv,
+                           const real* type_emb2b,int nt,const int* type_map,
+                           const int* tipos,const int* actual_type,real* grad_net,
+                           real* grad_alpha2b,real* grad_emb2b);
 
 
 class ComputeForceRadialGradOp : public OpKernel {
@@ -87,13 +88,13 @@ class ComputeForceRadialGradOp : public OpKernel {
       int num_finger=alpha_radiale_T.shape().dim_size(1);
 
       //Flatting Tensors
-      auto prevgrad=prevgrad_T.flat<float>();
-      auto netderiv = netderiv_T.flat<float>();
-      auto desder = desder_T.flat<float>();
+      auto prevgrad=prevgrad_T.flat<real>();
+      auto netderiv = netderiv_T.flat<real>();
+      auto desder = desder_T.flat<real>();
       auto intmap2b = intmap2b_T.flat<int>();
-      auto radiale = desr_T.flat<float>();
-      auto alpha_radiale = alpha_radiale_T.flat<float>();
-      auto type_emb2b = type_emb2b_T.flat<float>();
+      auto radiale = desr_T.flat<real>();
+      auto alpha_radiale = alpha_radiale_T.flat<real>();
+      auto type_emb2b = type_emb2b_T.flat<real>();
       auto type_map = type_map_T.flat<int>();
       auto tipos = tipos_T.flat<int>();
 
@@ -108,7 +109,7 @@ class ComputeForceRadialGradOp : public OpKernel {
       grad_net_shape.AddDim (num_finger);
       OP_REQUIRES_OK(context, context->allocate_output(0, grad_net_shape,
                                                        &grad_net_T));
-      set_tensor_to_zero_float(grad_net_T->flat<float>().data(),dimbat*N_local*num_finger);
+      set_tensor_to_zero_float(grad_net_T->flat<real>().data(),dimbat*N_local*num_finger);
 
       Tensor* grad_alpha2b_T = NULL;
       TensorShape grad_alpha2b_shape ;
@@ -116,7 +117,7 @@ class ComputeForceRadialGradOp : public OpKernel {
       grad_alpha2b_shape.AddDim (num_finger);
       OP_REQUIRES_OK(context, context->allocate_output(1, grad_alpha2b_shape,
                                                        &grad_alpha2b_T));
-      set_tensor_to_zero_float(grad_alpha2b_T->flat<float>().data(),nt*num_finger);
+      set_tensor_to_zero_float(grad_alpha2b_T->flat<real>().data(),nt*num_finger);
 
       Tensor* grad_emb2b_T = NULL;
       TensorShape grad_emb2b_shape;
@@ -124,15 +125,15 @@ class ComputeForceRadialGradOp : public OpKernel {
       grad_emb2b_shape.AddDim (num_finger);
       OP_REQUIRES_OK(context, context->allocate_output(2,grad_emb2b_shape,
                                                        &grad_emb2b_T));
-      set_tensor_to_zero_float(grad_emb2b_T->flat<float>().data(),nt*num_finger);
+      set_tensor_to_zero_float(grad_emb2b_T->flat<real>().data(),nt*num_finger);
 
 
 
 
       back_prop_grad_force2b_Launcher(prevgrad.data(),radiale.data(),nr,alpha_radiale.data(),num_finger,
                            desder.data(),intmap2b.data(),dimbat,N,N_local,netderiv.data(),type_emb2b.data(),
-                           nt,type_map.data(),tipos.data(),actual_type,grad_net_T->flat<float>().data(),
-                           grad_alpha2b_T->flat<float>().data(),grad_emb2b_T->flat<float>().data());
+                           nt,type_map.data(),tipos.data(),actual_type,grad_net_T->flat<real>().data(),
+                           grad_alpha2b_T->flat<real>().data(),grad_emb2b_T->flat<real>().data());
 
 
   }

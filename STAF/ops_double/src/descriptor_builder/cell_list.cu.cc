@@ -7,6 +7,7 @@
 #include "interaction_map.h"
 #include "smart_allocator.h"
 #include "cell_list.h"
+#include "staf_real.h"
 //#include "events.h"
 //#include "log.h"
 
@@ -17,7 +18,7 @@
 static listcell *ListMc;
 static int Max_neighbours;
 
-static double Cellsize;
+static real Cellsize;
 
 // variabili del modulo mc
 
@@ -36,12 +37,12 @@ static int module(int n,int mo)
 }
 
 
-listcell* getList(const double Box[],double cutoff,int num_particles)
+listcell* getList(const real Box[],real cutoff,int num_particles)
 {
 	listcell *l=(listcell*)malloc(sizeof(listcell));
 
 
-	double volume=Box[0]*Box[3]*Box[5];
+	real volume=Box[0]*Box[3]*Box[5];
 	l->NumberCells_x=(int)(volume/(sqrt(Box[3]*Box[3]*Box[5]*Box[5]+Box[5]*Box[5]*Box[1]*Box[1]+Box[3]*Box[3]*Box[2]*Box[2]+Box[4]*Box[4]*Box[1]*Box[1])*cutoff));
 	l->NumberCells_y=(int)(volume/(Box[0]*sqrt(Box[5]*Box[5]+Box[4]*Box[4])*cutoff));
 	l->NumberCells_z=(int)(volume/(Box[0]*Box[3]*cutoff));
@@ -82,9 +83,9 @@ listcell* getList(const double Box[],double cutoff,int num_particles)
 
 	// le coordinate sono periodiche fra [0,1], quindi i lati della cella nello
 	// spazio s sono sempre 1
-	l->CellSize_x=1./(double)l->NumberCells_x;
-	l->CellSize_y=1./(double)l->NumberCells_y;
-	l->CellSize_z=1./(double)l->NumberCells_z;
+	l->CellSize_x=1./(real)l->NumberCells_x;
+	l->CellSize_y=1./(real)l->NumberCells_y;
+	l->CellSize_z=1./(real)l->NumberCells_z;
 
 
 	l->HoC=(int*)calloc(l->NumberCells_x*l->NumberCells_y*l->NumberCells_z,sizeof(int));
@@ -173,7 +174,7 @@ void updateList(listcell *l,const vector *pos,int num)
 
 }
 
-void fullUpdateList(listcell *l,vector *pos,int num,const double box[],double cutoff)
+void fullUpdateList(listcell *l,vector *pos,int num,const real box[],real cutoff)
 {
 	int i;
 	int ncell;                       // cell number
@@ -181,7 +182,7 @@ void fullUpdateList(listcell *l,vector *pos,int num,const double box[],double cu
 
 	int old=l->NumberCells_x*l->NumberCells_y*l->NumberCells_z;
 
-	double volume=box[0]*box[3]*box[5];
+	real volume=box[0]*box[3]*box[5];
 	l->NumberCells_x=(int)(volume/(sqrt(box[3]*box[3]*box[5]*box[5]+box[5]*box[5]*box[1]*box[1]+box[3]*box[3]*box[2]*box[2]+box[4]*box[4]*box[1]*box[1])*cutoff));
 	l->NumberCells_y=(int)(volume/(box[0]*sqrt(box[5]*box[5]+box[4]*box[4])*cutoff));
 	l->NumberCells_z=(int)(volume/(box[0]*box[3]*cutoff));
@@ -224,9 +225,9 @@ void fullUpdateList(listcell *l,vector *pos,int num,const double box[],double cu
 
 	// le coordinate sono periodiche fra [0,1], quindi i lati della cella nello
 	// spazio s sono sempre 1
-	l->CellSize_x=1./(double)l->NumberCells_x;
-	l->CellSize_y=1./(double)l->NumberCells_y;
-	l->CellSize_z=1./(double)l->NumberCells_z;
+	l->CellSize_x=1./(real)l->NumberCells_x;
+	l->CellSize_y=1./(real)l->NumberCells_y;
+	l->CellSize_z=1./(real)l->NumberCells_z;
 
 	// HoC initialization
 	for (i=0;i<nnn;i++)
@@ -252,7 +253,7 @@ void fullUpdateList(listcell *l,vector *pos,int num,const double box[],double cu
 	}
 }
 
-int getParticleInteractionMap_ImPos(listcell *l,vector *pos,int label,interactionmap *im,int im_pos,double Box[],double cutoff)
+int getParticleInteractionMap_ImPos(listcell *l,vector *pos,int label,interactionmap *im,int im_pos,real Box[],real cutoff)
 {
 	int j;
 	int nx,ny,nz,nn;               // Number of cells on surface and in box
@@ -299,12 +300,12 @@ int getParticleInteractionMap_ImPos(listcell *l,vector *pos,int label,interactio
 	// interactions with particles in the same cell
 	// and in neighbouring cells
 
-	double cutoff2=cutoff*cutoff;
+	real cutoff2=cutoff*cutoff;
 
 	int ncounter=0;
 
 	vector dist;
-	double dist2;
+	real dist2;
 
 	for (dx=0;dx<3;dx++)
 	{
@@ -356,7 +357,7 @@ int getParticleInteractionMap_ImPos(listcell *l,vector *pos,int label,interactio
 	return ncounter;
 }
 
-int getParticleInteractionMap(listcell *l,vector *pos,int label,interactionmap *im,double Box[],double cutoff)
+int getParticleInteractionMap(listcell *l,vector *pos,int label,interactionmap *im,real Box[],real cutoff)
 {
 	int j;
 	int nx,ny,nz,nn;               // Number of cells on surface and in box
@@ -403,12 +404,12 @@ int getParticleInteractionMap(listcell *l,vector *pos,int label,interactionmap *
 	// interactions with particles in the same cell
 	// and in neighbouring cells
 
-	double cutoff2=cutoff*cutoff;
+	real cutoff2=cutoff*cutoff;
 
 	int ncounter=0;
 
 	vector dist;
-	double dist2;
+	real dist2;
 
 	for (dx=0;dx<3;dx++)
 	{
@@ -552,7 +553,7 @@ void changeCell(listcell *l,const vector *oldpos,const vector *newpos,int num)
 	(l->MyCell)[num]=ncell_new;
 }
 
-void calculateExtendedInteractionMapWithCutoffDistance(listcell *l,interactionmap *im,interactionmap *ime,vector *pos,double Box[],double cutoff)
+void calculateExtendedInteractionMapWithCutoffDistance(listcell *l,interactionmap *im,interactionmap *ime,vector *pos,real Box[],real cutoff)
 {
 
 	int i;
@@ -564,7 +565,7 @@ void calculateExtendedInteractionMapWithCutoffDistance(listcell *l,interactionma
 	int kx,ky,kz;                    // previous cell coordinates
 
 	vector dist,olddist;
-	double dist2;
+	real dist2;
 
 	nn=l->NumberCells_x*l->NumberCells_y;
 	nnn=l->NumberCells_z*nn;
@@ -572,7 +573,7 @@ void calculateExtendedInteractionMapWithCutoffDistance(listcell *l,interactionma
 
 	int number_particles=0;
 
-	double cutoff2=SQR(cutoff);
+	real cutoff2=SQR(cutoff);
 
 	im->num_bonds=0;
 
@@ -1054,14 +1055,14 @@ void calculateExtendedInteractionMapWithCutoffDistance(listcell *l,interactionma
 	assert(number_particles==im->size);
 }
 
-static void insertionSort_dist2(int *number,int num_el,double *dist2,double dist2_el,int *length)
+static void insertionSort_dist2(int *number,int num_el,real *dist2,real dist2_el,int *length)
 {
 	int l=*length;
 	number[l]=num_el;
 	dist2[l]=dist2_el;
 	while ((l>0) && (dist2[l]<dist2[l-1]))
 	{
-		double buffer_dist2;
+		real buffer_dist2;
 		buffer_dist2=dist2[l];
 		dist2[l]=dist2[l-1];
 		dist2[l-1]=buffer_dist2;
@@ -1076,12 +1077,12 @@ static void insertionSort_dist2(int *number,int num_el,double *dist2,double dist
 	(*length)++;
 }
 
-void calculateInteractionMapWithCutoffDistanceOrdered(listcell *l,interactionmap *ime,vector *pos,const double*  Box,double cutoff)
+void calculateInteractionMapWithCutoffDistanceOrdered(listcell *l,interactionmap *ime,vector *pos,const real*  Box,real cutoff)
 {
 
 
 	vector olddist,dist;
-	double dist2;
+	real dist2;
 
 	int i;
 	int nn,nnn;                      // Number of cells on surface and in box
@@ -1098,7 +1099,7 @@ void calculateInteractionMapWithCutoffDistanceOrdered(listcell *l,interactionmap
 
 	int number_particles=0;
 
-	double cutoff2=SQR(cutoff);
+	real cutoff2=SQR(cutoff);
 
 	ime->num_bonds=0;
 
@@ -1107,8 +1108,8 @@ void calculateInteractionMapWithCutoffDistanceOrdered(listcell *l,interactionmap
 	// usiamo ime->rij2
 	/*
 	int ncolloids=ime->size;
-	double **dist2map;
-	Matrix2D(dist2map,ncolloids,ncolloids,double);
+	real **dist2map;
+	Matrix2D(dist2map,ncolloids,ncolloids,real);
 	*/
 
 
@@ -1556,7 +1557,7 @@ void calculateInteractionMapWithCutoffDistanceOrdered(listcell *l,interactionmap
 	//Free2D(dist2map);
 }
 
-int calculateSystemInteractionMapExtended(listcell *l,interactionmap *ime,vector *pos,double Box[],double cutoff)
+int calculateSystemInteractionMapExtended(listcell *l,interactionmap *ime,vector *pos,real Box[],real cutoff)
 {
 	int i;
 	int nn,nnn;                      // Number of cells on surface and in box
@@ -1571,11 +1572,11 @@ int calculateSystemInteractionMapExtended(listcell *l,interactionmap *ime,vector
 	nnn=l->NumberCells_z*nn;
 
 	vector olddist,dist;
-	double dist2;
+	real dist2;
 
 	int number_particles=0;
 
-	double cutoff2=SQR(cutoff);
+	real cutoff2=SQR(cutoff);
 
 	ime->num_bonds=0;
 
@@ -2215,7 +2216,7 @@ int calculateSystemInteractionMapExtended(listcell *l,interactionmap *ime,vector
 	return max_neighbours;
 }
 
-int calculateSystemInteractionMap(listcell *l,interactionmap *im,vector *pos,double Box[],double cutoff)
+int calculateSystemInteractionMap(listcell *l,interactionmap *im,vector *pos,real Box[],real cutoff)
 {
 
 	int i;
@@ -2227,7 +2228,7 @@ int calculateSystemInteractionMap(listcell *l,interactionmap *im,vector *pos,dou
 	int kx,ky,kz;                    // previous cell coordinates
 
 	vector olddist,dist;
-	double dist2;
+	real dist2;
 
 	nn=l->NumberCells_x*l->NumberCells_y;
 	nnn=l->NumberCells_z*nn;
@@ -2235,7 +2236,7 @@ int calculateSystemInteractionMap(listcell *l,interactionmap *im,vector *pos,dou
 
 	int number_particles=0;
 
-	double cutoff2=SQR(cutoff);
+	real cutoff2=SQR(cutoff);
 
 	im->num_bonds=0;
 
@@ -2741,7 +2742,7 @@ void changeIdentityInList(listcell *l,int oldnum,int newnum)
 }
 
 
-void calculateLinksWithinCutoff(listcell *l,vector *pos,double Box[],double cutoff,interactionmap *im,int *num_links)
+void calculateLinksWithinCutoff(listcell *l,vector *pos,real Box[],real cutoff,interactionmap *im,int *num_links)
 {
 
 	int i;
@@ -2757,11 +2758,11 @@ void calculateLinksWithinCutoff(listcell *l,vector *pos,double Box[],double cuto
 	nnn=l->NumberCells_z*nn;
 
 	vector olddist,dist;
-	double dist2;
+	real dist2;
 
 	int number_particles=0;
 
-	double cutoff2=SQR(cutoff);
+	real cutoff2=SQR(cutoff);
 
 	// scan cells
 	for (i=0;i<nnn;i++)

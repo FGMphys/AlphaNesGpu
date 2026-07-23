@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include "staf_real.h"
 
 #include "vector.h"
 #include "smart_allocator.h"
@@ -24,7 +25,7 @@ interactionmap* createInteractionMap(int max_elements,int max_neighbours)
 	// caso ci sia uno sforamento nel numero di vicini dell'ultima particella.
 	// lasciamo in fondo max_elements spazi vuoti
 	Matrix2DSafe(i->with,max_elements,max_neighbours,max_elements,int);
-	Matrix2DSafe(i->rij2,max_elements,max_neighbours,max_elements,double);
+	Matrix2DSafe(i->rij2,max_elements,max_neighbours,max_elements,real);
 	Matrix2DSafe(i->rij,max_elements,max_neighbours,max_elements,vector);
 	return i;
 }
@@ -94,7 +95,7 @@ void buildImeFromIm(interactionmap *im,interactionmap *ime)
 		for (index=0;index<im->howmany[i];index++)
 		{
 			j=im->with[i][index];
-			double rij2=im->rij2[i][index];
+			real rij2=im->rij2[i][index];
 			vector rij=im->rij[i][index];
 
 			ime->rij[i][ime->howmany[i]]=rij;
@@ -118,7 +119,7 @@ threebodyim* create3BodyInteractionMap(int max_triangles)
 	i->num=0;
 	Matrix2D(i->t_index,max_triangles,3,int);
 	Matrix2D(i->t_dr,max_triangles,3,vector);
-	Matrix2D(i->t_dr2,max_triangles,3,double);
+	Matrix2D(i->t_dr2,max_triangles,3,real);
 
 	return i;
 }
@@ -131,11 +132,11 @@ void free3BodyInteractionMap(threebodyim *i)
 	free(i);
 }
 
-int build3BodyMapfromInteractionMap(threebodyim *tm,interactionmap *im,vector *pos,vector *box,double cutoff)
+int build3BodyMapfromInteractionMap(threebodyim *tm,interactionmap *im,vector *pos,vector *box,real cutoff)
 {
 	int i,j,k;
 
-	double cutoff2=cutoff*cutoff;
+	real cutoff2=cutoff*cutoff;
 
 	tm->num=0;
 
@@ -165,7 +166,7 @@ int build3BodyMapfromInteractionMap(threebodyim *tm,interactionmap *im,vector *p
 				dist.y-=box->y*rint(dist.y/box->y);
 				dist.z-=box->z*rint(dist.z/box->z);
 
-				double dist2=SQR(dist.x)+SQR(dist.y)+SQR(dist.z);
+				real dist2=SQR(dist.x)+SQR(dist.y)+SQR(dist.z);
 
 				if (dist2<cutoff2)
 				{
@@ -280,7 +281,7 @@ void generateImeSecondShell_dist2(interactionmap *ime_f,interactionmap *ime_s,ve
 
 
 
-int insertionSort_ime_dist2(interactionmap *ime,int particle,int neighbour,vector dist,double dist2)
+int insertionSort_ime_dist2(interactionmap *ime,int particle,int neighbour,vector dist,real dist2)
 {
 	int l=ime->howmany[particle];
 	ime->with[particle][l]=neighbour;
@@ -289,7 +290,7 @@ int insertionSort_ime_dist2(interactionmap *ime,int particle,int neighbour,vecto
 
 	while ((l>0) && (ime->rij2[particle][l]<ime->rij2[particle][l-1]))
 	{
-		double buffer_dist2;
+		real buffer_dist2;
 		buffer_dist2=ime->rij2[particle][l];
 		ime->rij2[particle][l]=ime->rij2[particle][l-1];
 		ime->rij2[particle][l-1]=buffer_dist2;
@@ -313,7 +314,7 @@ int insertionSort_ime_dist2(interactionmap *ime,int particle,int neighbour,vecto
 }
 
 
-void generateImeSecondShell_dist2(interactionmap *ime_f,interactionmap *ime_s,vector *pos,int ncolloids,int *buffer,double Box[6])
+void generateImeSecondShell_dist2(interactionmap *ime_f,interactionmap *ime_s,vector *pos,int ncolloids,int *buffer,real Box[6])
 {
 	int i;
 
@@ -360,7 +361,7 @@ void generateImeSecondShell_dist2(interactionmap *ime_f,interactionmap *ime_s,ve
 					dist.y=Box[3]*olddist.y+Box[4]*olddist.z;
 					dist.z=Box[5]*olddist.z;
 
-					double dist2=SQR(dist.x)+SQR(dist.y)+SQR(dist.z);
+					real dist2=SQR(dist.x)+SQR(dist.y)+SQR(dist.z);
 
 					insertionSort_ime_dist2(ime_s,i,nn,dist,dist2);
 

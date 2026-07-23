@@ -27,8 +27,14 @@ Shared `staf/dtype.py`; YAML `precision: float|double`.
 | Force FD float/double | OK (corr ≈ 0.9998 / 0.9999 at δ=0.001) |
 | `time_story` 1-epoch (V100) | float **91.1** ms/frame (×0.996); double **153.1** ms/frame (×1.02) |
 
+## Slice 4 — CUDA `real` + STAF logs (2026-07-23)
+
+- Shared `STAF/include/staf_real.h`: `typedef real`, `staf_exp`/`staf_cos`/… overloads, `sizeof(real)` allocs
+- `ops_float` built without `-DSTAF_REAL_DOUBLE`; `ops_double` with it
+- Rebuilt `.so`; CUDA printf now `STAF:` (no more stale `Alpha_nes:` in binaries)
+
 Still pending A2:
 
-- CUDA `real` typedef / single `src/` (collapse `ops_float` + `ops_double`)
+- Collapse `ops_float` + `ops_double` into a single `src/` tree (same sources, two build flags)
 - Remove deprecated `AlphaNesGpu_*` redirects when callers migrated
 - DEV/ trees

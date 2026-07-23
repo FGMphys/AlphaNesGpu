@@ -1,6 +1,7 @@
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/shape_inference.h"
 #include "tensorflow/core/framework/op_kernel.h"
+#include "staf_real.h"
 
 using namespace tensorflow;
 
@@ -32,36 +33,36 @@ REGISTER_OP("InitGradForceTripl")
       REGISTER_KERNEL_BUILDER(Name("InitGradForceTripl").Device(DEVICE_CPU), InitGradForceTriplOp);
 
 REGISTER_OP("ComputeForceTriplGrad")
-    .Input("prevgrad: double")
-    .Input("netderiv: double")
-    .Input("radial_descriptor: double")
-    .Input("angular_descriptor: double")
-    .Input("descriptor_derivative_rad: double")
-    .Input("descriptor_derivative_ang: double")
+    .Input("prevgrad: " STAF_TF_DTYPE)
+    .Input("netderiv: " STAF_TF_DTYPE)
+    .Input("radial_descriptor: " STAF_TF_DTYPE)
+    .Input("angular_descriptor: " STAF_TF_DTYPE)
+    .Input("descriptor_derivative_rad: " STAF_TF_DTYPE)
+    .Input("descriptor_derivative_ang: " STAF_TF_DTYPE)
     .Input("interaction_map_rad: int32")
     .Input("interaction_map_ang: int32")
-    .Input("alpha3b_parameters: double")
-    .Input("type_emb3b_parameters: double")
+    .Input("alpha3b_parameters: " STAF_TF_DTYPE)
+    .Input("type_emb3b_parameters: " STAF_TF_DTYPE)
     .Input("type_map: int32")
     .Input("tipos: int32")
     .Input("actual_type: int32")
     .Input("num_triplets: int32")
-    .Output("gradnet: double")
-    .Output("gradalpha: double")
-    .Output("gradck: double");
+    .Output("gradnet: " STAF_TF_DTYPE)
+    .Output("gradalpha: " STAF_TF_DTYPE)
+    .Output("gradck: " STAF_TF_DTYPE);
 
-    void gradforce_tripl_Launcher(const double*  prevgrad_T_d,const double*  netderiv_T_d, const double* desr_T_d,
-                                      const double* desa_T_d,const double* intderiv_r_T_d,
-                                      const double* intderiv_a_T_d,const int* intmap_r_T_d,
+    void gradforce_tripl_Launcher(const real*  prevgrad_T_d,const real*  netderiv_T_d, const real* desr_T_d,
+                                      const real* desa_T_d,const real* intderiv_r_T_d,
+                                      const real* intderiv_a_T_d,const int* intmap_r_T_d,
                                       const int* intmap_a_T_d,int nr, int na, int N,
-                                      int dimbat,int num_finger,const double* type_emb3b_d,int nt,
+                                      int dimbat,int num_finger,const real* type_emb3b_d,int nt,
                                       const int* tipos_T,const int* actual_type,
-                                      const int *num_triplets_d,const double* smooth_a_T,
-                                      const int* type_map_T_d,int prod,double* gradnet_3b_T_d,
-                                      double* grad_alpha3b_T_d,double* grad_emb3b_T_d);
+                                      const int *num_triplets_d,const real* smooth_a_T,
+                                      const int* type_map_T_d,int prod,real* gradnet_3b_T_d,
+                                      real* grad_alpha3b_T_d,real* grad_emb3b_T_d);
 
 
-void set_tensor_to_zero_double(double* tensor,int dim);
+void set_tensor_to_zero_double(real* tensor,int dim);
 
 class ComputeForceTriplGradOp : public OpKernel {
  public:
@@ -105,16 +106,16 @@ class ComputeForceTriplGradOp : public OpKernel {
     int num_finger=int(smooth_a_T.shape().dim_size(1)/3);
 
     //Flatting tensor to be used as arrays
-    auto prevgrad_T_d=prevgrad_T.flat<double>();
-    auto netderiv_T_d=netderiv_T.flat<double>();
-    auto desr_T_d= desr_T.flat<double>();
-    auto desa_T_d= desa_T.flat<double>();
-    auto intderiv_r_T_d=intderiv_r_T.flat<double>();
-    auto intderiv_a_T_d=intderiv_a_T.flat<double>();
+    auto prevgrad_T_d=prevgrad_T.flat<real>();
+    auto netderiv_T_d=netderiv_T.flat<real>();
+    auto desr_T_d= desr_T.flat<real>();
+    auto desa_T_d= desa_T.flat<real>();
+    auto intderiv_r_T_d=intderiv_r_T.flat<real>();
+    auto intderiv_a_T_d=intderiv_a_T.flat<real>();
     auto intmap_r_T_d=intmap_r_T.flat<int>();
     auto intmap_a_T_d=intmap_a_T.flat<int>();
-    auto type_emb3b_T_d=type_emb3b_T.flat<double>();
-    auto smooth_a_T_d=smooth_a_T.flat<double>();
+    auto type_emb3b_T_d=type_emb3b_T.flat<real>();
+    auto smooth_a_T_d=smooth_a_T.flat<real>();
     auto type_map_T_d=type_map_T.flat<int>();
     auto tipos_T_d=tipos_T.flat<int>();
     auto num_triplets_T_d=num_triplets_T.flat<int>();
@@ -128,7 +129,7 @@ class ComputeForceTriplGradOp : public OpKernel {
     gradnet_3b_shape.AddDim (num_finger);
     OP_REQUIRES_OK(context, context->allocate_output(0, gradnet_3b_shape,
                                                      &gradnet_3b_T));
-    set_tensor_to_zero_double(gradnet_3b_T->flat<double>().data(),dimbat*Nlocal*num_finger);
+    set_tensor_to_zero_double(gradnet_3b_T->flat<real>().data(),dimbat*Nlocal*num_finger);
     // Create an output tensor for DL/Dalpha
     Tensor* grad_alpha3b_T = NULL;
     TensorShape grad_alpha3b_shape ;
@@ -137,7 +138,7 @@ class ComputeForceTriplGradOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(1, grad_alpha3b_shape,
                                                      &grad_alpha3b_T));
     int dimnow=nt_couple*3*num_finger;
-    set_tensor_to_zero_double(grad_alpha3b_T->flat<double>().data(),dimnow);
+    set_tensor_to_zero_double(grad_alpha3b_T->flat<real>().data(),dimnow);
     // Create an output tensor for DL/Dck
     Tensor* grad_emb3b_T = NULL;
     TensorShape grad_emb3b_shape;
@@ -145,7 +146,7 @@ class ComputeForceTriplGradOp : public OpKernel {
     grad_emb3b_shape.AddDim (num_finger);
     OP_REQUIRES_OK(context, context->allocate_output(2, grad_emb3b_shape,
                                                      &grad_emb3b_T));
-    set_tensor_to_zero_double(grad_emb3b_T->flat<double>().data(),nt_couple*num_finger);
+    set_tensor_to_zero_double(grad_emb3b_T->flat<real>().data(),nt_couple*num_finger);
 
 
     int prod=dimbat*Nlocal*na;
@@ -154,9 +155,9 @@ class ComputeForceTriplGradOp : public OpKernel {
                         nr, na, N, dimbat,num_finger,type_emb3b_T_d.data(),nt,
                         tipos_T_d.data(),
                         actual_type,num_triplets_T_d.data(),smooth_a_T_d.data(),
-                        type_map_T_d.data(),prod,gradnet_3b_T->flat<double>().data(),
-                        grad_alpha3b_T->flat<double>().data(),
-  			grad_emb3b_T->flat<double>().data());
+                        type_map_T_d.data(),prod,gradnet_3b_T->flat<real>().data(),
+                        grad_alpha3b_T->flat<real>().data(),
+  			grad_emb3b_T->flat<real>().data());
 
 }
 };

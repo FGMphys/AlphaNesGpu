@@ -5,6 +5,7 @@
 #include <complex.h>
 #include <math.h>
 #include <ctype.h>
+#include "staf_real.h"
 
 #include "vector.h"
 #include "interaction_map.h"
@@ -17,73 +18,73 @@
 #include "tensorflow/core/framework/shape_inference.h"
 #include "tensorflow/core/framework/op_kernel.h"
 
-#define PI 3.141592654f
+#define PI real(3.141592654)
 #define SQR(x) ((x)*(x))
-#define Power(x,n) (pow(x,n))
+#define Power(x,n) (staf_pow((real)(x),(real)(n)))
 
 static int Radbuff,Angbuff;
-static double R_c,Rs,R_a,coeffA,coeffB,coeffC,Pow_alpha,Pow_beta;
+static real R_c,Rs,R_a,coeffA,coeffB,coeffC,Pow_alpha,Pow_beta;
 
-static double box[6],Inobox[6];
+static real box[6],Inobox[6];
 static vector* Nowinopos;
 static interactionmap *Ime;
 static listcell *Cells;
 
-static double* Full_pos;
-static double* Full_box;
+static real* Full_pos;
+static real* Full_box;
 
 static int *howmany_d;
 static int *with_d;
 static int *code_ret_d;
 static int *code_ret;
-static double *nowinopos_d;
+static real *nowinopos_d;
 
 
 
-void save_cutoff(double rc){
+void save_cutoff(real rc){
   FILE *newfile;
   newfile=fopen("cutoff_curve.dat","w");
-  double dx=rc/1000.;
-  double x=0;
+  real dx=rc/1000.;
+  real x=0;
   for (int k=0;k<1000;k++){
     x=x+dx;
     if (x<Rs){
       fprintf(newfile,"%g %g\n",x,coeffA/Power(x,Pow_alpha)+coeffB/Power(x,Pow_beta)+coeffC);
     }
     else{
-      fprintf(newfile,"%g %g\n",x,0.5*(1+cos(PI*x/rc)));
+      fprintf(newfile,"%g %g\n",x,0.5*(1+staf_cos(PI*x/rc)));
   }
 }
    fclose(newfile);
 }
 void construct_repulsion(){
-    double alpha=1.;
-    double beta=-30.;
+    real alpha=1.;
+    real beta=-30.;
     Pow_alpha=alpha;
     Pow_beta=beta;
-    double rs=Rs;
-    double rc=R_c;
-    double f=0.5*(cos(PI*rs/rc)+1);
-    double f1=-0.5*PI/rc*sin(PI*rs/rc);
-    double f2_red=-0.5*SQR(PI/rc)*cos(PI*rs/rc)*SQR(rs);
-    double gamma_red=1./(alpha-beta)*alpha-1;
-    double delta_red=1./(alpha-beta)*(f*(alpha-beta)-f1*rs-f*alpha);
-    double eta_red=-alpha/(alpha-beta);
-    double epsilon_red=1./(alpha-beta)*(rs*f1+alpha*f);
-    double c2_red=alpha*(alpha+1)*delta_red+beta*(beta+1)*epsilon_red;
-    double c1_red=alpha*(alpha+1)*gamma_red+beta*(beta+1)*eta_red;
+    real rs=Rs;
+    real rc=R_c;
+    real f=0.5*(staf_cos(PI*rs/rc)+1);
+    real f1=-0.5*PI/rc*staf_sin(PI*rs/rc);
+    real f2_red=-0.5*SQR(PI/rc)*staf_cos(PI*rs/rc)*SQR(rs);
+    real gamma_red=1./(alpha-beta)*alpha-1;
+    real delta_red=1./(alpha-beta)*(f*(alpha-beta)-f1*rs-f*alpha);
+    real eta_red=-alpha/(alpha-beta);
+    real epsilon_red=1./(alpha-beta)*(rs*f1+alpha*f);
+    real c2_red=alpha*(alpha+1)*delta_red+beta*(beta+1)*epsilon_red;
+    real c1_red=alpha*(alpha+1)*gamma_red+beta*(beta+1)*eta_red;
     coeffC=(f2_red-c2_red)/c1_red;
-    double eta=-alpha*Power(rs,beta)/(alpha-beta);
-    double epsilon=Power(rs,beta)/(alpha-beta)*(rs*f1+alpha*f);
+    real eta=-alpha*Power(rs,beta)/(alpha-beta);
+    real epsilon=Power(rs,beta)/(alpha-beta)*(rs*f1+alpha*f);
     coeffB=eta*coeffC+epsilon;
-    double gamma=Power(rs,alpha)/(alpha-beta)*alpha-Power(rs,alpha);
-    double delta=Power(rs,alpha)/(alpha-beta)*(f*(alpha-beta)-f1*rs-f*alpha);
+    real gamma=Power(rs,alpha)/(alpha-beta)*alpha-Power(rs,alpha);
+    real delta=Power(rs,alpha)/(alpha-beta)*(f*(alpha-beta)-f1*rs-f*alpha);
     coeffA=gamma*coeffC+delta;
     save_cutoff(rc);
 
 }
 
-void construct_descriptor(const double* box,int N,int max_batch){
+void construct_descriptor(const real* box,int N,int max_batch){
 
           Inobox[0]=1./box[0];
           Inobox[1]=-box[1]/(box[0]*box[3]);
@@ -100,46 +101,46 @@ void construct_descriptor(const double* box,int N,int max_batch){
           Nowinopos=(vector*)calloc(N,sizeof(vector));
 	  //Memory to copy input on CPU
 	  int nf=max_batch;
-	  Full_pos=(double*)calloc(nf*N*3,sizeof(double));
-	  Full_box=(double*)calloc(nf*6,sizeof(double));
+	  Full_pos=(real*)calloc(nf*N*3,sizeof(real));
+	  Full_box=(real*)calloc(nf*6,sizeof(real));
           
 	  cudaMalloc(&howmany_d,nf*N*sizeof(int));
           cudaMalloc(&with_d,nf*N*Radbuff*sizeof(int));
-          cudaMalloc(&nowinopos_d,nf*N*3*sizeof(double));
+          cudaMalloc(&nowinopos_d,nf*N*3*sizeof(real));
           cudaMalloc(&code_ret_d,sizeof(int));
 	  code_ret=(int*)calloc(1,sizeof(int));
  }
 
- void fill_radial_launcher(double R_c,int radbuff,double R_a,int angbuff,int N,
-                       double* inopos_d,const double* box_d,
+ void fill_radial_launcher(real R_c,int radbuff,real R_a,int angbuff,int N,
+                       real* inopos_d,const real* box_d,
                        int *howmany_d,int *with_d,
-                       double* descriptor_d,int* intmap2b_d,double* der2b_d,
-                       double* des3bsupp_d,
-                       double* der3bsupp_d, int nf,int* numtriplet_d,
-                       double rs, double coeffa,double coeffb,double coeffc,double pow_alpha, double pow_beta);
- void fill_angular_launcher(double R_c,int radbuff,double R_a,int angbuff,int N,
-                       double* inopos_d,const double* box_d,
+                       real* descriptor_d,int* intmap2b_d,real* der2b_d,
+                       real* des3bsupp_d,
+                       real* der3bsupp_d, int nf,int* numtriplet_d,
+                       real rs, real coeffa,real coeffb,real coeffc,real pow_alpha, real pow_beta);
+ void fill_angular_launcher(real R_c,int radbuff,real R_a,int angbuff,int N,
+                       real* inopos_d,const real* box_d,
                        int *howmany_d,int *with_d,
-                       double* ang_descr_d,int* intmap3b_d,
-                       double* des3bsupp_d,double* der3b_d,
-                       double* der3bsupp_d, int nf,int* numtriplet_d);
+                       real* ang_descr_d,int* intmap3b_d,
+                       real* des3bsupp_d,real* der3b_d,
+                       real* der3bsupp_d, int nf,int* numtriplet_d);
 
 void set_tensor_to_zero_int(int* tensor,int dimten);
 
-void set_tensor_to_zero_double(double* tensor,int dimten);
+void set_tensor_to_zero_double(real* tensor,int dimten);
 
 void check_max_launcher(int* tensor,int dim,int maxval,int* resval);
 
 using namespace tensorflow;
 
 REGISTER_OP("ConstructDescriptorsLight")
-    .Input("radial_cutoff: double")
+    .Input("radial_cutoff: " STAF_TF_DTYPE)
     .Input("radial_buffer: int32")
     .Input("angular_buffer: int32")
     .Input("numpar: int32")
-    .Input("boxer: double")
-    .Input("rs: double")
-    .Input("ra: double")
+    .Input("boxer: " STAF_TF_DTYPE)
+    .Input("rs: " STAF_TF_DTYPE)
+    .Input("ra: " STAF_TF_DTYPE)
     .Input("max_batch: int32")
     .Output("exitcode: int32");
 
@@ -160,10 +161,10 @@ REGISTER_OP("ConstructDescriptorsLight")
            const Tensor& ra_T = context->input(6);
            const Tensor& max_batch_T = context->input(7); 
 
-           auto rs_T_flat=rs_T.flat<double>();
+           auto rs_T_flat=rs_T.flat<real>();
            Rs=rs_T_flat(0);
 
-           auto rcrad_T_flat=rcrad_T.flat<double>();
+           auto rcrad_T_flat=rcrad_T.flat<real>();
            R_c=rcrad_T_flat(0);
 
            auto radbuff_T_flat=radbuff_T.flat<int>();
@@ -172,7 +173,7 @@ REGISTER_OP("ConstructDescriptorsLight")
            auto angbuff_T_flat=angbuff_T.flat<int>();
            Angbuff=angbuff_T_flat(0);
 
-           auto ra_T_flat=ra_T.flat<double>();
+           auto ra_T_flat=ra_T.flat<real>();
            R_a=ra_T_flat(0);
 
 	   int numpar=numpar_T.flat<int>()(0);
@@ -180,23 +181,23 @@ REGISTER_OP("ConstructDescriptorsLight")
            printf("\nSTAF: Descriptor constructor found Rc %f\n",R_c);
 	   printf("          Ra %f Rs %f Radbuff %d Angbuff %d max_batch %d N_max %d\n",R_a,Rs,Radbuff,Angbuff,max_batch,numpar);
            construct_repulsion();
-           construct_descriptor(box_T.flat<double>().data(),numpar,max_batch);
+           construct_descriptor(box_T.flat<real>().data(),numpar,max_batch);
          }
     };
 REGISTER_KERNEL_BUILDER(Name("ConstructDescriptorsLight").Device(DEVICE_CPU), ConstructDescriptorsLightOp);
 
 
 REGISTER_OP("ComputeDescriptorsLight")
-    .Input("positions: double")
-    .Input("boxer: double")
-    .Output("raddescr: double")
-    .Output("angdescr: double")
-    .Output("des3bsupp: double")
+    .Input("positions: " STAF_TF_DTYPE)
+    .Input("boxer: " STAF_TF_DTYPE)
+    .Output("raddescr: " STAF_TF_DTYPE)
+    .Output("angdescr: " STAF_TF_DTYPE)
+    .Output("des3bsupp: " STAF_TF_DTYPE)
     .Output("intmap2b: int32")
     .Output("intmap3b: int32")
-    .Output("der2b: double")
-    .Output("der3b: double")
-    .Output("der3bsupp: double")
+    .Output("der2b: " STAF_TF_DTYPE)
+    .Output("der3b: " STAF_TF_DTYPE)
+    .Output("der3bsupp: " STAF_TF_DTYPE)
     .Output("numtriplet: int32");
 
 
@@ -213,9 +214,9 @@ class ComputeDescriptorsLightOp : public OpKernel {
     const Tensor& box_T = context->input(1);
 
 
-    auto positions = positions_T.flat<double>();
-    const double* nowpos=positions.data();
-    const double* nowbox = box_T.flat<double>().data();
+    auto positions = positions_T.flat<real>();
+    const real* nowpos=positions.data();
+    const real* nowbox = box_T.flat<real>().data();
 
 
 
@@ -223,25 +224,25 @@ class ComputeDescriptorsLightOp : public OpKernel {
     int nf=box_T.shape().dim_size(0);
     int N=int(positions_T.shape().dim_size(1)/3);
 
-    cudaMemcpy(Full_pos,nowpos,nf*N*3*sizeof(double),cudaMemcpyDeviceToHost);
-    cudaMemcpy(Full_box,nowbox,nf*6*sizeof(double),cudaMemcpyDeviceToHost);
+    cudaMemcpy(Full_pos,nowpos,nf*N*3*sizeof(real),cudaMemcpyDeviceToHost);
+    cudaMemcpy(Full_box,nowbox,nf*6*sizeof(real),cudaMemcpyDeviceToHost);
     //////////BUILDING CELL LIST AND IME (FULL ORDERED INTERACTION MAP)////
     int ii;
     for (ii=0;ii<nf;ii++)
     {
-      Inobox[0] = 1.f / Full_box[ii*6+0];
+      Inobox[0] = real(1.) / Full_box[ii*6+0];
       Inobox[1] = -Full_box[ii*6+1] / (Full_box[ii*6+0] * Full_box[ii*6+3]);
       Inobox[2] = (Full_box[ii*6+1] * Full_box[ii*6+4]) /
                   (Full_box[ii*6+0] * Full_box[ii*6+3] * Full_box[ii*6+5]) -
                   Full_box[ii*6+2] / (Full_box[ii*6+0] * Full_box[ii*6+5]);
-      Inobox[3] = 1.f / Full_box[ii*6+3];
+      Inobox[3] = real(1.) / Full_box[ii*6+3];
       Inobox[4] = -Full_box[ii*6+4] / (Full_box[ii*6+3] * Full_box[ii*6+5]);
-      Inobox[5] = 1.f / Full_box[ii*6+5];
+      Inobox[5] = real(1.) / Full_box[ii*6+5];
 
       for (int i=0;i<N;i++){
-        double px=Full_pos[ii*N*3+i*3];
-        double py=Full_pos[ii*N*3+i*3+1];
-        double pz=Full_pos[ii*N*3+i*3+2];
+        real px=Full_pos[ii*N*3+i*3];
+        real py=Full_pos[ii*N*3+i*3+1];
+        real pz=Full_pos[ii*N*3+i*3+2];
 
         Nowinopos[i].x=(Inobox[0]*px+Inobox[1]*py+Inobox[2]*pz);
         Nowinopos[i].y=(Inobox[3]*py+Inobox[4]*pz);
@@ -255,7 +256,7 @@ class ComputeDescriptorsLightOp : public OpKernel {
 
       cudaMemcpy(howmany_d+ii*N,Ime->howmany,N*sizeof(int),cudaMemcpyHostToDevice);
       cudaMemcpy(with_d+ii*N*Radbuff,Ime->with[0],N*Radbuff*sizeof(int),cudaMemcpyHostToDevice);
-      cudaMemcpy(nowinopos_d+ii*N*3,Nowinopos,N*3*sizeof(double),cudaMemcpyHostToDevice);
+      cudaMemcpy(nowinopos_d+ii*N*3,Nowinopos,N*3*sizeof(real),cudaMemcpyHostToDevice);
 
       for (int i=0;i<N;i++)
       {
@@ -289,7 +290,7 @@ class ComputeDescriptorsLightOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(1,angdescr_shape,
                                                      &angdescr_tensor));
 
-    set_tensor_to_zero_double(angdescr_tensor->flat<double>().data(),nf*N*Angbuff);
+    set_tensor_to_zero_double(angdescr_tensor->flat<real>().data(),nf*N*Angbuff);
     ///////////////DESCRIPTORS 3B SUPP///////////////
     // Create an output tensor
     Tensor* des3bsupp_tensor = NULL;
@@ -366,16 +367,16 @@ class ComputeDescriptorsLightOp : public OpKernel {
 
     set_tensor_to_zero_int(numtriplet_tensor->flat<int>().data(),nf*N);
 
-    double* rad_descr_d=raddescr_tensor->flat<double>().data();
+    real* rad_descr_d=raddescr_tensor->flat<real>().data();
     int* intmap2b_d=intmap2b_tensor->flat<int>().data();
-    double* der2b_d=der2b_tensor->flat<double>().data();
-    double* des3bsupp_d=des3bsupp_tensor->flat<double>().data();
-    double* der3bsupp_d=der3bsupp_tensor->flat<double>().data();
+    real* der2b_d=der2b_tensor->flat<real>().data();
+    real* des3bsupp_d=des3bsupp_tensor->flat<real>().data();
+    real* der3bsupp_d=der3bsupp_tensor->flat<real>().data();
     int* numtriplet_d=numtriplet_tensor->flat<int>().data();
 
-    double* ang_descr_d=angdescr_tensor->flat<double>().data();
+    real* ang_descr_d=angdescr_tensor->flat<real>().data();
     int* intmap3b_d=intmap3b_tensor->flat<int>().data();
-    double* der3b_d=der3b_tensor->flat<double>().data();
+    real* der3b_d=der3b_tensor->flat<real>().data();
 
     fill_radial_launcher(R_c,Radbuff,R_a,Angbuff,N,
                       nowinopos_d,nowbox,

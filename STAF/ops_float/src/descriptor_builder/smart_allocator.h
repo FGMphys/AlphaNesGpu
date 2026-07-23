@@ -1,3 +1,4 @@
+#include "staf_real.h"
 #ifndef SMART_ALLOCATOR_H
 #define SMART_ALLOCATOR_H
 

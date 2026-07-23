@@ -1,23 +1,24 @@
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/shape_inference.h"
 #include "tensorflow/core/framework/op_kernel.h"
+#include "staf_real.h"
 
 
 using namespace tensorflow;
 
 REGISTER_OP("ComputeSortProj")
-    .Input("radial_descriptor: double")
+    .Input("radial_descriptor: " STAF_TF_DTYPE)
     .Input("interaction_map_rad: int32")
-    .Input("alpha2b_parameters: double")
-    .Input("type_emb2b_parameters: double")
+    .Input("alpha2b_parameters: " STAF_TF_DTYPE)
+    .Input("type_emb2b_parameters: " STAF_TF_DTYPE)
     .Input("type_map: int32")
-    .Output("two_body_afs: double");
+    .Output("two_body_afs: " STAF_TF_DTYPE);
 
 
-void radialAFs_Launcher(const double* radial_descriptor,const int nr,const double* alpha2b_parameters,
-        const int nalpha_r,double* radial_AFs,const int dimbat,const int N_local,
-        const int* interaction_map_rad,const double* type_emb2b,const int* type_map);
-void set_tensor_to_zero_double(double* tensor,int dimten);
+void radialAFs_Launcher(const real* radial_descriptor,const int nr,const real* alpha2b_parameters,
+        const int nalpha_r,real* radial_AFs,const int dimbat,const int N_local,
+        const int* interaction_map_rad,const real* type_emb2b,const int* type_map);
+void set_tensor_to_zero_double(real* tensor,int dimten);
 
 class ComputeSortProjOp : public OpKernel {
  public:
@@ -33,11 +34,11 @@ class ComputeSortProjOp : public OpKernel {
 
 
     //flattizzo
-    auto radial_descriptor = radiale_T.flat<double>();
+    auto radial_descriptor = radiale_T.flat<real>();
     auto interaction_map_rad = intmap2b_T.flat<int>();
-    auto alpha2b_parameters = alpha_radiale_T.flat<double>();
+    auto alpha2b_parameters = alpha_radiale_T.flat<real>();
 
-    auto type_emb2b = type_emb2b_T.flat<double>();
+    auto type_emb2b = type_emb2b_T.flat<real>();
     auto type_map = type_map_T.flat<int>();
 
 
@@ -58,12 +59,12 @@ class ComputeSortProjOp : public OpKernel {
                                                      &radial_AFs_T));
 
     //It seems tensorflow does not set to zero the pointed memory!
-    set_tensor_to_zero_double(radial_AFs_T->flat<double>().data(),dimbat*Nlocal*nalpha_r);
+    set_tensor_to_zero_double(radial_AFs_T->flat<real>().data(),dimbat*Nlocal*nalpha_r);
 
     //Calcolo della proiezione su base
     radialAFs_Launcher(
           radial_descriptor.data(),nr,alpha2b_parameters.data(),
-          nalpha_r,radial_AFs_T->flat<double>().data(),dimbat,Nlocal,
+          nalpha_r,radial_AFs_T->flat<real>().data(),dimbat,Nlocal,
           interaction_map_rad.data(),type_emb2b.data(),type_map.data()
     );
 

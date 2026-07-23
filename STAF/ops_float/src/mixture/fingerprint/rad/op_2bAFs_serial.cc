@@ -1,6 +1,7 @@
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/shape_inference.h"
 #include "tensorflow/core/framework/op_kernel.h"
+#include "staf_real.h"
 
 
 using namespace tensorflow;
@@ -37,7 +38,7 @@ for (b=0;b<dimbat;b++){
             int ch_type=type_map(neighj);
         for (i=0;i<nalpha_r;i++)
             {
-              double buffer1=ds(actual+j)*exp(alpha(nalpha_r*ch_type+i)*ds(actual+j))*type_emb2b(nalpha_r*ch_type+i);
+              double buffer1=ds(actual+j)*staf_exp(alpha(nalpha_r*ch_type+i)*ds(actual+j))*type_emb2b(nalpha_r*ch_type+i);
               twobodyafs(b*nalpha_r*N+par*nalpha_r+i)+=buffer1;
              }
              }

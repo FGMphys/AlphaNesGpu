@@ -1,3 +1,4 @@
+#include "staf_real.h"
 #ifndef CELL_LIST_H
 #define CELL_LIST_H
 
@@ -7,16 +8,16 @@ typedef struct _listcell {
 	int NumberCells_x;                     // number of cells in one direction
 	int NumberCells_y;
 	int NumberCells_z;
-	double CellSize_x;                     // cell edge size
-	double CellSize_y;
-	double CellSize_z;
+	real CellSize_x;                     // cell edge size
+	real CellSize_y;
+	real CellSize_z;
 	int *MyCell;
 } listcell;
 
-void celllistConstructor(FILE *config_file,vector *pos,int max_number_colloids,int *ncolloids,double box[],double *cutoff,interactionmap *interactionList,int *movedparticle);
+void celllistConstructor(FILE *config_file,vector *pos,int max_number_colloids,int *ncolloids,real box[],real *cutoff,interactionmap *interactionList,int *movedparticle);
 void celllistFree();
 
-listcell* getList(const double Box[],double cutoff,int num_particles);
+listcell* getList(const real Box[],real cutoff,int num_particles);
 void freeList(listcell *l);
 
 void resetList(listcell *l);
@@ -25,7 +26,7 @@ void copyList(listcell *dst,listcell *src,int ncolloids);
 
 void updateList(listcell *l,const vector *pos,int num);
 
-void fullUpdateList(listcell *l,vector *pos,int num,const double Box[],double cutoff);
+void fullUpdateList(listcell *l,vector *pos,int num,const real Box[],real cutoff);
 
 void changeCell(listcell *l,const vector *oldpos,const vector *newpos,int num);
 
@@ -35,18 +36,18 @@ void addToList(listcell *l,const vector *pos,int num);
 void removeFromList(listcell *l,int num);
 void changeIdentityInList(listcell *l,int oldnum,int newnum);
 
-void calculateLinksWithinCutoff(listcell *l,vector *pos,double Box[],double cutoff,interactionmap *im,int *num_links);
+void calculateLinksWithinCutoff(listcell *l,vector *pos,real Box[],real cutoff,interactionmap *im,int *num_links);
 
 vector getCellSize(listcell *l);
 
-void calculateExtendedInteractionMapWithCutoffDistance(listcell *l,interactionmap *im,interactionmap *ime,vector *pos,double Box[],double cutoff);
-void calculateInteractionMapWithCutoffDistanceOrdered(listcell *l,interactionmap *ime,vector *pos,const double* Box,double cutoff);
+void calculateExtendedInteractionMapWithCutoffDistance(listcell *l,interactionmap *im,interactionmap *ime,vector *pos,real Box[],real cutoff);
+void calculateInteractionMapWithCutoffDistanceOrdered(listcell *l,interactionmap *ime,vector *pos,const real* Box,real cutoff);
 
 
-int getParticleInteractionMap(listcell *l,vector *pos,int label,interactionmap *im,double Box[],double cutoff);
-int getParticleInteractionMap_ImPos(listcell *l,vector *pos,int label,interactionmap *im,int im_pos,double Box[],double cutoff);
-int calculateSystemInteractionMapExtended(listcell *l,interactionmap *ime,vector *pos,double Box[],double cutoff);
-int calculateSystemInteractionMap(listcell *l,interactionmap *im,vector *pos,double Box[],double cutoff);
+int getParticleInteractionMap(listcell *l,vector *pos,int label,interactionmap *im,real Box[],real cutoff);
+int getParticleInteractionMap_ImPos(listcell *l,vector *pos,int label,interactionmap *im,int im_pos,real Box[],real cutoff);
+int calculateSystemInteractionMapExtended(listcell *l,interactionmap *ime,vector *pos,real Box[],real cutoff);
+int calculateSystemInteractionMap(listcell *l,interactionmap *im,vector *pos,real Box[],real cutoff);
 
 void celllistUpdateList();
 

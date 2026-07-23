@@ -3,6 +3,7 @@
 #include "unsupported/Eigen/CXX11/Tensor" 
 #include "tensorflow/core/util/gpu_kernel_helper.h"
 #include "tensorflow/core/util/gpu_launch_config.h"
+#include "staf_real.h"
 
 
 static int BLOCK_DIM;
@@ -25,16 +26,16 @@ void init_block_dim(int buffdim){
 }
 
 
-__global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*  netderiv_T,
-                                       const double* desr_T, const double* desa_T,
-                                       const double* intderiv_r_T, const double* intderiv_a_T_l,
+__global__ void gradforce_tripl_kernel(const real*  prevgrad_T_d,const real*  netderiv_T,
+                                       const real* desr_T, const real* desa_T,
+                                       const real* intderiv_r_T, const real* intderiv_a_T_l,
                                        const int* intmap_r_T,const int* intmap_a_T_l,
                                        int nr, const int na, int N, int dimbat , int num_finger,
-                                       const double* type_emb3b,int nt,const int* tipos_T,
+                                       const real* type_emb3b,int nt,const int* tipos_T,
                                        const int* actual_type_p,
-                                       const int *num_triplets,const double* smooth_a_T_l,
-                                       const int* type_map_T_d,double* gradnet_3b_T_d,
-                                      double* grad_alpha3b_T,double* grad_emb3b_T_d,int req_alpha,int req_sum,int BLOCK_DIM)
+                                       const int *num_triplets,const real* smooth_a_T_l,
+                                       const int* type_map_T_d,real* gradnet_3b_T_d,
+                                      real* grad_alpha3b_T,real* grad_emb3b_T_d,int req_alpha,int req_sum,int BLOCK_DIM)
 {
 
     int actual_type=actual_type_p[0];
@@ -44,14 +45,14 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
     for (int y=0;y<actual_type;y++){
         tipos_shift=tipos_shift+tipos_T[y];
     }
-    const double2* intderiv_a_T=(const double2 *)intderiv_a_T_l;
+    const real2* intderiv_a_T=(const real2 *)intderiv_a_T_l;
     const int2* intmap_a_T=(const int2 *) intmap_a_T_l;
-    const double3* smooth_a_T=(const double3 *)smooth_a_T_l;
-    double3* grad_alpha3b_T_d=(double3*)grad_alpha3b_T;
+    const real3* smooth_a_T=(const real3 *)smooth_a_T_l;
+    real3* grad_alpha3b_T_d=(real3*)grad_alpha3b_T;
     int t=blockIdx.x*blockDim.x+threadIdx.x;
 
 
-    extern __shared__ double4 allgrad[];
+    extern __shared__ real4 allgrad[];
     allgrad[threadIdx.x].x=0.0;
     allgrad[threadIdx.x].y=0.0;
     allgrad[threadIdx.x].z=0.0;
@@ -61,9 +62,9 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
     __syncthreads();
 
 
-    double3 local_alpha= {0.0, 0.0, 0.0};
-    double local_ck= 0.0;
-    double local_net=0.0;
+    real3 local_alpha= {0.0, 0.0, 0.0};
+    real local_ck= 0.0;
+    real local_net=0.0;
 
     // from t to b,par,j,k
     int b=t/(na*N_local);
@@ -96,9 +97,9 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
             int k=nn-prev_row+1+j;
 
 
-            double delta=0.0;
-            double Bp_j=0.0;
-            double Bp_k=0.0;
+            real delta=0.0;
+            real Bp_j=0.0;
+            real Bp_k=0.0;
 
 
             int2 neigh=intmap_a_T[b*(N_local*na)+na*par+nn];
@@ -109,67 +110,67 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
             sum=j_type+k_type;
 	    if (req_sum==sum){
 
-               double angulardes=desa_T[actual_ang+nn];
-               double radialdes_j=desr_T[actual+j];
-               double radialdes_k=desr_T[actual+k];
+               real angulardes=desa_T[actual_ang+nn];
+               real radialdes_j=desr_T[actual+j];
+               real radialdes_k=desr_T[actual+k];
 
 
-	       double accumulate_1=0.0;
-               double accumulate_3=0.0;
-               double accumulate_4=0.0;
-               double accumulate_5=0.0;
-               double NGel=netderiv_T[actgrad+req_alpha];
-               double3 alphas=smooth_a_T[sum*num_finger+req_alpha];
-               double chtjk_par=type_emb3b[sum*num_finger+req_alpha];
+	       real accumulate_1=0.0;
+               real accumulate_3=0.0;
+               real accumulate_4=0.0;
+               real accumulate_5=0.0;
+               real NGel=netderiv_T[actgrad+req_alpha];
+               real3 alphas=smooth_a_T[sum*num_finger+req_alpha];
+               real chtjk_par=type_emb3b[sum*num_finger+req_alpha];
 
-               double expbeta=exp(alphas.z*angulardes);
+               real expbeta=staf_exp(alphas.z*angulardes);
 
-               double sim1=exp(alphas.y*radialdes_j+alphas.x*radialdes_k);
-               double sim2=exp(alphas.x*radialdes_j+alphas.y*radialdes_k);
-               double sum_sim=sim1+sim2;
+               real sim1=staf_exp(alphas.y*radialdes_j+alphas.x*radialdes_k);
+               real sim2=staf_exp(alphas.x*radialdes_j+alphas.y*radialdes_k);
+               real sum_sim=sim1+sim2;
 
                delta=expbeta*(1.0+alphas.z*angulardes)*sum_sim*0.5;
 
-               double suppj=(alphas.x*sim2+alphas.y*sim1)*expbeta;
-               double suppk=(alphas.x*sim1+alphas.y*sim2)*expbeta;
+               real suppj=(alphas.x*sim2+alphas.y*sim1)*expbeta;
+               real suppk=(alphas.x*sim1+alphas.y*sim2)*expbeta;
                Bp_j=suppj*angulardes*0.5;
                Bp_k=suppk*angulardes*0.5;
 
  	       int cor;
                for (cor=0;cor<3;cor++){
-                    double2 intder = intderiv_a_T[b*(N_local*na)*3+par*na*3+cor*na+nn];
-                    double intder_r_j=intderiv_r_T[b*N_local*3*nr+nr*3*par+cor*nr+j];
-                    double intder_r_k=intderiv_r_T[b*N_local*3*nr+nr*3*par+cor*nr+k];
-                    double prevgrad_loc=prevgrad_T_d[b*(N*3)+absolute_par*3+cor];
-                    double prevgrad_neighj=prevgrad_T_d[b*(N*3)+neigh.x*3+cor];
-                    double prevgrad_neighk=prevgrad_T_d[b*(N*3)+neigh.y*3+cor];
+                    real2 intder = intderiv_a_T[b*(N_local*na)*3+par*na*3+cor*na+nn];
+                    real intder_r_j=intderiv_r_T[b*N_local*3*nr+nr*3*par+cor*nr+j];
+                    real intder_r_k=intderiv_r_T[b*N_local*3*nr+nr*3*par+cor*nr+k];
+                    real prevgrad_loc=prevgrad_T_d[b*(N*3)+absolute_par*3+cor];
+                    real prevgrad_neighj=prevgrad_T_d[b*(N*3)+neigh.x*3+cor];
+                    real prevgrad_neighk=prevgrad_T_d[b*(N*3)+neigh.y*3+cor];
 
-                    double gradxij=chtjk_par*delta*intder.x+chtjk_par*Bp_j*intder_r_j;
-                    double gradxik=chtjk_par*delta*intder.y+chtjk_par*Bp_k*intder_r_k;
+                    real gradxij=chtjk_par*delta*intder.x+chtjk_par*Bp_j*intder_r_j;
+                    real gradxik=chtjk_par*delta*intder.y+chtjk_par*Bp_k*intder_r_k;
                     accumulate_1+=-prevgrad_loc*0.5*(gradxij+gradxik);
 	            accumulate_1+=prevgrad_neighj*0.5*gradxij+prevgrad_neighk*0.5*gradxik;
 
-                    double buff_a1_ang=expbeta*(1.0+alphas.z*angulardes)*(sim1*radialdes_k+sim2*radialdes_j)*0.5;
-                    double buff_a2_ang=expbeta*(1.0+alphas.z*angulardes)*(sim1*radialdes_j+sim2*radialdes_k)*0.5;
-                    double buff_beta_ang=expbeta*angulardes*(2.0+alphas.z*angulardes)*sum_sim*0.5;
+                    real buff_a1_ang=expbeta*(1.0+alphas.z*angulardes)*(sim1*radialdes_k+sim2*radialdes_j)*0.5;
+                    real buff_a2_ang=expbeta*(1.0+alphas.z*angulardes)*(sim1*radialdes_j+sim2*radialdes_k)*0.5;
+                    real buff_beta_ang=expbeta*angulardes*(2.0+alphas.z*angulardes)*sum_sim*0.5;
 
-                    double buff_beta_r_j=suppj*angulardes*angulardes*0.5;
-                    double buff_beta_r_k=suppk*angulardes*angulardes*0.5;
+                    real buff_beta_r_j=suppj*angulardes*angulardes*0.5;
+                    real buff_beta_r_k=suppk*angulardes*angulardes*0.5;
 
-                    double buff_a1_r_j=(sim2+alphas.x*sim2*radialdes_j+alphas.y*sim1*radialdes_k)*expbeta*0.5*angulardes;
-                    double buff_a2_r_j=(sim1+alphas.y*sim1*radialdes_j+alphas.x*sim2*radialdes_k)*expbeta*0.5*angulardes;
+                    real buff_a1_r_j=(sim2+alphas.x*sim2*radialdes_j+alphas.y*sim1*radialdes_k)*expbeta*0.5*angulardes;
+                    real buff_a2_r_j=(sim1+alphas.y*sim1*radialdes_j+alphas.x*sim2*radialdes_k)*expbeta*0.5*angulardes;
 
-                    double buff_a1_r_k=(sim1+alphas.x*sim1*radialdes_k+alphas.y*sim2*radialdes_j)*expbeta*0.5*angulardes;
-                    double buff_a2_r_k=(sim2+alphas.y*sim2*radialdes_k+alphas.x*sim1*radialdes_j)*expbeta*0.5*angulardes;
+                    real buff_a1_r_k=(sim1+alphas.x*sim1*radialdes_k+alphas.y*sim2*radialdes_j)*expbeta*0.5*angulardes;
+                    real buff_a2_r_k=(sim2+alphas.y*sim2*radialdes_k+alphas.x*sim1*radialdes_j)*expbeta*0.5*angulardes;
 
-                    double grad_a1_xij=chtjk_par*buff_a1_ang*intder.x+chtjk_par*buff_a1_r_j*intder_r_j;
-                    double grad_a1_xik=chtjk_par*buff_a1_ang*intder.y+chtjk_par*buff_a1_r_k*intder_r_k;
+                    real grad_a1_xij=chtjk_par*buff_a1_ang*intder.x+chtjk_par*buff_a1_r_j*intder_r_j;
+                    real grad_a1_xik=chtjk_par*buff_a1_ang*intder.y+chtjk_par*buff_a1_r_k*intder_r_k;
 
-                    double grad_a2_xij=chtjk_par*buff_a2_ang*intder.x+chtjk_par*buff_a2_r_j*intder_r_j;
-                    double grad_a2_xik=chtjk_par*buff_a2_ang*intder.y+chtjk_par*buff_a2_r_k*intder_r_k;
+                    real grad_a2_xij=chtjk_par*buff_a2_ang*intder.x+chtjk_par*buff_a2_r_j*intder_r_j;
+                    real grad_a2_xik=chtjk_par*buff_a2_ang*intder.y+chtjk_par*buff_a2_r_k*intder_r_k;
 
-                    double grad_beta_xij=chtjk_par*buff_beta_ang*intder.x+chtjk_par*buff_beta_r_j*intder_r_j;
-                    double grad_beta_xik=chtjk_par*buff_beta_ang*intder.y+chtjk_par*buff_beta_r_k*intder_r_k;
+                    real grad_beta_xij=chtjk_par*buff_beta_ang*intder.x+chtjk_par*buff_beta_r_j*intder_r_j;
+                    real grad_beta_xik=chtjk_par*buff_beta_ang*intder.y+chtjk_par*buff_beta_r_k*intder_r_k;
 
                     accumulate_3+=-prevgrad_loc*0.5*NGel*(grad_a1_xij+grad_a1_xik)+prevgrad_neighj*0.5*NGel*grad_a1_xij+prevgrad_neighk*0.5*NGel*grad_a1_xik;
 
@@ -200,32 +201,32 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
            }
        // actgrad is set for thread 0 whenever t < prod (true for launched blocks).
        if (t < N_local*dimbat*na){
-         atomicAdd((double*)&(gradnet_3b_T_d[actgrad+req_alpha]),local_net);
+         atomicAdd((real*)&(gradnet_3b_T_d[actgrad+req_alpha]),local_net);
        }
-       atomicAdd((double*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].x),local_alpha.x);
-       atomicAdd((double*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].y),local_alpha.y);
-       atomicAdd((double*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].z),local_alpha.z);
+       atomicAdd((real*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].x),local_alpha.x);
+       atomicAdd((real*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].y),local_alpha.y);
+       atomicAdd((real*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].z),local_alpha.z);
       }
 }
 
 
-void gradforce_tripl_Launcher(const double*  prevgrad_T_d,const double*  netderiv_T_d, const double* desr_T_d,
-                                      const double* desa_T_d,const double* intderiv_r_T_d,
-                                      const double* intderiv_a_T_d,const int* intmap_r_T_d,
+void gradforce_tripl_Launcher(const real*  prevgrad_T_d,const real*  netderiv_T_d, const real* desr_T_d,
+                                      const real* desa_T_d,const real* intderiv_r_T_d,
+                                      const real* intderiv_a_T_d,const int* intmap_r_T_d,
                                       const int* intmap_a_T_d,int nr, int na, int N,
-                                      int dimbat,int num_finger,const double* type_emb3b_d,int nt,
+                                      int dimbat,int num_finger,const real* type_emb3b_d,int nt,
                                       const int* tipos_T,const int* actual_type,
-                                      const int *num_triplets_d,const double* smooth_a_T,
-                                      const int* type_map_T_d,int prod,double* gradnet_3b_T_d,
-                                      double* grad_alpha3b_T_d,double* grad_emb3b_T_d){
+                                      const int *num_triplets_d,const real* smooth_a_T,
+                                      const int* type_map_T_d,int prod,real* gradnet_3b_T_d,
+                                      real* grad_alpha3b_T_d,real* grad_emb3b_T_d){
 
-    dim3 dimGrid(ceil(double(prod)/double(BLOCK_DIM)),1,1);
+    dim3 dimGrid(ceil(real(prod)/real(BLOCK_DIM)),1,1);
     dim3 dimBlock(BLOCK_DIM,1,1);
     int nt_couple=nt*(nt+1)/2;
     for (int req_alpha=0;req_alpha<num_finger;req_alpha++){
 	for (int req_sum=0;req_sum<nt_couple;req_sum++){
     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(gradforce_tripl_kernel,dimGrid,
-                dimBlock, BLOCK_DIM*sizeof(double4), nullptr,prevgrad_T_d,netderiv_T_d,desr_T_d,desa_T_d,
+                dimBlock, BLOCK_DIM*sizeof(real4), nullptr,prevgrad_T_d,netderiv_T_d,desr_T_d,desa_T_d,
                 intderiv_r_T_d,intderiv_a_T_d,intmap_r_T_d,
                 intmap_a_T_d,nr,na,N,dimbat,num_finger,
                 type_emb3b_d,nt,tipos_T,actual_type,
@@ -238,15 +239,15 @@ void gradforce_tripl_Launcher(const double*  prevgrad_T_d,const double*  netderi
 
 }
 
-__global__ void set_tensor_to_zero_double_kernel(double* tensor,int dim){
+__global__ void set_tensor_to_zero_double_kernel(real* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
 
 	  if (t<dim)
 	     tensor[t]=0.0;
 }
 
-void set_tensor_to_zero_double(double* tensor,int dimten){
-     int grids=ceil(double(dimten)/double(300));
+void set_tensor_to_zero_double(real* tensor,int dimten){
+     int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_double_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));

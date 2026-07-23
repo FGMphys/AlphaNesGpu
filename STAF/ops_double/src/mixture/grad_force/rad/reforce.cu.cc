@@ -3,6 +3,7 @@
 #include "unsupported/Eigen/CXX11/Tensor"  // from @eigen_archive
 #include "tensorflow/core/util/gpu_kernel_helper.h"
 #include "tensorflow/core/util/gpu_launch_config.h"
+#include "staf_real.h"
 
 
 
@@ -25,13 +26,13 @@ void init_block_dim(int buffdim){
       }
 }
 
-__global__ void back_prop_grad_force2b_kernel(const double* prevgrad,const double* ds,
-                           int nr,const double* alpha2b,int num_finger,
-                           const double* intderiv_r,const int* intmap_r,
-                           int dimbat,int N,int N_local,const double*netderiv,
-                           const double* type_emb2b,int nt,const int* type_map,
-                           const int* tipos,const int* actual_type_p,double* grad_net,
-                           double* grad_alpha2b,double* grad_emb2b)
+__global__ void back_prop_grad_force2b_kernel(const real* prevgrad,const real* ds,
+                           int nr,const real* alpha2b,int num_finger,
+                           const real* intderiv_r,const int* intmap_r,
+                           int dimbat,int N,int N_local,const real*netderiv,
+                           const real* type_emb2b,int nt,const int* type_map,
+                           const int* tipos,const int* actual_type_p,real* grad_net,
+                           real* grad_alpha2b,real* grad_emb2b)
                             {
        int t=blockIdx.x*blockDim.x+threadIdx.x;
        // from t to b,par,j,k
@@ -66,25 +67,25 @@ __global__ void back_prop_grad_force2b_kernel(const double* prevgrad,const doubl
           int ch_type=type_map[neighj];
 
 
-          double ds_el=ds[actual+j];
+          real ds_el=ds[actual+j];
           for (int i=0;i<num_finger;i++){
-          double accumulate1=0.0;
-          double accumulate2=0.0;
-          double accumulate3=0.0;
+          real accumulate1=0.0;
+          real accumulate2=0.0;
+          real accumulate3=0.0;
 	  int index_sup=b*(N_local*num_finger)+par*num_finger+i;
           for (int a =0; a<3; a++){
-              double prevgrad_el=prevgrad[b*(N*3)+absolute_par*3+a];
-              double prevgrad_neigh=prevgrad[b*(N*3)+neighj*3+a];
-              double common = 0.5*intderiv_r[b*N_local*3*nr+nr*3*par+a*nr+j];
+              real prevgrad_el=prevgrad[b*(N*3)+absolute_par*3+a];
+              real prevgrad_neigh=prevgrad[b*(N*3)+neighj*3+a];
+              real common = 0.5*intderiv_r[b*N_local*3*nr+nr*3*par+a*nr+j];
 
 
-              double alpha_el=alpha2b[num_finger*ch_type+i];
-              double chpar=type_emb2b[num_finger*ch_type+i];
-              double supp1=exp(alpha_el*ds_el);
-              double sds_deriv=supp1*(1.0+alpha_el*ds_el);
-              double buff_alpha=chpar*supp1*ds_el*(2.0+alpha_el*ds_el);
+              real alpha_el=alpha2b[num_finger*ch_type+i];
+              real chpar=type_emb2b[num_finger*ch_type+i];
+              real supp1=staf_exp(alpha_el*ds_el);
+              real sds_deriv=supp1*(1.0+alpha_el*ds_el);
+              real buff_alpha=chpar*supp1*ds_el*(2.0+alpha_el*ds_el);
 
-              double  NGel=netderiv[b*N_local*num_finger+par*num_finger+i];
+              real  NGel=netderiv[b*N_local*num_finger+par*num_finger+i];
 
               accumulate1-=prevgrad_el*common*chpar*sds_deriv;
               accumulate1+=prevgrad_neigh*common*chpar*sds_deriv;
@@ -95,9 +96,9 @@ __global__ void back_prop_grad_force2b_kernel(const double* prevgrad,const doubl
               accumulate3-=prevgrad_el*NGel*sds_deriv*common;
               accumulate3+=prevgrad_neigh*NGel*sds_deriv*common;
             }
-            atomicAdd((double*)&grad_net[index_sup],accumulate1);
-            atomicAdd((double*)&grad_alpha2b[num_finger*ch_type+i],accumulate2);
-            atomicAdd((double*)&grad_emb2b[num_finger*ch_type+i],accumulate3);
+            atomicAdd((real*)&grad_net[index_sup],accumulate1);
+            atomicAdd((real*)&grad_alpha2b[num_finger*ch_type+i],accumulate2);
+            atomicAdd((real*)&grad_emb2b[num_finger*ch_type+i],accumulate3);
 
            }
          }
@@ -105,15 +106,15 @@ __global__ void back_prop_grad_force2b_kernel(const double* prevgrad,const doubl
   }
 
 
-void back_prop_grad_force2b_Launcher(const double* prevgrad,const double* radiale,
-                           int nr,const double* alpha_radiale,int num_finger,
-                           const double* desder,const int* intmap_r,
-                           int dimbat,int N,int N_local,const double*netderiv,
-                           const double* type_emb2b,int nt,const int* type_map,
-                           const int* tipos,const int* actual_type,double* grad_net,
-                           double* grad_alpha2b,double* grad_emb2b){
+void back_prop_grad_force2b_Launcher(const real* prevgrad,const real* radiale,
+                           int nr,const real* alpha_radiale,int num_finger,
+                           const real* desder,const int* intmap_r,
+                           int dimbat,int N,int N_local,const real*netderiv,
+                           const real* type_emb2b,int nt,const int* type_map,
+                           const int* tipos,const int* actual_type,real* grad_net,
+                           real* grad_alpha2b,real* grad_emb2b){
 
-              dim3 dimGrid(ceil(double(dimbat*N_local*nr)/double(BLOCK_DIM)),1,1);
+              dim3 dimGrid(ceil(real(dimbat*N_local*nr)/real(BLOCK_DIM)),1,1);
      		      dim3 dimBlock(BLOCK_DIM,1,1);
 
      		      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(back_prop_grad_force2b_kernel,
@@ -128,15 +129,15 @@ void back_prop_grad_force2b_Launcher(const double* prevgrad,const double* radial
               cudaDeviceSynchronize();
 
       }
-__global__ void set_tensor_to_zero_double_kernel(double* tensor,int dim){
+__global__ void set_tensor_to_zero_double_kernel(real* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
 
           if (t<dim)
              tensor[t]=0.0;
 }
 
-void set_tensor_to_zero_double(double* tensor,int dimten){
-     int grids=ceil(double(dimten)/double(300));
+void set_tensor_to_zero_double(real* tensor,int dimten){
+     int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_double_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));

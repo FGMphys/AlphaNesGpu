@@ -6,6 +6,7 @@
 set -e
 PRECISION="${1:-all}"
 STAF_HOME="$(cd "$(dirname "$0")" && pwd)"
+export STAF_INC="$STAF_HOME/include"
 REPO_ROOT="$(cd "$STAF_HOME/.." && pwd)"
 
 NVCC_PATH="/home/francegm/programmi/cuda/bin/nvcc"

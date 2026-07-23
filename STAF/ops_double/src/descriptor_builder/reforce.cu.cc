@@ -3,6 +3,7 @@
 #include "unsupported/Eigen/CXX11/Tensor"  // from @eigen_archive
 #include "tensorflow/core/util/gpu_kernel_helper.h"
 #include "tensorflow/core/util/gpu_launch_config.h"
+#include "staf_real.h"
 
 #include "vector.h"
 
@@ -11,15 +12,15 @@
 
 #define BLOCK_DIM 256
 
-#define PI 3.141592654f
+#define PI real(3.141592654)
 
-__global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double range_angolare,int angular_buffer,int N,
-                      double* position,const double* boxes,
+__global__ void DescriptorsRadial_kernel(real range,int radial_buffer,real range_angolare,int angular_buffer,int N,
+                      real* position,const real* boxes,
                       int *howmany,int *with,
-                      double* descriptors,int* intmap2b,double* der2b,
-                      double* des3bsupp,
-                      double* der3bsupp, int nf,int* numtriplet,
-		      double rs, double coeffa,double coeffb,double coeffc,double pow_alpha, double pow_beta)
+                      real* descriptors,int* intmap2b,real* der2b,
+                      real* des3bsupp,
+                      real* der3bsupp, int nf,int* numtriplet,
+		      real rs, real coeffa,real coeffb,real coeffc,real pow_alpha, real pow_beta)
 {
   int t=blockIdx.x*blockDim.x+threadIdx.x;
 
@@ -29,7 +30,7 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
   int i=reminder/radial_buffer;
   int k=reminder%radial_buffer;
 
-  double3* coor=(double3*)position;
+  real3* coor=(real3*)position;
   // shared memory counter for numero di vicini angolari
   __shared__ int3 num_angolare[BLOCK_DIM];
 
@@ -45,7 +46,7 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
     }
 
     vector olddist,dist;
-    double dist_norm;
+    real dist_norm;
 
     if (k<howmany[b*N+i])
     {
@@ -71,10 +72,10 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
       {
         num_angolare[threadIdx.x].z=1;
 
-        des3bsupp[actual_pos+k]=0.5*(cos(PI*dist_norm/range_angolare)+1);
-        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.x/dist_norm;
-        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.y/dist_norm;
-        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.z/dist_norm;
+        des3bsupp[actual_pos+k]=0.5*(staf_cos(PI*dist_norm/range_angolare)+1);
+        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*staf_sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.x/dist_norm;
+        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*staf_sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.y/dist_norm;
+        der3bsupp[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*staf_sin(PI*dist_norm/range_angolare)*PI/range_angolare*dist.z/dist_norm;
       }
       //STEP 1: filling radial descriptor with larger cutoff
       if (dist_norm<rs){
@@ -85,10 +86,10 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
           der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=(-pow_alpha*coeffa/pow(dist_norm,pow_alpha+1.)-pow_beta*coeffb/pow(dist_norm,pow_beta+1.))*dist.z/dist_norm;
       }
       else{
-        descriptors[actual_pos+k]=0.5*(cos(PI*dist_norm/range)+1);
-        der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.x/dist_norm;
-        der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.y/dist_norm;
-        der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*sin(PI*dist_norm/range)*PI/range*dist.z/dist_norm;
+        descriptors[actual_pos+k]=0.5*(staf_cos(PI*dist_norm/range)+1);
+        der2b[b*N*3*radial_buffer+i*3*radial_buffer+k]=-0.5*staf_sin(PI*dist_norm/range)*PI/range*dist.x/dist_norm;
+        der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer+k]=-0.5*staf_sin(PI*dist_norm/range)*PI/range*dist.y/dist_norm;
+        der2b[b*N*3*radial_buffer+i*3*radial_buffer+radial_buffer*2+k]=-0.5*staf_sin(PI*dist_norm/range)*PI/range*dist.z/dist_norm;
       }
       //STEP 2: filling interaction map for pair descriptors
       intmap2b[b*N*(radial_buffer+1)+i*(radial_buffer+1)+1+k]=with[b*radial_buffer*N+i*radial_buffer+k];
@@ -108,18 +109,18 @@ __global__ void DescriptorsRadial_kernel(double range,int radial_buffer,double r
 
 }
 
-__global__ void DescriptorsAngular_kernel(double range,int radial_buffer,double range_angolare,int angular_buffer,int N,
-                      double* position,const double* boxes,
+__global__ void DescriptorsAngular_kernel(real range,int radial_buffer,real range_angolare,int angular_buffer,int N,
+                      real* position,const real* boxes,
                       int *howmany,int *with,
-                      double* descriptors,int* intmap3b_l,
-                      double* des3bsupp,double* der3b_l,
-                      double* der3bsupp, int nf,int* numtriplet)
+                      real* descriptors,int* intmap3b_l,
+                      real* des3bsupp,real* der3b_l,
+                      real* der3bsupp, int nf,int* numtriplet)
 {
   int t=blockIdx.x*blockDim.x+threadIdx.x;
 
   int2* intmap3b=(int2*)intmap3b_l;
-  double2* der3b=(double2*)der3b_l;
-  double3* coor=(double3*)position;
+  real2* der3b=(real2*)der3b_l;
+  real3* coor=(real3*)position;
   // from t to b,par,j,k
   int b=t/(angular_buffer*N);
   int reminder=t%(angular_buffer*N);
@@ -153,7 +154,7 @@ __global__ void DescriptorsAngular_kernel(double range,int radial_buffer,double 
 
     vector distj, distk;
 
-    double dist_normj,dist_normk;
+    real dist_normj,dist_normk;
 
     int j_who=with[b*N*radial_buffer+i*radial_buffer+j];
     int k_who=with[b*N*radial_buffer+i*radial_buffer+k];
@@ -185,28 +186,28 @@ __global__ void DescriptorsAngular_kernel(double range,int radial_buffer,double 
     distk.z=boxes[b*6+5]*olddist.z;
 
     dist_normk=sqrt(SQR(distk.x)+SQR(distk.y)+SQR(distk.z));
-    double angle=(distj.x*distk.x+distj.y*distk.y+distj.z*distk.z)/(dist_normj*dist_normk);
+    real angle=(distj.x*distk.x+distj.y*distk.y+distj.z*distk.z)/(dist_normj*dist_normk);
 
     //Here we implement a cosine cutoff
-    double cutoffj,cutoffk;
-    double3 dcij,dcik;
+    real cutoffj,cutoffk;
+    real3 dcij,dcik;
 
-    cutoffj=0.5*(1.0+cos(PI*dist_normj/range_angolare));
-    cutoffk=0.5*(1.0+cos(PI*dist_normk/range_angolare));
+    cutoffj=0.5*(1.0+staf_cos(PI*dist_normj/range_angolare));
+    cutoffk=0.5*(1.0+staf_cos(PI*dist_normk/range_angolare));
 
-    double tijk=0.5*(angle+1)*cutoffj*cutoffk;
-
-
-    dcij.x=-0.5*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.x;
-    dcij.y=-0.5*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.y;
-    dcij.z=-0.5*sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.z;
-
-    dcik.x=-0.5*sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.x;
-    dcik.y=-0.5*sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.y;
-    dcik.z=-0.5*sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.z;
+    real tijk=0.5*(angle+1)*cutoffj*cutoffk;
 
 
-    double3 dangleij,dangleik;
+    dcij.x=-0.5*staf_sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.x;
+    dcij.y=-0.5*staf_sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.y;
+    dcij.z=-0.5*staf_sin(PI*dist_normj/range_angolare)*PI/range_angolare/dist_normj*distj.z;
+
+    dcik.x=-0.5*staf_sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.x;
+    dcik.y=-0.5*staf_sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.y;
+    dcik.z=-0.5*staf_sin(PI*dist_normk/range_angolare)*PI/range_angolare/dist_normk*distk.z;
+
+
+    real3 dangleij,dangleik;
 
     dangleij.x = 0.5 * (SQR(dist_normj) * distk.x - distj.x * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
     dangleij.y = 0.5 * (SQR(dist_normj) * distk.y - distj.y * (distj.x * distk.x + distj.y * distk.y + distj.z * distk.z)) / (dist_normj * dist_normj* dist_normj * dist_normk);
@@ -234,15 +235,15 @@ __global__ void DescriptorsAngular_kernel(double range,int radial_buffer,double 
   }
 }
 
-void fill_radial_launcher(double R_c,int radbuff,double R_a,int angbuff,int N,
-                      double* inopos_d,const double* box_d,
+void fill_radial_launcher(real R_c,int radbuff,real R_a,int angbuff,int N,
+                      real* inopos_d,const real* box_d,
                       int *howmany_d,int *with_d,
-                      double* descriptor_d,int* intmap2b_d,double* der2b_d,
-                      double* des3bsupp_d,
-                      double* der3bsupp_d, int nf,int* numtriplet_d,
-                      double rs, double coeffa,double coeffb,double coeffc,double pow_alpha, double pow_beta){
+                      real* descriptor_d,int* intmap2b_d,real* der2b_d,
+                      real* des3bsupp_d,
+                      real* der3bsupp_d, int nf,int* numtriplet_d,
+                      real rs, real coeffa,real coeffb,real coeffc,real pow_alpha, real pow_beta){
 
-      dim3 dimGrid(ceil(double(nf*N*radbuff)/double(BLOCK_DIM)),1,1);
+      dim3 dimGrid(ceil(real(nf*N*radbuff)/real(BLOCK_DIM)),1,1);
       dim3 dimBlock(BLOCK_DIM,1,1);
 
       TF_CHECK_OK(::tensorflow::GpuLaunchKernel(DescriptorsRadial_kernel,dimGrid, dimBlock,
@@ -256,14 +257,14 @@ void fill_radial_launcher(double R_c,int radbuff,double R_a,int angbuff,int N,
 
 
 
-void fill_angular_launcher(double R_c,int radbuff,double R_a,int angbuff,int N,
-                      double* inopos_d,const double* box_d,
+void fill_angular_launcher(real R_c,int radbuff,real R_a,int angbuff,int N,
+                      real* inopos_d,const real* box_d,
                       int *howmany_d,int *with_d,
-                      double* ang_descr_d,int* intmap3b_d,
-                      double* des3bsupp_d,double* der3b_d,
-                      double* der3bsupp_d, int nf,int* numtriplet_d){
+                      real* ang_descr_d,int* intmap3b_d,
+                      real* des3bsupp_d,real* der3b_d,
+                      real* der3bsupp_d, int nf,int* numtriplet_d){
 
-                dim3 dimGrid(ceil(double(nf*N*angbuff)/double(BLOCK_DIM)),1,1);
+                dim3 dimGrid(ceil(real(nf*N*angbuff)/real(BLOCK_DIM)),1,1);
                 dim3 dimBlock(BLOCK_DIM,1,1);
                 
                 TF_CHECK_OK(::tensorflow::GpuLaunchKernel(DescriptorsAngular_kernel,
@@ -276,14 +277,14 @@ void fill_angular_launcher(double R_c,int radbuff,double R_a,int angbuff,int N,
 
      }
 
-__global__ void set_tensor_to_zero_double_kernel(double* tensor,int dim){
+__global__ void set_tensor_to_zero_double_kernel(real* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
 
           if (t<dim)
              tensor[t]=0.0;
 }
-void set_tensor_to_zero_double(double* tensor,int dimten){
-     int grids=ceil(double(dimten)/double(300));
+void set_tensor_to_zero_double(real* tensor,int dimten){
+     int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_double_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
@@ -297,7 +298,7 @@ __global__ void set_tensor_to_zero_int_kernel(int* tensor,int dim){
              tensor[t]=0;
 }
 void set_tensor_to_zero_int(int* tensor,int dimten){
-     int grids=ceil(double(dimten)/double(300));
+     int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_int_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
@@ -312,7 +313,7 @@ __global__ void check_max_kernel(int* tensor,int dim,int maxval,int* resval){
            }
 }
 void check_max_launcher(int* tensor,int dimten,int maxval,int* resval){
-     int grids=ceil(double(dimten)/double(300));
+     int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(check_max_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten,maxval,resval));

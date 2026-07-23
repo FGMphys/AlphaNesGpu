@@ -1,6 +1,7 @@
 #include "tensorflow/core/framework/op.h"
 #include "tensorflow/core/framework/shape_inference.h"
 #include "tensorflow/core/framework/op_kernel.h"
+#include "staf_real.h"
 using namespace tensorflow;
 
 void init_block_dim(int buffdim);
@@ -32,27 +33,27 @@ REGISTER_OP("InitForceRadial")
 
 
 REGISTER_OP("ComputeForceRadial")
-    .Input("netderiv: float")
-    .Input("descriptor_derivative_rad: float")
+    .Input("netderiv: " STAF_TF_DTYPE)
+    .Input("descriptor_derivative_rad: " STAF_TF_DTYPE)
     .Input("interaction_map_rad: int32")
-    .Input("radial_descriptor: float")
-    .Input("alpha2b_parameters: float")
-    .Input("type_emb2b_parameters: float")
+    .Input("radial_descriptor: " STAF_TF_DTYPE)
+    .Input("alpha2b_parameters: " STAF_TF_DTYPE)
+    .Input("type_emb2b_parameters: " STAF_TF_DTYPE)
     .Input("type_map: int32")
     .Input("tipos: int32")
     .Input("actual_type: int32")
-    .Output("force: float");
+    .Output("force: " STAF_TF_DTYPE);
 
 
 
-void computeforce_doublets_Launcher(const float*  netderiv, const float* des_r,
-                    const float* intderiv_r,const int* intmap_r,
+void computeforce_doublets_Launcher(const real*  netderiv, const real* des_r,
+                    const real* intderiv_r,const int* intmap_r,
                     int nr, int N, int dimbat,int num_alpha_radiale,
-                    const float* alpha_radiale,const float* type_emb2b,int nt,
-                    const int* tipos_T,const int* actual_type,float* forces2b,const int* type_map,int prod);
+                    const real* alpha_radiale,const real* type_emb2b,int nt,
+                    const int* tipos_T,const int* actual_type,real* forces2b,const int* type_map,int prod);
 
 
-void set_tensor_to_zero_float(float* tensor,int dimten);
+void set_tensor_to_zero_float(real* tensor,int dimten);
 
 class ComputeForceRadialOp : public OpKernel {
  public:
@@ -82,13 +83,13 @@ class ComputeForceRadialOp : public OpKernel {
     int num_alpha_radiale=alpha_radiale_T.shape().dim_size(1);
 
     //Getting data pointer
-    auto netderiv_T_flat = netderiv_T.flat<float>();
-    auto desder_T_flat = desder_T.flat<float>();
+    auto netderiv_T_flat = netderiv_T.flat<real>();
+    auto desder_T_flat = desder_T.flat<real>();
     auto intmap2b_T_flat = intmap2b_T.flat<int>();
-    auto desr_T_flat = desr_T.flat<float>();
-    auto alpha_radiale_T_flat = alpha_radiale_T.flat<float>();
+    auto desr_T_flat = desr_T.flat<real>();
+    auto alpha_radiale_T_flat = alpha_radiale_T.flat<real>();
 
-    auto type_emb2b_T_flat = type_emb2b_T.flat<float>();
+    auto type_emb2b_T_flat = type_emb2b_T.flat<real>();
     auto type_map_T_flat = type_map_T.flat<int>();
 
     auto tipos_T_flat = tipos_T.flat<int>();
@@ -106,9 +107,9 @@ class ComputeForceRadialOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(0, grad_net_shape,
                                                      &forces2b_T));
 
-    set_tensor_to_zero_float(forces2b_T->flat<float>().data(),dimbat*3*N);
+    set_tensor_to_zero_float(forces2b_T->flat<real>().data(),dimbat*3*N);
     int prod=dimbat*Nlocal*nr;
-   computeforce_doublets_Launcher(netderiv_T_flat.data(),desr_T_flat.data(),desder_T_flat.data(),intmap2b_T_flat.data(),nr,N,dimbat,num_alpha_radiale,alpha_radiale_T_flat.data(),type_emb2b_T_flat.data(),nt,tipos_T_flat.data(),actual_type,forces2b_T->flat<float>().data(),type_map_T_flat.data(),prod);
+   computeforce_doublets_Launcher(netderiv_T_flat.data(),desr_T_flat.data(),desder_T_flat.data(),intmap2b_T_flat.data(),nr,N,dimbat,num_alpha_radiale,alpha_radiale_T_flat.data(),type_emb2b_T_flat.data(),nt,tipos_T_flat.data(),actual_type,forces2b_T->flat<real>().data(),type_map_T_flat.data(),prod);
 
   }
 };

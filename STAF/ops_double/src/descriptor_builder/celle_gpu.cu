@@ -6,28 +6,29 @@
 #include <thrust/device_vector.h>
 #include <thrust/sort.h>
 #include <cuda_runtime.h>
+#include "staf_real.h"
 #define BLOCK_DIM 256
 #define SQR(x) ((x)*(x))
 
 
 
-__global__ void imeBuild(int N,double *box,double *position,int *cells,int *cells_howmany,int celle_nx,int celle_ny,int celle_nz,double cutoff,int *with,int *howmany,double *with_dist2,int MAX_PARTICLE_CELLS,int maxneigh)
+__global__ void imeBuild(int N,real *box,real *position,int *cells,int *cells_howmany,int celle_nx,int celle_ny,int celle_nz,real cutoff,int *with,int *howmany,real *with_dist2,int MAX_PARTICLE_CELLS,int maxneigh)
 {
-    double3 *coor=(double3*)position;
+    real3 *coor=(real3*)position;
     extern __shared__ unsigned char sharedMemory[];  // Dichiarazione generica
 
-    // Puntatore all'array di double3
-    double3 *pos_ncella = (double3 *) sharedMemory;
+    // Puntatore all'array di real3
+    real3 *pos_ncella = (real3 *) sharedMemory;
 
-    // Puntatore all'array di int (dopo i double3)
-    int *i_ncella = (int *)(sharedMemory + sizeof(double3) * MAX_PARTICLE_CELLS);
+    // Puntatore all'array di int (dopo i real3)
+    int *i_ncella = (int *)(sharedMemory + sizeof(real3) * MAX_PARTICLE_CELLS);
 
 
     int central_cell=blockIdx.x+blockIdx.y*celle_nx+blockIdx.z*celle_nx*celle_ny;
 
 
 
-    double3 p_i;
+    real3 p_i;
     int whoami;
     if (threadIdx.x<cells_howmany[central_cell])
     {
@@ -85,7 +86,7 @@ __global__ void imeBuild(int N,double *box,double *position,int *cells,int *cell
                     int n;
                     for (n=0;n<cells_howmany[neighbour_cell];n++)
                     {
-                        double3 olddist,dist;
+                        real3 olddist,dist;
 
                         olddist.x=pos_ncella[n].x-p_i.x;
                         olddist.y=pos_ncella[n].y-p_i.y;
@@ -99,7 +100,7 @@ __global__ void imeBuild(int N,double *box,double *position,int *cells,int *cell
                         dist.y=box[3]*olddist.y+box[4]*olddist.z;
                         dist.z=box[5]*olddist.z;
                         
-                        double dist2=SQR(dist.x)+SQR(dist.y)+SQR(dist.z);
+                        real dist2=SQR(dist.x)+SQR(dist.y)+SQR(dist.z);
                         
                         if (dist2<cutoff*cutoff)
                         {
@@ -125,7 +126,7 @@ __global__ void imeBuild(int N,double *box,double *position,int *cells,int *cell
     }
 
 }
-__global__ void sort_neighbors(int *with, double *with_r2, int *howmany, int N, int Radial_Buffer) {
+__global__ void sort_neighbors(int *with, real *with_r2, int *howmany, int N, int Radial_Buffer) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= N) return;
 
@@ -134,39 +135,39 @@ __global__ void sort_neighbors(int *with, double *with_r2, int *howmany, int N, 
 
         // Puntatori alla riga della particella i
         int *row_with = with + i * Radial_Buffer;
-        double *row_r2 = with_r2 + i * Radial_Buffer;
+        real *row_r2 = with_r2 + i * Radial_Buffer;
          
         // Ordina solo i primi num_neighbors elementi
        thrust::sort_by_key(thrust::device, row_r2, row_r2 + num_neighbors, row_with);
     }
 }
 
-void sort_in_gpu(int *d_with, double *d_with_r2, int *d_howmany, int N, int Radial_Buffer) {
+void sort_in_gpu(int *d_with, real *d_with_r2, int *d_howmany, int N, int Radial_Buffer) {
     int threads_per_block = 128;
     int blocks_per_grid = (N + threads_per_block - 1) / threads_per_block;
     sort_neighbors<<<blocks_per_grid, threads_per_block>>>(d_with, d_with_r2, d_howmany, N, Radial_Buffer);
     cudaDeviceSynchronize();
 }
 
-void imeCompute(int N,double *box_d,double *position_d,double cutoff,int *cells,int *cells_howmany,int celle_nx,int celle_ny,int celle_nz,int *with,int *howmany,double *with_dist2,int MAX_PARTICLE_CELLS,int Radial_Buffer)
+void imeCompute(int N,real *box_d,real *position_d,real cutoff,int *cells,int *cells_howmany,int celle_nx,int celle_ny,int celle_nz,int *with,int *howmany,real *with_dist2,int MAX_PARTICLE_CELLS,int Radial_Buffer)
 {
 
     dim3 dimGrid(celle_nx,celle_ny,celle_nz);
     dim3 dimBlock(BLOCK_DIM,1,1);
 
-    //cudaMemcpyToSymbol(box,box_h,6*sizeof(double));
+    //cudaMemcpyToSymbol(box,box_h,6*sizeof(real));
 
     cudaMemset(howmany,0,N*sizeof(int));
 
-    imeBuild<<<dimGrid,dimBlock,sizeof(double3)*MAX_PARTICLE_CELLS+sizeof(int)*MAX_PARTICLE_CELLS,nullptr>>>(N,box_d,position_d,cells,cells_howmany,celle_nx,celle_ny,celle_nz,cutoff,with,howmany,with_dist2,MAX_PARTICLE_CELLS,Radial_Buffer);
+    imeBuild<<<dimGrid,dimBlock,sizeof(real3)*MAX_PARTICLE_CELLS+sizeof(int)*MAX_PARTICLE_CELLS,nullptr>>>(N,box_d,position_d,cells,cells_howmany,celle_nx,celle_ny,celle_nz,cutoff,with,howmany,with_dist2,MAX_PARTICLE_CELLS,Radial_Buffer);
 
     cudaDeviceSynchronize();
     sort_in_gpu(with,with_dist2,howmany,N,Radial_Buffer);
 }
 
-__global__ void celleBuild(int N,double *inopos,int *cells,int *cells_howmany,double celle_xsize,double celle_ysize,double celle_zsize,int celle_nx,int celle_ny,int celle_nz,int MAX_PARTICLE_CELLS)
+__global__ void celleBuild(int N,real *inopos,int *cells,int *cells_howmany,real celle_xsize,real celle_ysize,real celle_zsize,int celle_nx,int celle_ny,int celle_nz,int MAX_PARTICLE_CELLS)
 {
-    double3 *coor=(double3*)inopos;
+    real3 *coor=(real3*)inopos;
 
 
 
@@ -203,11 +204,11 @@ __global__ void celleBuild(int N,double *inopos,int *cells,int *cells_howmany,do
     }
 }
 
-void celleCompute(int N,double *box,double *inopos_d,double cutoff,int **cells_address,int **cells_howmany_address,int *c_nx,int *c_ny,int *c_nz,int MAX_PARTICLE_CELLS)
+void celleCompute(int N,real *box,real *inopos_d,real cutoff,int **cells_address,int **cells_howmany_address,int *c_nx,int *c_ny,int *c_nz,int MAX_PARTICLE_CELLS)
 {
 
     
-    double volume=box[0]*box[3]*box[5];
+    real volume=box[0]*box[3]*box[5];
     //volume/Areayz
     int celle_nx=(int)(volume/(sqrt(box[3]*box[3]*box[5]*box[5]+box[5]*box[5]*box[1]*box[1]+box[3]*box[3]*box[2]*box[2]+box[4]*box[4]*box[1]*box[1])*cutoff));
     int celle_ny=(int)(volume/(box[0]*sqrt(box[5]*box[5]+box[4]*box[4])*cutoff));
@@ -235,9 +236,9 @@ void celleCompute(int N,double *box,double *inopos_d,double cutoff,int **cells_a
     *c_ny=celle_ny;
     *c_nz=celle_nz;
 
-    double celle_xsize=1.f/(double)celle_nx;
-    double celle_ysize=1.f/(double)celle_ny;
-    double celle_zsize=1.f/(double)celle_nz;
+    real celle_xsize=real(1.)/(real)celle_nx;
+    real celle_ysize=real(1.)/(real)celle_ny;
+    real celle_zsize=real(1.)/(real)celle_nz;
 
     int num_celle=celle_nx*celle_ny*celle_nz;
 
@@ -263,7 +264,7 @@ void celleCompute(int N,double *box,double *inopos_d,double cutoff,int **cells_a
     cells=(int*) *cells_address;
 
     // kernel launch
-    dim3 dimGrid(ceil(double(N)/double(BLOCK_DIM)),1,1);
+    dim3 dimGrid(ceil(real(N)/real(BLOCK_DIM)),1,1);
     dim3 dimBlock(BLOCK_DIM,1,1);
     celleBuild<<<dimGrid,dimBlock>>>(N,inopos_d,cells,cells_howmany,celle_xsize,celle_ysize,celle_zsize,celle_nx,celle_ny,celle_nz,MAX_PARTICLE_CELLS);
 

@@ -1,10 +1,11 @@
+#include "staf_real.h"
 #ifndef VECTOR_H
 #define VECTOR_H
 
 typedef struct _vector {
-	double x;
-	double y;
-	double z;
+	real x;
+	real y;
+	real z;
 } vector;
 
 
