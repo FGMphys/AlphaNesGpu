@@ -86,3 +86,9 @@ Gates after C (V100):
 - `grad_finger/ang` and `grad_force/ang`: host nested `(alpha,sum)` launch loops → single 2D grid (`blockIdx.y` selects pair). Same block reduction as before (per-thread atomics regressed float badly).
 
 Gates after D+E (V100): float **76.4 ms/frame** (×0.84); double **142.8 ms/frame** (×0.95); grad-param α3b families ≈1.
+
+## Intmap CPU-NL vs GPU-NL (2026-07-23)
+
+A/B on `test/test-inference-pipeline` frames (10 frames, float and double):
+`int2b` / `int3b` (howmany, neighbor set, order) are **bit-identical** between pre-C CPU neighbor list and current GPU NL.
+Harness: `test/test-inference-pipeline/compare_intmap_cpu_vs_gpu.py`.
