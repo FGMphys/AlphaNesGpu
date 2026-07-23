@@ -6,16 +6,15 @@
 
 > DOI: **10.1063/5.0139245**
 
-Official code lives in **`STAF/`** (one tree; precision from YAML):
+Official code: **`STAF/`** (one tree; precision from YAML):
 
 ```bash
 cd STAF
-bash install_path.sh all          # ops_float + ops_double
+bash install_path.sh all          # builds ops_float + ops_double from src/
 python staf_train.py input_staf.yaml   # precision: float|double
 ```
 
-`AlphaNesGpu_float/` and `AlphaNesGpu_double/` are deprecated thin redirects.
-Experimental variants remain under `DEV/`.
+Experimental variants remain under `DEV/` (not part of the A2 full-atom unify).
 
 See `STAF/README.md`, `test/ACCEPTANCE.md`, and `test/A2_PROGRESS.md`.
 
@@ -32,8 +31,6 @@ Measured on **Tesla V100-PCIE-16GB** (driver 470.256.02, CUDA 11.8, TensorFlow 2
 | Neighbor buffers | `Radial_Buffer` = `Max_Angular_Neigh` = 60 |
 | Batch | `batch_size = 4`, `buffer_stream_dim_tr = 4`, energy+force |
 
-Steady-state timings from `time_story.dat` (`displ_freq = 10` → each sample covers 10 batches / 40 frames; reports > 8 s excluded as compile / validation spikes):
-
 | Precision | Per frame | Frames / s | Per batch (4 frames) | ≈ train / epoch (120 steps) |
 | --- | --- | --- | --- | --- |
 | **float32** | **91.5 ms** | 10.9 | 0.366 s | ≈ 44 s |
@@ -41,7 +38,7 @@ Steady-state timings from `time_story.dat` (`displ_freq = 10` → each sample co
 
 float64 / float32 wall-time ratio on this workload: **≈ 1.64×**.
 
-Raw logs and notes: `test/test-training-pipeline/comparison/performance_baseline.txt`.
+Raw logs: `test/test-training-pipeline/comparison/performance_baseline.txt`.
 
 ## Citation
 
@@ -49,6 +46,6 @@ If you use this code, please cite:
 
 ```
 Francesco Guidarelli Mattioli, Federico Dogo, Franz Saija, and Marco Fabrizio,
-"A Soft Two-Body Angular Fingerprint approach for the development of neural network potentials for water and biomolecular systems",
+"A Soft Two-body Angular Fingerprint approach for the development of neural network potentials for water and biomolecular systems",
 J. Chem. Phys. 158, 104101 (2023). https://doi.org/10.1063/5.0139245
 ```

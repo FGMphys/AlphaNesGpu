@@ -3,8 +3,8 @@
 Single official tree for the Soft Two-body Angular Fingerprint potential.
 
 ```bash
-# compile ops (float, double, or both)
-bash install_path.sh float    # → ops_float/src/**/reforce.so
+# compile ops from STAF/src → ops_{float,double}/src
+bash install_path.sh float
 bash install_path.sh double
 bash install_path.sh all
 
@@ -12,7 +12,7 @@ bash install_path.sh all
 python staf_train.py input_staf.yaml
 ```
 
-YAML key:
+YAML:
 
 ```yaml
 precision: float   # or double / float32 / float64
@@ -22,12 +22,11 @@ Layout:
 
 | Path | Role |
 |------|------|
-| `staf_models/` | Training + inference models (no `mixture/` nesting) |
+| `staf_models/` | Training + inference models |
 | `source_routine/` | Descriptor, physics, force layers |
 | `gradient_utility/` | Custom-op gradient registrations |
-| `ops_float/`, `ops_double/` | Compiled CUDA `.so` via `real` (`STAF/include/staf_real.h`) |
+| `src/` | **Single** CUDA/C++ source tree (`real` via `include/staf_real.h`) |
+| `ops_float/`, `ops_double/` | Build outputs (gitignored); `.so` loaded at runtime |
 | `staf_paths.py` | Resolves active ops root from precision |
-| `include/staf_real.h` | `real` / `staf_exp` / `sizeof(real)` for both precisions |
 
-
-Deprecated entry points: `../AlphaNesGpu_float/`, `../AlphaNesGpu_double/` (thin redirects).
+Experimental CG / RDF forks remain under `../DEV/` (out of A2 scope).

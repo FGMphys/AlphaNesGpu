@@ -20,9 +20,9 @@ fingerprints, network gradients, forces, energy) on the same frames.
 source ../../.venv/bin/activate
 cd test/test-inference-pipeline
 
-python ../../AlphaNesGpu_double/save_models/save_model.py \
+python ../../STAF/save_models/save_model.py \
   -imodel source_model_log1 -modelname model_double
-python ../../AlphaNesGpu_double/save_models/save_model_in_float.py \
+python ../../STAF/save_models/save_model_in_float.py \
   -imodel source_model_log1 -modelname model_float
 
 python prepare_frames.py

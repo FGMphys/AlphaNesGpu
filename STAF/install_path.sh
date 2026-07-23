@@ -1,13 +1,16 @@
 #!/bin/sh
-# Compile STAF custom ops into ops_float and/or ops_double.
+# Compile STAF custom ops from the single source tree STAF/src
+# into precision-specific output trees ops_{float,double}/src.
+#
 # Usage: ./install_path.sh [float|double|all]
 # Default: all
 
 set -e
 PRECISION="${1:-all}"
 STAF_HOME="$(cd "$(dirname "$0")" && pwd)"
-export STAF_INC="$STAF_HOME/include"
 REPO_ROOT="$(cd "$STAF_HOME/.." && pwd)"
+export STAF_INC="$STAF_HOME/include"
+STAF_SRC="$STAF_HOME/src"
 
 NVCC_PATH="/home/francegm/programmi/cuda/bin/nvcc"
 GPP_PATH="/usr/bin/g++"
@@ -23,9 +26,23 @@ COMPCAP=$("$PYTHON_PATH" "$STAF_HOME/get_compcap.py")
 export PATH="$(dirname "$PYTHON_PATH"):$PATH"
 
 compile_ops() {
-  ops_dir="$1"
-  echo "==== Compiling $ops_dir ===="
-  cd "$ops_dir"
+  prec="$1"   # float | double
+  out_dir="$STAF_HOME/ops_${prec}"
+  echo "==== Compiling $prec → $out_dir (from $STAF_SRC) ===="
+
+  if [ "$prec" = "double" ]; then
+    export STAF_PREC_FLAGS="-I${STAF_INC} -DSTAF_REAL_DOUBLE"
+  else
+    export STAF_PREC_FLAGS="-I${STAF_INC}"
+  fi
+
+  mkdir -p "$out_dir"
+  # Sync sources into the output tree, then compile in-place (writes .so next to sources).
+  rsync -a --delete \
+    --exclude='*.so' --exclude='*.o' --exclude='nohup.out' \
+    "$STAF_SRC/" "$out_dir/src/"
+
+  cd "$out_dir"
   cd src/descriptor_builder
   echo Compiling Descriptors
   rm -f *.o *.so
@@ -51,14 +68,14 @@ compile_ops() {
 
 case "$PRECISION" in
   float|float32)
-    compile_ops "$STAF_HOME/ops_float"
+    compile_ops float
     ;;
   double|float64)
-    compile_ops "$STAF_HOME/ops_double"
+    compile_ops double
     ;;
   all)
-    compile_ops "$STAF_HOME/ops_float"
-    compile_ops "$STAF_HOME/ops_double"
+    compile_ops float
+    compile_ops double
     ;;
   *)
     echo "Usage: $0 [float|double|all]" >&2

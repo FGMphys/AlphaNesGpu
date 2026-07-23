@@ -1,9 +1,11 @@
-# Acceptance gates (pre-refactor freeze)
+# Acceptance gates (pre-refactor freeze + A2)
 
-Any modification, integration, or refactor of **STAF** must stay
-comparable to these baselines **before** it is considered acceptable.
+Any modification of **STAF** must stay comparable to these baselines
+**before** it is considered acceptable.
 
 Frozen reference: git tag **`pre-refactor`** (see `git describe --tags`).
+Post-A2 official tree: **`STAF/`** (`precision: float|double` in YAML;
+CUDA from `STAF/src/` → `ops_{float,double}/`).
 
 Longer roadmap: `/home/francegm/PIANO_ALPHANES_DEBUG_LAMMPS_CG.md` (Linea A→B).
 Derivator policy for training: keep **`tf.gradients` inside `@tf.function`**
@@ -15,6 +17,9 @@ unless a controlled A/B on this gate shows a clear win (do not switch to
 From repo root, with `.venv` active:
 
 ```bash
+# 0) Build ops (once per machine / after CUDA edits)
+cd STAF && bash install_path.sh all && cd ..
+
 # 1) Inference float↔double compatibility
 cd test/test-inference-pipeline
 python analyze_compatibility.py
@@ -38,6 +43,7 @@ python run_grad_param_regression.py --precision float  --n-per-family 100
 # Compare new time_story.dat steady-state ms/frame to:
 #   test/test-training-pipeline/comparison/performance_baseline.txt
 # V100 reference: float32 ≈ 91.5 ms/frame, float64 ≈ 150 ms/frame (~1.64×)
+# Quick check: 1-epoch via STAF/staf_train.py (≤15% slower than baseline)
 ```
 
 Do **not** run float and double GPU jobs in parallel on a single GPU.
@@ -49,7 +55,8 @@ Do **not** run float and double GPU jobs in parallel on a single GPU.
 | Parity vs `neuralmdGPU` / `jmd_nn` export | Deferred to Linea **B** (LAMMPS / libstaf) |
 | CPU OpenMP parity | Deferred to **A4** |
 | Multi-GPU | Deferred to **A3/A5** |
+| DEV/ CG trees | Deferred to Linea **C** |
 
-## A1 residual (known before CUDA template unify)
+## A1 residual
 
-See `test/A1_RESIDUAL.md`.
+See `test/A1_RESIDUAL.md` (historical). Production CUDA now uses `STAF/include/staf_real.h`.

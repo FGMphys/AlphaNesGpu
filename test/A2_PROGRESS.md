@@ -1,40 +1,29 @@
 # A2 progress notes
 
-## Slice 1 — naming (2026-07-23)
+## Closed (2026-07-23) — official full-atom path
 
-| Old | New |
+| Slice | Deliverable |
 | --- | --- |
-| `alphanes_models/` | `staf_models/` |
-| `alpha_nes_model*.py` | `staf_model*.py` |
-| `alpha_nnpes_full_main.py` | `staf_train.py` |
+| 1 | Naming: `staf_models`, `staf_train`, STAF logs |
+| 2 | `staf/dtype.py` + YAML `precision` |
+| 3 | Unified Python tree `STAF/` (no `mixture/` nesting) |
+| 4 | `include/staf_real.h` (`real`, `staf_exp`, `sizeof(real)`) |
+| 5 | **Single CUDA `STAF/src/`**; build → `ops_{float,double}/` (gitignored) |
+| — | Removed `AlphaNesGpu_{float,double}/` redirects |
 
-## Slice 2 — precision-agnostic Python (2026-07-23)
+### Final gates (post single-`src/` rebuild, V100)
 
-Shared `staf/dtype.py`; YAML `precision: float|double`.
+| Gate | float | double |
+| --- | --- | --- |
+| Force FD δ=0.001 | corr=0.99983 | corr=0.99994 |
+| `time_story` 1-epoch | 89.0 ms/frame (×0.97 vs 91.5) | 156.5 ms/frame (×1.05 vs 149.7) |
 
-## Slice 3 — unified `STAF/` tree (2026-07-23)
+Logs use `STAF:` (no `Alpha_nes:`). Both performance ratios ≤ 1.15.
 
-- Canonical tree: **`STAF/`** (no separate float/double Python trees)
-- Flattened out of `mixture/`: `staf_models/`, `source_routine/`, `gradient_utility/`
-- Ops remain split until CUDA `real` unify: `STAF/ops_float/src`, `STAF/ops_double/src`
-- `AlphaNesGpu_{float,double}/` → thin deprecated redirects
-- `alphanes_models` removed from official trees
+## Out of A2 scope (deferred)
 
-### Slice 3 gates (2026-07-23)
+- **`DEV/`** CG / RDF forks (Linea C) — not migrated; keep using their local trees
+- Structured CSV/JSON logging, dead-file cleanup polish (A2.2 leftovers)
+- A3+ multi-GPU / A4 CPU MPI
 
-| Gate | Result |
-| --- | --- |
-| Force FD float/double | OK (corr ≈ 0.9998 / 0.9999 at δ=0.001) |
-| `time_story` 1-epoch (V100) | float **91.1** ms/frame (×0.996); double **153.1** ms/frame (×1.02) |
-
-## Slice 4 — CUDA `real` + STAF logs (2026-07-23)
-
-- Shared `STAF/include/staf_real.h`: `typedef real`, `staf_exp`/`staf_cos`/… overloads, `sizeof(real)` allocs
-- `ops_float` built without `-DSTAF_REAL_DOUBLE`; `ops_double` with it
-- Rebuilt `.so`; CUDA printf now `STAF:` (no more stale `Alpha_nes:` in binaries)
-
-Still pending A2:
-
-- Collapse `ops_float` + `ops_double` into a single `src/` tree (same sources, two build flags)
-- Remove deprecated `AlphaNesGpu_*` redirects when callers migrated
-- DEV/ trees
+A2 exit criterion for full-atom: one install command, float **or** double, regression + performance gates green — **met**.

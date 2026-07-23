@@ -1,49 +1,20 @@
-# A1 residual notes (pre A2)
+# A1 residual notes (historical)
 
-Audit date: 2026-07-23. Tree: `AlphaNesGpu_double` (official).
+Audit date: 2026-07-23. Originally against `AlphaNesGpu_double`.
 
-## D1 — float math on double buffers (CUDA) — **fixed on production paths**
+Superseded for the official full-atom path by **A2**: single `STAF/src/`
+with `STAF/include/staf_real.h` (`real`, `staf_exp`, `sizeof(real)`).
 
-Replaced `expf` / `cosf` / `sinf` / `0.f` / `1.f` / … with double variants in:
+## Status after A2
 
-- `AlphaNesGpu_double/src/mixture/**` (fingerprint, force, grad_*)
-- `AlphaNesGpu_double/src/descriptor_builder/` (wired builder)
-
-Left untouched: `descriptor_builder_develop/` (experimental).
-
-Recompile with `cd AlphaNesGpu_double && bash install_path.sh`, then re-run
-ACCEPTANCE gates 2–3 (refresh perf baseline if timings move).
-
-## D2 — energy-only `loss_force` dtype — **fixed**
-
-`alpha_nes_model.py` (double): `loss_force` constant now `float64`.
-
-## D7 — hardcoded `root_path` — **fixed**
-
-Loaders use `staf_paths.code_root()` with preferred
-`STAF_DOUBLE_ROOT` / `STAF_FLOAT_ROOT` (deprecated aliases
-`ALPHANES_*_ROOT` still work). `install_path.sh` no longer `sed`s Python
-sources. Package rename `alphanes_models` → `staf_models` is in A2
-(see `test/A2_PROGRESS.md`); shims remain for one transition.
-
-## D8 — divergent `__syncthreads` in angular grads — **mitigated**
-
-`grad_force/ang` (and `grad_finger/ang`) had `__syncthreads()` + block
-reduction **inside** `if (t < prod)`. That is illegal CUDA (divergent barrier)
-and showed up after D1 as intermittent **ghost** `∂Loss_F/∂α3b` on
-energy-inactive AF slots (FD = 0, analytic ≠ 0), poisoning the grad-param
-gate when sampling ranked by `|g_E|+|g_F|`.
-
-Mitigation:
-
-- Move barrier + reduction outside the `t` filter; zero shared mem then sync;
-  same change on float tree for parity.
-- Grad-param sampler for α3b now requires `|g_E| > eps` (energy-active slots).
-
-A2 CUDA should replace the thread-0 shared reduction with a proper block reduce.
+| Item | Status |
+|------|--------|
+| D1 float math on double buffers | Fixed via `staf_real` / `staf_exp` |
+| D2 energy-only `loss_force` dtype | Fixed via `staf.dtype` |
+| D7 hardcoded `root_path` | Fixed via `staf_paths.code_root()` |
+| D8 divergent `__syncthreads` | Mitigated (see freeze commit); proper block reduce still optional |
 
 ## Deferred
 
-- **jmd_nn / neuralmdGPU parity** → Linea B (`PIANO_…` B1–B3).
-- Optimizer split `opt_net` / `opt_phys`, `type_emb` grads (D4/D5) → A2 Python.
-- Single `src/` with `real` typedef → A2 CUDA.
+- **jmd_nn / neuralmdGPU parity** → Linea **B**
+- **DEV/ CG** → Linea **C**

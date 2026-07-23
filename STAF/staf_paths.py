@@ -1,9 +1,10 @@
 """Resolve STAF custom-op roots (compiled ``.so`` trees).
 
-Python lives under ``STAF/``; float32 and float64 ops stay in
-``STAF/ops_float/src`` and ``STAF/ops_double/src`` until the CUDA
-``real`` unify lands. Call ``set_ops_root`` / ``set_precision`` before
-loading layers that ``tf.load_op_library``.
+Python lives under ``STAF/``. CUDA sources live in ``STAF/src/`` and are
+built into ``STAF/ops_float/src`` or ``STAF/ops_double/src`` by
+``install_path.sh`` (``real`` via ``STAF/include/staf_real.h``).
+Call ``set_ops_root`` / ``set_precision`` before loading layers that
+``tf.load_op_library``.
 """
 from __future__ import annotations
 
@@ -36,7 +37,6 @@ def set_ops_root(precision: Optional[Union[str, Path]] = None) -> Path:
         _ops_root = Path(env).resolve()
         return _ops_root
     if precision is None:
-        # Fall back to keras floatx if already set; else float.
         try:
             import tensorflow as tf
 
@@ -59,7 +59,6 @@ def code_root() -> Path:
     if env:
         _ops_root = Path(env).resolve()
         return _ops_root
-    # Legacy aliases
     for key in (
         "STAF_FLOAT_ROOT",
         "STAF_DOUBLE_ROOT",
