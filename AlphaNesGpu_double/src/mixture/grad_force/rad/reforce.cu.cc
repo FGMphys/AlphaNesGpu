@@ -68,21 +68,21 @@ __global__ void back_prop_grad_force2b_kernel(const double* prevgrad,const doubl
 
           double ds_el=ds[actual+j];
           for (int i=0;i<num_finger;i++){
-          double accumulate1=0.f;
-          double accumulate2=0.f;
-          double accumulate3=0.f;
+          double accumulate1=0.0;
+          double accumulate2=0.0;
+          double accumulate3=0.0;
 	  int index_sup=b*(N_local*num_finger)+par*num_finger+i;
           for (int a =0; a<3; a++){
               double prevgrad_el=prevgrad[b*(N*3)+absolute_par*3+a];
               double prevgrad_neigh=prevgrad[b*(N*3)+neighj*3+a];
-              double common = 0.5f*intderiv_r[b*N_local*3*nr+nr*3*par+a*nr+j];
+              double common = 0.5*intderiv_r[b*N_local*3*nr+nr*3*par+a*nr+j];
 
 
               double alpha_el=alpha2b[num_finger*ch_type+i];
               double chpar=type_emb2b[num_finger*ch_type+i];
-              double supp1=expf(alpha_el*ds_el);
-              double sds_deriv=supp1*(1.f+alpha_el*ds_el);
-              double buff_alpha=chpar*supp1*ds_el*(2.f+alpha_el*ds_el);
+              double supp1=exp(alpha_el*ds_el);
+              double sds_deriv=supp1*(1.0+alpha_el*ds_el);
+              double buff_alpha=chpar*supp1*ds_el*(2.0+alpha_el*ds_el);
 
               double  NGel=netderiv[b*N_local*num_finger+par*num_finger+i];
 
@@ -132,7 +132,7 @@ __global__ void set_tensor_to_zero_double_kernel(double* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
 
           if (t<dim)
-             tensor[t]=0.f;
+             tensor[t]=0.0;
 }
 
 void set_tensor_to_zero_double(double* tensor,int dimten){

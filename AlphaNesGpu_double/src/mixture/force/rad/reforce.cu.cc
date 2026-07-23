@@ -50,8 +50,8 @@ __global__ void computeforce_doublets_kernel(const double* netderiv,const double
     forza_i[threadIdx.x].z=0.;
 
 
-    double3 local_force = {0.f, 0.f, 0.f};
-    double3 other_force = {0.f, 0.f, 0.f};
+    double3 local_force = {0.0, 0.0, 0.0};
+    double3 other_force = {0.0, 0.0, 0.0};
 
     // from t to b,par,j,k
     int b=t/(nr*N_local);
@@ -77,11 +77,11 @@ __global__ void computeforce_doublets_kernel(const double* netderiv,const double
                 double alpha_now=alpha_radiale[num_alpha_radiale*ch_type+i];
                 double chpar=type_emb2b[num_alpha_radiale*ch_type+i];
                 double sds_deriv=chpar*exp(alpha_now*des_r_el);
-                sds_deriv*=(1.f+alpha_now*des_r_el);
+                sds_deriv*=(1.0+alpha_now*des_r_el);
                 double prevgrad=netderiv[b*N_local*num_alpha_radiale+num_alpha_radiale*par+i];
-                double tempx = 0.5f*sds_deriv*intder_r_x;
-                double tempy = 0.5f*sds_deriv*intder_r_y;
-                double tempz = 0.5f*sds_deriv*intder_r_z;
+                double tempx = 0.5*sds_deriv*intder_r_x;
+                double tempy = 0.5*sds_deriv*intder_r_y;
+                double tempz = 0.5*sds_deriv*intder_r_z;
 
                 forza_i[threadIdx.x].x-=prevgrad*tempx;
                 forza_i[threadIdx.x].y-=prevgrad*tempy;
@@ -142,7 +142,7 @@ __global__ void set_tensor_to_zero_double_kernel(double* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
 
           if (t<dim)
-             tensor[t]=0.f;
+             tensor[t]=0.0;
 }
 void set_tensor_to_zero_double(double* tensor,int dimten){
      int grids=ceil(double(dimten)/double(300));

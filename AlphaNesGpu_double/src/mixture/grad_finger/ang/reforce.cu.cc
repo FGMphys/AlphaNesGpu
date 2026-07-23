@@ -23,14 +23,14 @@ __global__ void alphagrad_ang_kernel(const double* radial_descriptor,const doubl
 
   __shared__ double3 grad_alpha_s[BLOCK_DIM];
   __shared__ double grad_ck_s[BLOCK_DIM];
-  grad_alpha_s[threadIdx.x].x=0.f;
-  grad_alpha_s[threadIdx.x].y=0.f;
-  grad_alpha_s[threadIdx.x].z=0.f;
+  grad_alpha_s[threadIdx.x].x=0.0;
+  grad_alpha_s[threadIdx.x].y=0.0;
+  grad_alpha_s[threadIdx.x].z=0.0;
 
-  grad_ck_s[threadIdx.x]=0.f;
+  grad_ck_s[threadIdx.x]=0.0;
 
-  double3 local_alpha= {0.f, 0.f, 0.f};
-  double local_ck= 0.f;
+  double3 local_alpha= {0.0, 0.0, 0.0};
+  double local_ck= 0.0;
 
 
 
@@ -81,13 +81,13 @@ __global__ void alphagrad_ang_kernel(const double* radial_descriptor,const doubl
 
         double chtjy_par=type_emb3b[sum*nsmooth_a+a1];
         double prevgradel=prevgrad[b*nsmooth_a*N_local+par*nsmooth_a+a1];
-        double a1dja2dy=expf(alpha1*dj+alpha2*dy);
-        double a1dya2dj=expf(alpha1*dy+alpha2*dj);
-        double btjy=expf(betaval*Tjy);
+        double a1dja2dy=exp(alpha1*dj+alpha2*dy);
+        double a1dya2dj=exp(alpha1*dy+alpha2*dj);
+        double btjy=exp(betaval*Tjy);
 
-	grad_alpha_s[threadIdx.x].x=prevgradel*chtjy_par*(a1dja2dy*dj+a1dya2dj*dy)*btjy*Tjy/2.f;
-        grad_alpha_s[threadIdx.x].y=prevgradel*chtjy_par*(a1dja2dy*dy+a1dya2dj*dj)*btjy*Tjy/2.f;
-        grad_alpha_s[threadIdx.x].z=prevgradel*chtjy_par*(a1dja2dy+a1dya2dj)*btjy*Tjy*Tjy/2.f;
+	grad_alpha_s[threadIdx.x].x=prevgradel*chtjy_par*(a1dja2dy*dj+a1dya2dj*dy)*btjy*Tjy/2.0;
+        grad_alpha_s[threadIdx.x].y=prevgradel*chtjy_par*(a1dja2dy*dy+a1dya2dj*dj)*btjy*Tjy/2.0;
+        grad_alpha_s[threadIdx.x].z=prevgradel*chtjy_par*(a1dja2dy+a1dya2dj)*btjy*Tjy*Tjy/2.0;
 
 
 	}
@@ -135,7 +135,7 @@ __global__ void set_tensor_to_zero_double_kernel(double* tensor,int dim){
          int t=blockIdx.x*blockDim.x+threadIdx.x;
 
          if (t<dim)
-            tensor[t]=0.f;
+            tensor[t]=0.0;
 }
 
 void set_tensor_to_zero_double(double* tensor,int dimten){

@@ -88,7 +88,7 @@ class alpha_nes_full(tf.Module):
         loss_bound=tf.add_n(loss_bound_2b)+tf.add_n(loss_bound_3b)
 
         loss_energy=self.lossfunction(self.totenergy,etrue)
-        loss_force=tf.constant(0.,dtype='float32')
+        loss_force=tf.constant(0.,dtype='float64')
         loss=pe*loss_energy+pb*loss_bound
         grad_w=[tf.gradients(loss,net.trainable_variables) for net  in  self.nets]
         grad_2b=[tf.gradients(loss,physlay.alpha2b) for physlay in self.physics_layer]
@@ -152,7 +152,7 @@ class alpha_nes_full(tf.Module):
 
 
         loss_energy=self.val_loss(self.totenergy,etrue)
-        loss_force=tf.constant(0.,dtype='float32')
+        loss_force=tf.constant(0.,dtype='float64')
         loss=loss_energy+loss_force
 
         return loss, loss_force,loss_energy

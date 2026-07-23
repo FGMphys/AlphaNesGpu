@@ -58,7 +58,7 @@ __global__ void computeforce_tripl_kernel(const double*  netderiv_T, const doubl
 
     // __syncthreads();
 
-    double3 local_force = {0.f, 0.f, 0.f};
+    double3 local_force = {0.0, 0.0, 0.0};
 
     // from t to b,par,j,k
     int b=t/(na*N_local);
@@ -77,10 +77,10 @@ __global__ void computeforce_tripl_kernel(const double*  netderiv_T, const doubl
         {
 
 
-            double3 other_forcej = {0.f, 0.f, 0.f};
-            double3 other_forcek = {0.f, 0.f, 0.f};
+            double3 other_forcej = {0.0, 0.0, 0.0};
+            double3 other_forcek = {0.0, 0.0, 0.0};
 
-            int na_dim=na_particle;//floorf(0.5f + sqrtf(0.25f + 2*na));
+            int na_dim=na_particle;//floor(0.5 + sqrt(0.25 + 2*na));
 
             int j=0;
             int prev_row=0;
@@ -95,9 +95,9 @@ __global__ void computeforce_tripl_kernel(const double*  netderiv_T, const doubl
 
 
 
-            double delta=0.f;
-            double Bp_j=0.f;
-            double Bp_k=0.f;
+            double delta=0.0;
+            double Bp_j=0.0;
+            double Bp_k=0.0;
 
 
 
@@ -128,17 +128,17 @@ __global__ void computeforce_tripl_kernel(const double*  netderiv_T, const doubl
                 double3 alphas=smooth_a_T[sum*num_finger+a1];
 		double chtjk_par=type_emb3b[sum*num_finger+a1];
 
-                double net_der=0.5f*netderiv_T[actgrad+a1]*chtjk_par;
+                double net_der=0.5*netderiv_T[actgrad+a1]*chtjk_par;
 
-		double expbeta=expf(alphas.z*angulardes);
+		double expbeta=exp(alphas.z*angulardes);
 
-                double sim1=expf(alphas.y*radialdes_j+alphas.x*radialdes_k);
-                double sim2=expf(alphas.x*radialdes_j+alphas.y*radialdes_k);
+                double sim1=exp(alphas.y*radialdes_j+alphas.x*radialdes_k);
+                double sim2=exp(alphas.x*radialdes_j+alphas.y*radialdes_k);
 
-                delta=expbeta*(1.+alphas.z*angulardes)*(sim1+sim2)*0.5f;
+                delta=expbeta*(1.+alphas.z*angulardes)*(sim1+sim2)*0.5;
 
-                double suppj=(alphas.x*sim2+alphas.y*sim1)*expbeta*0.5f;
-                double suppk=(alphas.x*sim1+alphas.y*sim2)*expbeta*0.5f;
+                double suppj=(alphas.x*sim2+alphas.y*sim1)*expbeta*0.5;
+                double suppk=(alphas.x*sim1+alphas.y*sim2)*expbeta*0.5;
                 Bp_j=suppj*angulardes;
                 Bp_k=suppk*angulardes;
 
@@ -236,7 +236,7 @@ __global__ void set_tensor_to_zero_double_kernel(double* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
 
           if (t<dim)
-             tensor[t]=0.f;
+             tensor[t]=0.0;
 }
 void set_tensor_to_zero_double(double* tensor,int dimten){
      int grids=ceil(double(dimten)/double(300));

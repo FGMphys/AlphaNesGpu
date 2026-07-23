@@ -1,6 +1,7 @@
 import tensorflow as tf
 
-root_path='/home/francegm/AlphaNesGpu/AlphaNesGpu_double'
+from alphanes_paths import code_root
+root_path = str(code_root())
 force2b_sopath=root_path+'/src/mixture/force/rad/reforce.so'
 force3b_sopath=root_path+'/src/mixture/force/ang/reforce.so'
 

@@ -25,7 +25,7 @@ double* nextgrad_alpha2b, double* nextgrad_emb2b,const double* prevgrad)
       int nr_particle=intmap_r[b*N_local*(nr+1)+par*(nr+1)];
       if (j<nr_particle)
       {
-          double accumulate=0.f;
+          double accumulate=0.0;
           int actual=b*N_local*nr+par*nr;
           double des_r_el=radial_descriptor[actual+j];
           int neighj=intmap_r[b*(N_local*(nr+1))+(nr+1)*par+1+j];
@@ -35,10 +35,10 @@ double* nextgrad_alpha2b, double* nextgrad_emb2b,const double* prevgrad)
               double prevgradel=prevgrad[b*nalpha_r*N_local+par*nalpha_r+i];
               double typew=type_emb2b[cht*nalpha_r+i];
               accumulate=des_r_el*des_r_el;
-              accumulate*=expf(alpha2b_parameters[cht*nalpha_r+i]*des_r_el)*typew*prevgradel;
+              accumulate*=exp(alpha2b_parameters[cht*nalpha_r+i]*des_r_el)*typew*prevgradel;
               atomicAdd((double*)&nextgrad_alpha2b[cht*nalpha_r+i],accumulate);
               accumulate=des_r_el;
-              accumulate*=expf(alpha2b_parameters[cht*nalpha_r+i]*des_r_el)*prevgradel;
+              accumulate*=exp(alpha2b_parameters[cht*nalpha_r+i]*des_r_el)*prevgradel;
               atomicAdd((double*)&nextgrad_emb2b[cht*nalpha_r+i],accumulate);
              }
           }
@@ -71,7 +71,7 @@ __global__ void set_tensor_to_zero_double_kernel(double* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
 
           if (t<dim)
-             tensor[t]=0.f;
+             tensor[t]=0.0;
 }
 
 void set_tensor_to_zero_double(double* tensor,int dimten){

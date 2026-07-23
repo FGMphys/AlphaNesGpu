@@ -1,7 +1,8 @@
 import tensorflow as tf
 import numpy as np
 
-root_path='/home/francegm/AlphaNesGpu/AlphaNesGpu_float'
+from alphanes_paths import code_root
+root_path = str(code_root())
 proj2b_sopath=root_path+'/src/mixture/fingerprint/rad/reforce.so'
 proj3b_sopath=root_path+'/src/mixture/fingerprint/ang/reforce.so'
 

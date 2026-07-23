@@ -38,7 +38,7 @@ __global__ void radialAFs_kernel(
                 for (int i=0; i<nalpha_r;i++){
                     double alpha_now=alphas[nalpha_r*ch_type+i];
                     double chpar=type_emb2b[nalpha_r*ch_type+i];
-                    double softmaxweight=expf(alpha_now*des_r_el)*chpar;
+                    double softmaxweight=exp(alpha_now*des_r_el)*chpar;
 
                     atomicAdd((double*)&radial_AFs[b*nalpha_r*N_local+par*nalpha_r+i], des_r_el*softmaxweight);
                 }
@@ -71,7 +71,7 @@ __global__ void set_tensor_to_zero_double_kernel(double* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
 
           if (t<dim)
-             tensor[t]=0.f;
+             tensor[t]=0.0;
 }
 
 void set_tensor_to_zero_double(double* tensor,int dimten){

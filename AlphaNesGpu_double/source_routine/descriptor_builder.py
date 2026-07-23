@@ -7,7 +7,8 @@ import sys
 
 
 
-root_path='/home/francegm/AlphaNesGpu/AlphaNesGpu_double'
+from alphanes_paths import code_root
+root_path = str(code_root())
 descriptor_sopath=root_path+'/src/descriptor_builder/reforce.so'
 
 class descriptor_layer(tf.Module):

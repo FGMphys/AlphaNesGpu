@@ -29,6 +29,8 @@ test/test-training-pipeline/run_*/shuffle_dataset_vec
 test/test-inference-pipeline/frames/*.npy
 test/test-inference-pipeline/inference_*/**
 test/test-regression/**/results_*/
+test/test-regression/**/*_run.log
+test/test-regression/**/cutoff_curve.dat
 **/*.npy
 
 # Editor / OS

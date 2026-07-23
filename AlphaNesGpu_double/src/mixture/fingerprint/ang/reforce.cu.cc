@@ -60,10 +60,10 @@ __global__ void angularAFs_kernel(const double* radial_descriptor,const double* 
 
              double chtjy_par=type_emb3b[sum*nsmooth_a+a1];
 
-             double softmaxweight=expf(alpha1*ds[actual+j]+alpha2*ds[actual+k]);
-             softmaxweight+=expf(alpha2*ds[actual+j]+alpha1*ds[actual+k]);
-             softmaxweight*=expf(betaval*angulardes);
-             atomicAdd((double*)&three_body_AFs[b*nsmooth_a*N_local+par*nsmooth_a+a1],angulardes*softmaxweight*chtjy_par/2.f);
+             double softmaxweight=exp(alpha1*ds[actual+j]+alpha2*ds[actual+k]);
+             softmaxweight+=exp(alpha2*ds[actual+j]+alpha1*ds[actual+k]);
+             softmaxweight*=exp(betaval*angulardes);
+             atomicAdd((double*)&three_body_AFs[b*nsmooth_a*N_local+par*nsmooth_a+a1],angulardes*softmaxweight*chtjy_par/2.0);
             }
               }
       }
@@ -90,7 +90,7 @@ __global__ void set_tensor_to_zero_double_kernel(double* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
 
           if (t<dim)
-             tensor[t]=0.f;
+             tensor[t]=0.0;
 }
 
 void set_tensor_to_zero_double(double* tensor,int dimten){

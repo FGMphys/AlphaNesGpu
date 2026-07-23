@@ -34,7 +34,7 @@ float64 / float32 wall-time ratio on this workload: **≈ 1.64×**.
 
 Raw logs and notes: `test/test-training-pipeline/comparison/performance_baseline.txt`, `time_story_baseline_float.txt`, `time_story_baseline_double.txt`.
 
-See also `test/test-training-pipeline/README.md` and `test/test-inference-pipeline/README.md`.
+See also `test/ACCEPTANCE.md` (gates before any refactor), `test/test-training-pipeline/README.md`, and `test/test-inference-pipeline/README.md`.
 
 ## Citation
 

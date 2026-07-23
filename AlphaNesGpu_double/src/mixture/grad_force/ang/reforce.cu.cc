@@ -52,17 +52,17 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
 
 
     extern __shared__ double4 allgrad[];
-    allgrad[threadIdx.x].x=0.f;
-    allgrad[threadIdx.x].y=0.f;
-    allgrad[threadIdx.x].z=0.f;
+    allgrad[threadIdx.x].x=0.0;
+    allgrad[threadIdx.x].y=0.0;
+    allgrad[threadIdx.x].z=0.0;
 
 
-    allgrad[threadIdx.x].w=0.f;
+    allgrad[threadIdx.x].w=0.0;
 
 
-    double3 local_alpha= {0.f, 0.f, 0.f};
-    double local_ck= 0.f;
-    double local_net=0.f;
+    double3 local_alpha= {0.0, 0.0, 0.0};
+    double local_ck= 0.0;
+    double local_net=0.0;
 
     // from t to b,par,j,k
     int b=t/(na*N_local);
@@ -95,9 +95,9 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
             int k=nn-prev_row+1+j;
 
 
-            double delta=0.f;
-            double Bp_j=0.f;
-            double Bp_k=0.f;
+            double delta=0.0;
+            double Bp_j=0.0;
+            double Bp_k=0.0;
 
 
             int2 neigh=intmap_a_T[b*(N_local*na)+na*par+nn];
@@ -113,26 +113,26 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
                double radialdes_k=desr_T[actual+k];
 
 
-	       double accumulate_1=0.f;
-               double accumulate_3=0.f;
-               double accumulate_4=0.f;
-               double accumulate_5=0.f;
+	       double accumulate_1=0.0;
+               double accumulate_3=0.0;
+               double accumulate_4=0.0;
+               double accumulate_5=0.0;
                double NGel=netderiv_T[actgrad+req_alpha];
                double3 alphas=smooth_a_T[sum*num_finger+req_alpha];
                double chtjk_par=type_emb3b[sum*num_finger+req_alpha];
 
-               double expbeta=expf(alphas.z*angulardes);
+               double expbeta=exp(alphas.z*angulardes);
 
-               double sim1=expf(alphas.y*radialdes_j+alphas.x*radialdes_k);
-               double sim2=expf(alphas.x*radialdes_j+alphas.y*radialdes_k);
+               double sim1=exp(alphas.y*radialdes_j+alphas.x*radialdes_k);
+               double sim2=exp(alphas.x*radialdes_j+alphas.y*radialdes_k);
                double sum_sim=sim1+sim2;
 
-               delta=expbeta*(1.0f+alphas.z*angulardes)*sum_sim*0.5f;
+               delta=expbeta*(1.0f+alphas.z*angulardes)*sum_sim*0.5;
 
                double suppj=(alphas.x*sim2+alphas.y*sim1)*expbeta;
                double suppk=(alphas.x*sim1+alphas.y*sim2)*expbeta;
-               Bp_j=suppj*angulardes*0.5f;
-               Bp_k=suppk*angulardes*0.5f;
+               Bp_j=suppj*angulardes*0.5;
+               Bp_k=suppk*angulardes*0.5;
 
  	       int cor;
                for (cor=0;cor<3;cor++){
@@ -145,21 +145,21 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
 
                     double gradxij=chtjk_par*delta*intder.x+chtjk_par*Bp_j*intder_r_j;
                     double gradxik=chtjk_par*delta*intder.y+chtjk_par*Bp_k*intder_r_k;
-                    accumulate_1+=-prevgrad_loc*0.5f*(gradxij+gradxik);
-	            accumulate_1+=prevgrad_neighj*0.5f*gradxij+prevgrad_neighk*0.5f*gradxik;
+                    accumulate_1+=-prevgrad_loc*0.5*(gradxij+gradxik);
+	            accumulate_1+=prevgrad_neighj*0.5*gradxij+prevgrad_neighk*0.5*gradxik;
 
-                    double buff_a1_ang=expbeta*(1.f+alphas.z*angulardes)*(sim1*radialdes_k+sim2*radialdes_j)*0.5f;
-                    double buff_a2_ang=expbeta*(1.f+alphas.z*angulardes)*(sim1*radialdes_j+sim2*radialdes_k)*0.5f;
-                    double buff_beta_ang=expbeta*angulardes*(2.f+alphas.z*angulardes)*sum_sim*0.5f;
+                    double buff_a1_ang=expbeta*(1.0+alphas.z*angulardes)*(sim1*radialdes_k+sim2*radialdes_j)*0.5;
+                    double buff_a2_ang=expbeta*(1.0+alphas.z*angulardes)*(sim1*radialdes_j+sim2*radialdes_k)*0.5;
+                    double buff_beta_ang=expbeta*angulardes*(2.0+alphas.z*angulardes)*sum_sim*0.5;
 
-                    double buff_beta_r_j=suppj*angulardes*angulardes*0.5f;
-                    double buff_beta_r_k=suppk*angulardes*angulardes*0.5f;
+                    double buff_beta_r_j=suppj*angulardes*angulardes*0.5;
+                    double buff_beta_r_k=suppk*angulardes*angulardes*0.5;
 
-                    double buff_a1_r_j=(sim2+alphas.x*sim2*radialdes_j+alphas.y*sim1*radialdes_k)*expbeta*0.5f*angulardes;
-                    double buff_a2_r_j=(sim1+alphas.y*sim1*radialdes_j+alphas.x*sim2*radialdes_k)*expbeta*0.5f*angulardes;
+                    double buff_a1_r_j=(sim2+alphas.x*sim2*radialdes_j+alphas.y*sim1*radialdes_k)*expbeta*0.5*angulardes;
+                    double buff_a2_r_j=(sim1+alphas.y*sim1*radialdes_j+alphas.x*sim2*radialdes_k)*expbeta*0.5*angulardes;
 
-                    double buff_a1_r_k=(sim1+alphas.x*sim1*radialdes_k+alphas.y*sim2*radialdes_j)*expbeta*0.5f*angulardes;
-                    double buff_a2_r_k=(sim2+alphas.y*sim2*radialdes_k+alphas.x*sim1*radialdes_j)*expbeta*0.5f*angulardes;
+                    double buff_a1_r_k=(sim1+alphas.x*sim1*radialdes_k+alphas.y*sim2*radialdes_j)*expbeta*0.5*angulardes;
+                    double buff_a2_r_k=(sim2+alphas.y*sim2*radialdes_k+alphas.x*sim1*radialdes_j)*expbeta*0.5*angulardes;
 
                     double grad_a1_xij=chtjk_par*buff_a1_ang*intder.x+chtjk_par*buff_a1_r_j*intder_r_j;
                     double grad_a1_xik=chtjk_par*buff_a1_ang*intder.y+chtjk_par*buff_a1_r_k*intder_r_k;
@@ -170,11 +170,11 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
                     double grad_beta_xij=chtjk_par*buff_beta_ang*intder.x+chtjk_par*buff_beta_r_j*intder_r_j;
                     double grad_beta_xik=chtjk_par*buff_beta_ang*intder.y+chtjk_par*buff_beta_r_k*intder_r_k;
 
-                    accumulate_3+=-prevgrad_loc*0.5f*NGel*(grad_a1_xij+grad_a1_xik)+prevgrad_neighj*0.5f*NGel*grad_a1_xij+prevgrad_neighk*0.5f*NGel*grad_a1_xik;
+                    accumulate_3+=-prevgrad_loc*0.5*NGel*(grad_a1_xij+grad_a1_xik)+prevgrad_neighj*0.5*NGel*grad_a1_xij+prevgrad_neighk*0.5*NGel*grad_a1_xik;
 
-                    accumulate_4+=-prevgrad_loc*0.5f*NGel*(grad_a2_xij+grad_a2_xik)+prevgrad_neighj*0.5f*NGel*grad_a2_xij+prevgrad_neighk*0.5f*NGel*grad_a2_xik;
+                    accumulate_4+=-prevgrad_loc*0.5*NGel*(grad_a2_xij+grad_a2_xik)+prevgrad_neighj*0.5*NGel*grad_a2_xij+prevgrad_neighk*0.5*NGel*grad_a2_xik;
 
-                    accumulate_5+=-prevgrad_loc*0.5f*NGel*(grad_beta_xij+grad_beta_xik)+prevgrad_neighj*0.5f*NGel*grad_beta_xij+prevgrad_neighk*0.5f*NGel*grad_beta_xik;
+                    accumulate_5+=-prevgrad_loc*0.5*NGel*(grad_beta_xij+grad_beta_xik)+prevgrad_neighj*0.5*NGel*grad_beta_xij+prevgrad_neighk*0.5*NGel*grad_beta_xik;
                }
 
                allgrad[threadIdx.x].w=accumulate_1;
@@ -238,7 +238,7 @@ __global__ void set_tensor_to_zero_double_kernel(double* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
 
 	  if (t<dim)
-	     tensor[t]=0.f;
+	     tensor[t]=0.0;
 }
 
 void set_tensor_to_zero_double(double* tensor,int dimten){

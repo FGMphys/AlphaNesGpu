@@ -12,18 +12,12 @@ else
   PYTHON_PATH="/home/francegm/miniconda3/envs/tensorgpu/bin/python"
 fi
 COMPCAP=$($PYTHON_PATH get_compcap.py)
-actual_path=$(pwd)
 
 # Ensure bare `python` in legacy compila.sh resolves to the same interpreter
 export PATH="$(dirname "$PYTHON_PATH"):$PATH"
 
-sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' source_routine/descriptor_builder.py
-sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' source_routine/mixture/physics_layer_mod.py
-sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' source_routine/mixture/force_layer_mod.py
-sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' gradient_utility/mixture/register_3bAFs_grad.py
-sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' gradient_utility/mixture/register_2bAFs_grad.py
-sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' gradient_utility/mixture/register_force_2bAFs_grad.py
-sed -i   's@root_path=.*@root_path='"\'$actual_path\'"'@' gradient_utility/mixture/register_force_3bAFs_grad.py
+# Custom-op .so paths are resolved at runtime via alphanes_paths.code_root()
+# (optional override: ALPHANES_FLOAT_ROOT). No sed of Python sources.
 
 
 
