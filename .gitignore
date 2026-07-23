@@ -47,3 +47,7 @@ STAF/ops_double/
 # Never track bytecode under experimental forks
 DEV/**/__pycache__/
 DEV/**/*.pyc
+
+# Leonardo data bundle (regenerate with test/pack_leonardo_bundle.sh)
+STAF_leonardo_test_bundle/
+STAF_leonardo_test_bundle.tar.gz

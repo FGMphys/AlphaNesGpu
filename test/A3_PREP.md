@@ -168,3 +168,6 @@ Results (V100, 2026-07-24), 125 steps:
 | **float** | max‖ΔF‖ ≈ 2.0e-6 | max‖ΔF‖ ≈ 3.9e-6 | GPU order noise; all ‖ΔF‖ under 1e-5 |
 
 Artifacts: `test/test-training-pipeline/parity_distribute/{float,double}/`.
+
+Leonardo pack (datasets + YAML + checklist, not STAF source): see [`test/LEONARDO.md`](LEONARDO.md)
+and `bash test/pack_leonardo_bundle.sh` → `STAF_leonardo_test_bundle.tar.gz`.
