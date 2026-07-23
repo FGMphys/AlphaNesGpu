@@ -8,7 +8,6 @@
 
 
 static int BLOCK_DIM;
-
 void init_block_dim(int buffdim){
      int i;
      for (i=buffdim;i>0;i--){
@@ -105,7 +104,6 @@ __global__ void back_prop_grad_force2b_kernel(const real* prevgrad,const real* d
       }
   }
 
-
 void back_prop_grad_force2b_Launcher(const real* prevgrad,const real* radiale,
                            int nr,const real* alpha_radiale,int num_finger,
                            const real* desder,const int* intmap_r,
@@ -126,9 +124,9 @@ void back_prop_grad_force2b_Launcher(const real* prevgrad,const real* radiale,
                            tipos,actual_type,grad_net,
                            grad_alpha2b,grad_emb2b));
 
-              cudaDeviceSynchronize();
 
-      }
+          cudaDeviceSynchronize();
+}
 __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
 
@@ -140,8 +138,8 @@ void set_tensor_to_zero_real(real* tensor,int dimten){
      int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
+     // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
-     cudaDeviceSynchronize();
-     }
+}
 
 #endif

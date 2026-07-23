@@ -10,6 +10,8 @@ dataset_folder: /leonardo_work/IscrB_NNPWATER/ALPHAGPU_2/dataset
 buffer_stream_dim_ts: 4
 buffer_stream_dim_tr: 4
 displ_freq: 10
+# Optional: host log of per-batch losses / lr (default = displ_freq). Lower = more sync.
+# log_batch_freq: 10
 ###If you want a random sub sampling indicate (for exmaple) 40 10 for 40 frames to train and 
 ###10 frames to test
 subsampling: 'no'

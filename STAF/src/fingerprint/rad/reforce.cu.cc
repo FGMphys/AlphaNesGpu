@@ -47,7 +47,6 @@ __global__ void radialAFs_kernel(
         }
 }
 
-
 void radialAFs_Launcher(
         const real* radial_descriptor,const int nr,const real* alpha2b_parameters,
         const int nalpha_r,real* radial_AFs,const int dimbat,const int N_local,
@@ -79,7 +78,7 @@ void set_tensor_to_zero_real(real* tensor,int dimten){
      int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
+     // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
-     cudaDeviceSynchronize();
-     }
+}
 #endif

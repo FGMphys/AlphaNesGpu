@@ -107,7 +107,6 @@ __global__ void alphagrad_ang_kernel(const real* radial_descriptor,const real* a
   }
 }
 
-
 void alphagrad_ang_Launcher(const real* radial_descriptor,const real* angular_descriptor,
                  int nr,int na,const real* prevgrad,int dimbat,
                  int N_local,const int* intmap3b,const real* alpha3b,
@@ -128,22 +127,22 @@ void alphagrad_ang_Launcher(const real* radial_descriptor,const real* angular_de
                                 next_emb3b_grad,num_triplet,req_alpha,req_sum));
 		        }
 		 }
-                   cudaDeviceSynchronize();
+        cudaDeviceSynchronize();
 }
 
 
 __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
-         int t=blockIdx.x*blockDim.x+threadIdx.x;
+          int t=blockIdx.x*blockDim.x+threadIdx.x;
 
-         if (t<dim)
-            tensor[t]=real(0.);
+          if (t<dim)
+             tensor[t]=real(0.);
 }
 
 void set_tensor_to_zero_real(real* tensor,int dimten){
-  int grids=ceil(real(dimten)/real(300));
-  dim3 dimGrid(grids,1,1);
-  dim3 dimBlock(300,1,1);
-  TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
-  cudaDeviceSynchronize();
-  }
+     int grids=ceil(real(dimten)/real(300));
+     dim3 dimGrid(grids,1,1);
+     dim3 dimBlock(300,1,1);
+     // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
+     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
+}
 #endif

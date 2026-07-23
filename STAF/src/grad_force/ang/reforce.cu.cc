@@ -7,7 +7,6 @@
 
 
 static int BLOCK_DIM;
-
 void init_block_dim(int buffdim){
      int i;
      for (i=buffdim;i>0;i--){
@@ -208,7 +207,6 @@ __global__ void gradforce_tripl_kernel(const real*  prevgrad_T_d,const real*  ne
       }
 }
 
-
 void gradforce_tripl_Launcher(const real*  prevgrad_T_d,const real*  netderiv_T_d, const real* desr_T_d,
                                       const real* desa_T_d,const real* intderiv_r_T_d,
                                       const real* intderiv_a_T_d,const int* intmap_r_T_d,
@@ -234,23 +232,23 @@ void gradforce_tripl_Launcher(const real*  prevgrad_T_d,const real*  netderiv_T_
 
 	}
     }
-    cudaDeviceSynchronize();
 
+        cudaDeviceSynchronize();
 }
 
 __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
 
-	  if (t<dim)
-	     tensor[t]=real(0.);
+          if (t<dim)
+             tensor[t]=real(0.);
 }
 
 void set_tensor_to_zero_real(real* tensor,int dimten){
      int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
+     // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
-     cudaDeviceSynchronize();
-     }
+}
 
 #endif

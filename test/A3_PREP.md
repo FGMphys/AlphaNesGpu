@@ -34,3 +34,10 @@ Production sources live under `STAF/src/`. Experimental trees are under
 1. Replace file-scope `static` buffers with per-op / per-device context (or thread-local keyed by `tf.device`).
 2. Ensure `Init*` kernels are idempotent per replica.
 3. Gate `cudaDeviceSynchronize` behind debug builds once streams are correct.
+
+## A+B single-GPU sync trim (2026-07-23)
+
+- **A:** `staf_train.py` logs batch losses / lr only every `log_batch_freq` (default=`displ_freq`); flush aligned to `displ_freq`.
+- **B:** removed `cudaDeviceSynchronize` after zero-fill kernels; **kept** one sync at end of each compute launcher (required until launchers use TF's Eigen GPU stream). Full sync removal without stream wiring caused `CUDA_ERROR_ILLEGAL_ADDRESS`.
+
+Gates after A+B: force/compat/grad OK; float `time_story` ≈ 88 ms/frame (×0.96 vs 91.5).

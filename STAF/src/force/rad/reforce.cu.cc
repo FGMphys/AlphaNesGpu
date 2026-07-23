@@ -7,7 +7,6 @@
 
 
 static int BLOCK_DIM;
-
 void init_block_dim(int buffdim){
      int i;
      for (i=buffdim;i>0;i--){
@@ -117,7 +116,6 @@ __global__ void computeforce_doublets_kernel(const real* netderiv,const real* de
 
    }
 }
-
 void computeforce_doublets_Launcher(const real*  netderiv, const real* des_r,
                     const real* intderiv_r,const int* intmap_r,
                     int nr, int N, int dimbat,int num_alpha_radiale,
@@ -134,9 +132,9 @@ void computeforce_doublets_Launcher(const real*  netderiv, const real* des_r,
                           type_emb2b,nt,tipos_T,
                           actual_type,type_map,forces2b,BLOCK_DIM));
 
-                      cudaDeviceSynchronize();
 
-     }
+         cudaDeviceSynchronize();
+}
 
 
 __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
@@ -145,12 +143,13 @@ __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
           if (t<dim)
              tensor[t]=real(0.);
 }
+
 void set_tensor_to_zero_real(real* tensor,int dimten){
      int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
+     // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
-     cudaDeviceSynchronize();
-     }
+}
 
 #endif

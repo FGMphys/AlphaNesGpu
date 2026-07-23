@@ -146,7 +146,6 @@ void sort_in_gpu(int *d_with, real *d_with_r2, int *d_howmany, int N, int Radial
     int threads_per_block = 128;
     int blocks_per_grid = (N + threads_per_block - 1) / threads_per_block;
     sort_neighbors<<<blocks_per_grid, threads_per_block>>>(d_with, d_with_r2, d_howmany, N, Radial_Buffer);
-    cudaDeviceSynchronize();
 }
 
 void imeCompute(int N,real *box_d,real *position_d,real cutoff,int *cells,int *cells_howmany,int celle_nx,int celle_ny,int celle_nz,int *with,int *howmany,real *with_dist2,int MAX_PARTICLE_CELLS,int Radial_Buffer)
@@ -161,7 +160,6 @@ void imeCompute(int N,real *box_d,real *position_d,real cutoff,int *cells,int *c
 
     imeBuild<<<dimGrid,dimBlock,sizeof(real3)*MAX_PARTICLE_CELLS+sizeof(int)*MAX_PARTICLE_CELLS,nullptr>>>(N,box_d,position_d,cells,cells_howmany,celle_nx,celle_ny,celle_nz,cutoff,with,howmany,with_dist2,MAX_PARTICLE_CELLS,Radial_Buffer);
 
-    cudaDeviceSynchronize();
     sort_in_gpu(with,with_dist2,howmany,N,Radial_Buffer);
 }
 
@@ -268,7 +266,6 @@ void celleCompute(int N,real *box,real *inopos_d,real cutoff,int **cells_address
     dim3 dimBlock(BLOCK_DIM,1,1);
     celleBuild<<<dimGrid,dimBlock>>>(N,inopos_d,cells,cells_howmany,celle_xsize,celle_ysize,celle_zsize,celle_nx,celle_ny,celle_nz,MAX_PARTICLE_CELLS);
 
-    cudaDeviceSynchronize();
 }
 
 

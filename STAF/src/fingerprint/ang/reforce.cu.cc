@@ -69,7 +69,6 @@ __global__ void angularAFs_kernel(const real* radial_descriptor,const real* angu
               }
       }
 	 }
-
 void angularAFs_Launcher(const real* radial_descriptor,const real* angular_descriptor,int nr,int na,
                           real* three_body_AFs,int dimbat,int N_local,
                           const int* interaction_map_angular,const real* alpha3b_parameters,
@@ -84,8 +83,8 @@ void angularAFs_Launcher(const real* radial_descriptor,const real* angular_descr
                           nsmooth_a,type_emb3b,
                           type_map,num_triplets));
 
-                          cudaDeviceSynchronize();
-                }
+                    cudaDeviceSynchronize();
+}
 
 __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
@@ -98,7 +97,7 @@ void set_tensor_to_zero_real(real* tensor,int dimten){
      int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
+     // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
-     cudaDeviceSynchronize();
-     }
+}
 #endif

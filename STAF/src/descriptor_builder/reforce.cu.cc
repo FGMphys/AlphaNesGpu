@@ -234,7 +234,6 @@ __global__ void DescriptorsAngular_kernel(real range,int radial_buffer,real rang
 
   }
 }
-
 void fill_radial_launcher(real R_c,int radbuff,real R_a,int angbuff,int N,
                       real* inopos_d,const real* box_d,
                       int *howmany_d,int *with_d,
@@ -251,10 +250,9 @@ void fill_radial_launcher(real R_c,int radbuff,real R_a,int angbuff,int N,
                       howmany_d,with_d,descriptor_d,intmap2b_d,der2b_d,
                       des3bsupp_d,der3bsupp_d,nf,numtriplet_d,
                       rs,coeffa,coeffb,coeffc,pow_alpha,pow_beta));
-      cudaDeviceSynchronize();
 
+        cudaDeviceSynchronize();
 }
-
 
 
 void fill_angular_launcher(real R_c,int radbuff,real R_a,int angbuff,int N,
@@ -273,9 +271,9 @@ void fill_angular_launcher(real R_c,int radbuff,real R_a,int angbuff,int N,
                            ang_descr_d,intmap3b_d,des3bsupp_d,der3b_d,
                            der3bsupp_d,nf,numtriplet_d));
 
-                cudaDeviceSynchronize();
 
-     }
+         cudaDeviceSynchronize();
+}
 
 __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
@@ -283,13 +281,14 @@ __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
           if (t<dim)
              tensor[t]=real(0.);
 }
+
 void set_tensor_to_zero_real(real* tensor,int dimten){
      int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
+     // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
-     cudaDeviceSynchronize();
-     }
+}
 
 __global__ void set_tensor_to_zero_int_kernel(int* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
@@ -297,13 +296,13 @@ __global__ void set_tensor_to_zero_int_kernel(int* tensor,int dim){
           if (t<dim)
              tensor[t]=0;
 }
+
 void set_tensor_to_zero_int(int* tensor,int dimten){
      int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_int_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
-     cudaDeviceSynchronize();
-     }
+}
 __global__ void check_max_kernel(int* tensor,int dim,int maxval,int* resval){
            int t=blockIdx.x*blockDim.x+threadIdx.x;
 	   if (t<dim){
@@ -311,12 +310,11 @@ __global__ void check_max_kernel(int* tensor,int dim,int maxval,int* resval){
                   atomicAdd((int*)&(resval[0]),tensor[t]);
 	         }
            }
-}
-void check_max_launcher(int* tensor,int dimten,int maxval,int* resval){
+}void check_max_launcher(int* tensor,int dimten,int maxval,int* resval){
      int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(check_max_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten,maxval,resval));
-     cudaDeviceSynchronize();
+        cudaDeviceSynchronize();
 }
 #endif

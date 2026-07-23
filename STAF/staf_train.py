@@ -434,6 +434,14 @@ try:
    displ_freq=int(full_param['displ_freq'])
 except:
    displ_freq=1
+# Host sync (.numpy / flush) only every log_batch_freq steps (default: displ_freq).
+try:
+   log_batch_freq=int(full_param.get('log_batch_freq', displ_freq))
+except Exception:
+   log_batch_freq=displ_freq
+if log_batch_freq < 1:
+   log_batch_freq=1
+print("STAF: batch loss/lr host log every", log_batch_freq, "steps")
 try:
    freq_test=int(full_param['freq_test'])
    print("STAF: test will be ever ",freq_test," epochs")
@@ -452,7 +460,8 @@ for ep in range(restart_ep,ne):
         [raddescr,angdescr,des3bsupp,
         intmap2b,intmap3b,intder2b,
         intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(tf.constant(pos_map_tr[el]),tf.constant(box_map_tr[el]))
-        max_ang=np.max(numtriplet.numpy())
+        # One host sync per buffer (safety), not per train step.
+        max_ang=int(tf.reduce_max(numtriplet).numpy())
         max_buff=int(max_ang*(max_ang-1)/2)
         if (max_buff>ang_buff):
             print("STAF: found angular neighbours beyond the buffer (%d vs %d)"%(max_buff,ang_buff))
@@ -464,19 +473,22 @@ for ep in range(restart_ep,ne):
             lrnow=model.get_lrnet()
             lrnow2=model.get_lrphys()
             accumul=accumul+1
-            print(accumul,losse.numpy(),lossf.numpy(),loss_bound.numpy(),file=lcurve_notmean)
-            lcurve_notmean.flush()
-            lr_file.write(str(lrnow.numpy())+'\n')
-            lr_file.flush()
             loss_buffer+=loss
+            if accumul % log_batch_freq == 0:
+                print(accumul, float(losse.numpy()), float(lossf.numpy()),
+                      float(loss_bound.numpy()), file=lcurve_notmean)
+                lr_file.write(str(float(lrnow.numpy())) + '\n')
+            if accumul % displ_freq == 0:
+                lcurve_notmean.flush()
+                lr_file.flush()
+                print("Epoch ",ep," step ",accumul,". Time to elaborate ",displ_freq," batch of ",bs," frames is",(time.time()-start_loc))
+                print("Epoch ",ep," step ",accumul,". Time to elaborate ",displ_freq," batch of ",bs," frames is",(time.time()-start_loc),file=out_time)
+                start_loc=time.time()
         losstot+=loss_buffer
-        if accumul%displ_freq==0:
-           print("Epoch ",ep," step ",accumul,". Time to elaborate ",displ_freq," batch of ",bs," frames is",(time.time()-start_loc))
-           print("Epoch ",ep," step ",accumul,". Time to elaborate ",displ_freq," batch of ",bs," frames is",(time.time()-start_loc),file=out_time)
-           start_loc=time.time()
     losstot*=1/(k+1)/(numbuf+1)
     stop_tr=time.time()
     lcurve_notmean.flush()
+    lr_file.flush()
     if (ep%freq_test==0):
        for numbuf,el in enumerate(idx_str_ts):
            vallosstot_buff=0.
@@ -501,17 +513,22 @@ for ep in range(restart_ep,ne):
 
        outfold_name=model_name+str(ep)
        model.save_model(outfold_name)
-       np.savetxt(outfold_name+"/model_error",[np.sqrt(vallosstote),np.sqrt(vallosstotf)],header='RMSE_e  RMSE_f ')
-       print(accumul,np.sqrt(vallosstote.numpy()),np.sqrt(vallosstotf.numpy()),losstot.numpy(),lrnow.numpy(),lrnow2.numpy(),ep,sep=' ',end='\n',file=fileOU)
-       print("Testing model at global step",accumul," and epoch ",ep," val_lossE ",np.sqrt(vallosstote.numpy())," val_lossF ",np.sqrt(vallosstotf.numpy())," loss_Tot ",losstot.numpy()," lr_net ",lrnow.numpy()," lr_finger ",lrnow2.numpy(),sep=' ',end='\n')
+       rmse_e=float(np.sqrt(vallosstote.numpy()))
+       rmse_f=float(np.sqrt(vallosstotf.numpy()))
+       loss_tot_v=float(losstot.numpy())
+       lr_net_v=float(lrnow.numpy())
+       lr_finger_v=float(lrnow2.numpy())
+       np.savetxt(outfold_name+"/model_error",[rmse_e,rmse_f],header='RMSE_e  RMSE_f ')
+       print(accumul,rmse_e,rmse_f,loss_tot_v,lr_net_v,lr_finger_v,ep,sep=' ',end='\n',file=fileOU)
+       print("Testing model at global step",accumul," and epoch ",ep," val_lossE ",rmse_e," val_lossF ",rmse_f," loss_Tot ",loss_tot_v," lr_net ",lr_net_v," lr_finger ",lr_finger_v,sep=' ',end='\n')
        metrics_log.log(
            global_step=int(accumul),
            epoch=int(ep),
-           rmse_e=float(np.sqrt(vallosstote.numpy())),
-           rmse_f=float(np.sqrt(vallosstotf.numpy())),
-           loss_tot=float(losstot.numpy()),
-           lr_net=float(lrnow.numpy()),
-           lr_finger=float(lrnow2.numpy()),
+           rmse_e=rmse_e,
+           rmse_f=rmse_f,
+           loss_tot=loss_tot_v,
+           lr_net=lr_net_v,
+           lr_finger=lr_finger_v,
        )
        print("We are at epoch ",ep)
        fileOU.flush()
