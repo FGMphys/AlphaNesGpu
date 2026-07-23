@@ -215,11 +215,11 @@ __global__ void computeforce_tripl_kernel(const real*  netderiv_T, const real* d
 void computeforce_tripl_Launcher(const real*  netderiv_T_d, const real* desr_T_d, const real* desa_T_d,
                         const real* intderiv_r_T_d, const real* intderiv_a_T_d,
                         const int* intmap_r_T_d,const int* intmap_a_T_d,
-                         int nr, int na, int N, int dimbat,int num_finger,const real* type_emb3b_d,int nt,const int* tipos_T,const int* actual_type,real* forces3b_T_d,const int *num_triplets_d,const real* smooth_a_T,const int* type_map_T_d,int prod){
+                         int nr, int na, int N, int dimbat,int num_finger,const real* type_emb3b_d,int nt,const int* tipos_T,const int* actual_type,real* forces3b_T_d,const int *num_triplets_d,const real* smooth_a_T,const int* type_map_T_d,int prod, cudaStream_t stream){
 
     dim3 dimGrid(ceil(real(prod)/real(BLOCK_DIM)),1,1);
     dim3 dimBlock(BLOCK_DIM,1,1);
-    TF_CHECK_OK(::tensorflow::GpuLaunchKernel(computeforce_tripl_kernel, dimGrid, dimBlock, BLOCK_DIM*sizeof(real3), nullptr,netderiv_T_d,desr_T_d,desa_T_d,
+    TF_CHECK_OK(::tensorflow::GpuLaunchKernel(computeforce_tripl_kernel, dimGrid, dimBlock, BLOCK_DIM*sizeof(real3), stream,netderiv_T_d,desr_T_d,desa_T_d,
         intderiv_r_T_d,intderiv_a_T_d,intmap_r_T_d,
         intmap_a_T_d,nr,na,N,dimbat,
         num_finger,
@@ -227,7 +227,6 @@ void computeforce_tripl_Launcher(const real*  netderiv_T_d, const real* desr_T_d
         actual_type,forces3b_T_d,num_triplets_d,smooth_a_T,type_map_T_d,BLOCK_DIM));
 
 
-        cudaDeviceSynchronize();
 }
 
 
@@ -238,12 +237,12 @@ __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
              tensor[t]=real(0.);
 }
 
-void set_tensor_to_zero_real(real* tensor,int dimten){
+void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream){
      int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
      // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
-     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
+     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, stream,tensor,dimten));
 }
 
 #endif

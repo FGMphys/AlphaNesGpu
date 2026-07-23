@@ -4,6 +4,10 @@
 #include "tensorflow/core/framework/op_kernel.h"
 #include "staf_real.h"
 
+#define EIGEN_USE_GPU
+#include "unsupported/Eigen/CXX11/Tensor"
+
+
 
 using namespace tensorflow;
 
@@ -22,14 +26,16 @@ void alpha_dist_grad_Launcher(const real* radial_descriptor,int nr,
                        int nalpha_r,real* nextgrad_alpha2b,int dimbat,
                        int Nlocal,const int* interaction_map_rad,
                        const real* prev_grad,const real* type_emb2b,
-                       const int* type_map,real* nextgrad_emb2);
-void set_tensor_to_zero_real(real* tensor,int dimten);
+                       const int* type_map,real* nextgrad_emb2, cudaStream_t stream);
+void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream);
 
 class ComputeTwoBodyParGradOp : public OpKernel {
  public:
   explicit ComputeTwoBodyParGradOp(OpKernelConstruction* context) : OpKernel(context) {}
 
   void Compute(OpKernelContext* context) override {
+    const cudaStream_t stream = context->eigen_device<Eigen::GpuDevice>().stream();
+
     // Grab the input tensor
     const Tensor& prev_grad_T = context->input(0);
     const Tensor& radiale_T = context->input(1);
@@ -64,7 +70,7 @@ class ComputeTwoBodyParGradOp : public OpKernel {
     grad_net_shape.AddDim (nalpha_r);
     OP_REQUIRES_OK(context, context->allocate_output(0, grad_net_shape,
                                                      &nextgrad_alpha2b_T));
-    set_tensor_to_zero_real(nextgrad_alpha2b_T->flat<real>().data(),nt*nalpha_r);
+    set_tensor_to_zero_real(nextgrad_alpha2b_T->flat<real>().data(),nt*nalpha_r, stream);
 
     //Create output tensor for backprob of embedding 2b params
     Tensor* nextgrad_emb2_T = NULL;
@@ -73,13 +79,13 @@ class ComputeTwoBodyParGradOp : public OpKernel {
     grad_net_shape2.AddDim (nalpha_r);
     OP_REQUIRES_OK(context, context->allocate_output(1, grad_net_shape2,
                                                      &nextgrad_emb2_T));
-    set_tensor_to_zero_real(nextgrad_emb2_T->flat<real>().data(),nt*nalpha_r);
+    set_tensor_to_zero_real(nextgrad_emb2_T->flat<real>().data(),nt*nalpha_r, stream);
 
     alpha_dist_grad_Launcher(radial_descriptor.data(),nr,alpha2b_parameters.data(),
                            nalpha_r,nextgrad_alpha2b_T->flat<real>().data(),dimbat,
                            Nlocal,interaction_map_rad.data(),
                            prev_grad.data(),type_emb2b.data(),type_map.data(),
-                           nextgrad_emb2_T->flat<real>().data());
+                           nextgrad_emb2_T->flat<real>().data(), stream);
 
   }
 };

@@ -215,7 +215,7 @@ void gradforce_tripl_Launcher(const real*  prevgrad_T_d,const real*  netderiv_T_
                                       const int* tipos_T,const int* actual_type,
                                       const int *num_triplets_d,const real* smooth_a_T,
                                       const int* type_map_T_d,int prod,real* gradnet_3b_T_d,
-                                      real* grad_alpha3b_T_d,real* grad_emb3b_T_d){
+                                      real* grad_alpha3b_T_d,real* grad_emb3b_T_d, cudaStream_t stream){
 
     dim3 dimGrid(ceil(real(prod)/real(BLOCK_DIM)),1,1);
     dim3 dimBlock(BLOCK_DIM,1,1);
@@ -223,7 +223,7 @@ void gradforce_tripl_Launcher(const real*  prevgrad_T_d,const real*  netderiv_T_
     for (int req_alpha=0;req_alpha<num_finger;req_alpha++){
 	for (int req_sum=0;req_sum<nt_couple;req_sum++){
     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(gradforce_tripl_kernel,dimGrid,
-                dimBlock, BLOCK_DIM*sizeof(real4), nullptr,prevgrad_T_d,netderiv_T_d,desr_T_d,desa_T_d,
+                dimBlock, BLOCK_DIM*sizeof(real4), stream,prevgrad_T_d,netderiv_T_d,desr_T_d,desa_T_d,
                 intderiv_r_T_d,intderiv_a_T_d,intmap_r_T_d,
                 intmap_a_T_d,nr,na,N,dimbat,num_finger,
                 type_emb3b_d,nt,tipos_T,actual_type,
@@ -233,7 +233,6 @@ void gradforce_tripl_Launcher(const real*  prevgrad_T_d,const real*  netderiv_T_
 	}
     }
 
-        cudaDeviceSynchronize();
 }
 
 __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
@@ -243,12 +242,12 @@ __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
              tensor[t]=real(0.);
 }
 
-void set_tensor_to_zero_real(real* tensor,int dimten){
+void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream){
      int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
      // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
-     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
+     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, stream,tensor,dimten));
 }
 
 #endif

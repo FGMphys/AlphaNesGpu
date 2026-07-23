@@ -2,6 +2,10 @@
 #include "tensorflow/core/framework/shape_inference.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "staf_real.h"
+
+#define EIGEN_USE_GPU
+#include "unsupported/Eigen/CXX11/Tensor"
+
 using namespace tensorflow;
 
 void init_block_dim(int buffdim);
@@ -14,7 +18,7 @@ REGISTER_OP("InitForceRadial")
      public:
       explicit InitForceRadialOp(OpKernelConstruction* context) : OpKernel(context) {}
       void Compute(OpKernelContext* context) override {
-           const Tensor& buffdim = context->input(0);
+const Tensor& buffdim = context->input(0);
 
            init_block_dim(buffdim.flat<int>()(0));
 
@@ -50,16 +54,18 @@ void computeforce_doublets_Launcher(const real*  netderiv, const real* des_r,
                     const real* intderiv_r,const int* intmap_r,
                     int nr, int N, int dimbat,int num_alpha_radiale,
                     const real* alpha_radiale,const real* type_emb2b,int nt,
-                    const int* tipos_T,const int* actual_type,real* forces2b,const int* type_map,int prod);
+                    const int* tipos_T,const int* actual_type,real* forces2b,const int* type_map,int prod, cudaStream_t stream);
 
 
-void set_tensor_to_zero_real(real* tensor,int dimten);
+void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream);
 
 class ComputeForceRadialOp : public OpKernel {
  public:
   explicit ComputeForceRadialOp(OpKernelConstruction* context) : OpKernel(context) {}
 
   void Compute(OpKernelContext* context) override {
+    const cudaStream_t stream = context->eigen_device<Eigen::GpuDevice>().stream();
+
     // Grab the input tensor
     const Tensor& netderiv_T = context->input(0);
     const Tensor& desder_T = context->input(1);
@@ -107,9 +113,9 @@ class ComputeForceRadialOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(0, grad_net_shape,
                                                      &forces2b_T));
 
-    set_tensor_to_zero_real(forces2b_T->flat<real>().data(),dimbat*3*N);
+    set_tensor_to_zero_real(forces2b_T->flat<real>().data(),dimbat*3*N, stream);
     int prod=dimbat*Nlocal*nr;
-   computeforce_doublets_Launcher(netderiv_T_flat.data(),desr_T_flat.data(),desder_T_flat.data(),intmap2b_T_flat.data(),nr,N,dimbat,num_alpha_radiale,alpha_radiale_T_flat.data(),type_emb2b_T_flat.data(),nt,tipos_T_flat.data(),actual_type,forces2b_T->flat<real>().data(),type_map_T_flat.data(),prod);
+   computeforce_doublets_Launcher(netderiv_T_flat.data(),desr_T_flat.data(),desder_T_flat.data(),intmap2b_T_flat.data(),nr,N,dimbat,num_alpha_radiale,alpha_radiale_T_flat.data(),type_emb2b_T_flat.data(),nt,tipos_T_flat.data(),actual_type,forces2b_T->flat<real>().data(),type_map_T_flat.data(),prod, stream);
 
   }
 };

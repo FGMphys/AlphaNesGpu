@@ -3,6 +3,10 @@
 #include "tensorflow/core/framework/op_kernel.h"
 #include "staf_real.h"
 
+#define EIGEN_USE_GPU
+#include "unsupported/Eigen/CXX11/Tensor"
+
+
 
 using namespace tensorflow;
 
@@ -17,14 +21,16 @@ REGISTER_OP("ComputeSortProj")
 
 void radialAFs_Launcher(const real* radial_descriptor,const int nr,const real* alpha2b_parameters,
         const int nalpha_r,real* radial_AFs,const int dimbat,const int N_local,
-        const int* interaction_map_rad,const real* type_emb2b,const int* type_map);
-void set_tensor_to_zero_real(real* tensor,int dimten);
+        const int* interaction_map_rad,const real* type_emb2b,const int* type_map, cudaStream_t stream);
+void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream);
 
 class ComputeSortProjOp : public OpKernel {
  public:
   explicit ComputeSortProjOp(OpKernelConstruction* context) : OpKernel(context) {}
 
   void Compute(OpKernelContext* context) override {
+    const cudaStream_t stream = context->eigen_device<Eigen::GpuDevice>().stream();
+
     // Grab the input tensor
     const Tensor& radiale_T = context->input(0);
     const Tensor& intmap2b_T = context->input(1);
@@ -59,14 +65,14 @@ class ComputeSortProjOp : public OpKernel {
                                                      &radial_AFs_T));
 
     //It seems tensorflow does not set to zero the pointed memory!
-    set_tensor_to_zero_real(radial_AFs_T->flat<real>().data(),dimbat*Nlocal*nalpha_r);
+    set_tensor_to_zero_real(radial_AFs_T->flat<real>().data(),dimbat*Nlocal*nalpha_r, stream);
 
     //Calcolo della proiezione su base
     radialAFs_Launcher(
           radial_descriptor.data(),nr,alpha2b_parameters.data(),
           nalpha_r,radial_AFs_T->flat<real>().data(),dimbat,Nlocal,
           interaction_map_rad.data(),type_emb2b.data(),type_map.data()
-    );
+    , stream);
 
   }
 };

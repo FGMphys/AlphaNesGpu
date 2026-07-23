@@ -9,7 +9,7 @@ Production sources live under `STAF/src/`. Experimental trees are under
 |----------|------|--------------------|
 | `src/descriptor_builder/reforce.cc` | many `static` host/device pointers + scalars (`Radbuff`, cell lists, …) | **High** — one process / one logical device assumed |
 | `src/*/force|grad_*/{rad,ang}/reforce.cu.cc` | `static int BLOCK_DIM` | Medium — init-once per process |
-| Widespread `cudaDeviceSynchronize()` | host sync after launches | Perf / multi-stream; not correctness alone |
+| ~~Widespread `cudaDeviceSynchronize()`~~ | removed in production after Eigen-stream wiring | Was perf / multi-stream hazard; see section below |
 | Quarantined `experimental/descriptor_builder_develop/` | same pattern, `double`-hardcoded | Out of build; ignore for A3 |
 
 ## Hygiene already done pre-A3
@@ -33,7 +33,7 @@ Production sources live under `STAF/src/`. Experimental trees are under
 
 1. Replace file-scope `static` buffers with per-op / per-device context (or thread-local keyed by `tf.device`).
 2. Ensure `Init*` kernels are idempotent per replica.
-3. Gate `cudaDeviceSynchronize` behind debug builds once streams are correct.
+3. ~~Gate `cudaDeviceSynchronize` behind debug builds once streams are correct.~~ Done for production: Eigen stream + no device sync.
 
 ## A+B single-GPU sync trim (2026-07-23)
 
@@ -41,3 +41,22 @@ Production sources live under `STAF/src/`. Experimental trees are under
 - **B:** removed `cudaDeviceSynchronize` after zero-fill kernels; **kept** one sync at end of each compute launcher (required until launchers use TF's Eigen GPU stream). Full sync removal without stream wiring caused `CUDA_ERROR_ILLEGAL_ADDRESS`.
 
 Gates after A+B: force/compat/grad OK; float `time_story` ≈ 88 ms/frame (×0.96 vs 91.5).
+
+## TF Eigen GPU stream wiring (2026-07-23)
+
+- Production launchers / `set_tensor_to_zero_*` take `cudaStream_t stream`.
+- Each GPU `OpKernel::Compute` passes `context->eigen_device<Eigen::GpuDevice>().stream()`.
+- Removed remaining production `cudaDeviceSynchronize` (sync after zero-fill and end-of-launcher).
+- `init_block_dim` stays host-only (no stream) — it only sets `BLOCK_DIM`.
+- `staf_real.h` always includes `<cuda_runtime.h>` so stream types resolve on host.
+
+Gates after stream wiring (V100, sequential float→double):
+
+| Gate | float | double |
+| --- | --- | --- |
+| Force FD δ=0.001 | corr=0.99985 | corr=0.99994 |
+| Grad-param dw=1e-3 | families ≈1 | families ≈1 |
+| Inference float↔double | Compatible | Compatible |
+| `time_story` 1-epoch | 87.2 ms (×0.95 vs 91.5) | 154.0 ms (×1.03 vs 149.7) |
+
+Next single-GPU win after this: wire/fix GPU neighbor list (`celle_gpu` / descriptor cell list) — still D2H→CPU→H2D per frame today.

@@ -110,13 +110,13 @@ void back_prop_grad_force2b_Launcher(const real* prevgrad,const real* radiale,
                            int dimbat,int N,int N_local,const real*netderiv,
                            const real* type_emb2b,int nt,const int* type_map,
                            const int* tipos,const int* actual_type,real* grad_net,
-                           real* grad_alpha2b,real* grad_emb2b){
+                           real* grad_alpha2b,real* grad_emb2b, cudaStream_t stream){
 
               dim3 dimGrid(ceil(real(dimbat*N_local*nr)/real(BLOCK_DIM)),1,1);
      		      dim3 dimBlock(BLOCK_DIM,1,1);
 
      		      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(back_prop_grad_force2b_kernel,
-                         dimGrid, dimBlock, 0, nullptr,prevgrad,radiale,
+                         dimGrid, dimBlock, 0, stream,prevgrad,radiale,
                            nr,alpha_radiale,num_finger,
                            desder,intmap_r,
                            dimbat,N,N_local,netderiv,
@@ -125,7 +125,6 @@ void back_prop_grad_force2b_Launcher(const real* prevgrad,const real* radiale,
                            grad_alpha2b,grad_emb2b));
 
 
-          cudaDeviceSynchronize();
 }
 __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
           int t=blockIdx.x*blockDim.x+threadIdx.x;
@@ -134,12 +133,12 @@ __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
              tensor[t]=real(0.);
 }
 
-void set_tensor_to_zero_real(real* tensor,int dimten){
+void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream){
      int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
      // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
-     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
+     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, stream,tensor,dimten));
 }
 
 #endif

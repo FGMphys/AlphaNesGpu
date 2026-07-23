@@ -3,6 +3,10 @@
 #include "tensorflow/core/framework/op_kernel.h"
 #include "staf_real.h"
 
+#define EIGEN_USE_GPU
+#include "unsupported/Eigen/CXX11/Tensor"
+
+
 
 
 
@@ -23,15 +27,17 @@ void angularAFs_Launcher(const real* radial_descriptor,const real* angular_descr
                           real* three_body_AFs,int dimbat,int Nlocal,
                           const int* interaction_map_angular,const real* alpha3b_parameters,
                           int nsmooth_a,const real* type_emb3b,
-                          const int* type_map,const int* num_triplets);
+                          const int* type_map,const int* num_triplets, cudaStream_t stream);
 
-void set_tensor_to_zero_real(real* tensor,int dimten);
+void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream);
 
 class ComputeSortProj3bodyOp : public OpKernel {
  public:
   explicit ComputeSortProj3bodyOp(OpKernelConstruction* context) : OpKernel(context) {}
 
   void Compute(OpKernelContext* context) override {
+    const cudaStream_t stream = context->eigen_device<Eigen::GpuDevice>().stream();
+
     // Grab the input tensor
     const Tensor& angular_descriptor_T = context->input(0);
     const Tensor& radial_descriptor_T = context->input(1);
@@ -75,13 +81,13 @@ class ComputeSortProj3bodyOp : public OpKernel {
     angular_AFs_shape.AddDim (nsmooth_a);
     OP_REQUIRES_OK(context, context->allocate_output(0, angular_AFs_shape,
                                                      &angular_AFs_T));
-    set_tensor_to_zero_real(angular_AFs_T->flat<real>().data(),dimbat*Nlocal*nsmooth_a);
+    set_tensor_to_zero_real(angular_AFs_T->flat<real>().data(),dimbat*Nlocal*nsmooth_a, stream);
 
     //Computing three-body atomic-fingerprints
     angularAFs_Launcher(radial_descriptor.data(),angular_descriptor.data(),nr,na,
                           angular_AFs_T->flat<real>().data(),dimbat,Nlocal,interaction_map_angular.data(),
                           alpha3b_parameters.data(),nsmooth_a,type_emb3b.data(),
-                          type_map.data(),num_triplet.data());
+                          type_map.data(),num_triplet.data(), stream);
   }
 };
 REGISTER_KERNEL_BUILDER(Name("ComputeSortProj3body").Device(DEVICE_GPU), ComputeSortProj3bodyOp);

@@ -3,6 +3,10 @@
 #include "tensorflow/core/framework/op_kernel.h"
 #include "staf_real.h"
 
+#define EIGEN_USE_GPU
+#include "unsupported/Eigen/CXX11/Tensor"
+
+
 using namespace tensorflow;
 
 REGISTER_OP("ComputeSortProj3bodyGrad")
@@ -24,9 +28,9 @@ void alphagrad_ang_Launcher(const real* radial_descriptor,const real* angular_de
                  int Nlocal,const int* intmap3b,const real* alpha3b,
                  int nsmooth_a,real* next_alpha3b_grad,
                  const real* type_emb3b,const int* type_map,
-                 real* next_emb3b_grad, const int* num_triplet,int nt_couple);
+                 real* next_emb3b_grad, const int* num_triplet,int nt_couple, cudaStream_t stream);
 
-void set_tensor_to_zero_real(real* tensor,int dimten);
+void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream);
 
 
 class ComputeSortProj3bodyGradOp : public OpKernel {
@@ -34,6 +38,8 @@ class ComputeSortProj3bodyGradOp : public OpKernel {
   explicit ComputeSortProj3bodyGradOp(OpKernelConstruction* context) : OpKernel(context) {}
 
   void Compute(OpKernelContext* context) override {
+    const cudaStream_t stream = context->eigen_device<Eigen::GpuDevice>().stream();
+
     // Grab the input tensor
     const Tensor& prevgrad_T = context->input(0);
     const Tensor& angular_descriptor_T = context->input(1);
@@ -70,7 +76,7 @@ class ComputeSortProj3bodyGradOp : public OpKernel {
     grad_net_shape.AddDim (nsmooth_a*3);
     OP_REQUIRES_OK(context, context->allocate_output(0, grad_net_shape,
                                                      &next_alpha3b_grad_T));
-    set_tensor_to_zero_real(next_alpha3b_grad_T->flat<real>().data(),nt_couple*nsmooth_a*3);
+    set_tensor_to_zero_real(next_alpha3b_grad_T->flat<real>().data(),nt_couple*nsmooth_a*3, stream);
 
     // Create an output for gradient wrt embedding 3b
     Tensor* next_emb3b_grad_T = NULL;
@@ -79,14 +85,14 @@ class ComputeSortProj3bodyGradOp : public OpKernel {
     grad_net_shape2.AddDim (nsmooth_a);
     OP_REQUIRES_OK(context, context->allocate_output(1, grad_net_shape2,
                                                      &next_emb3b_grad_T));
-    set_tensor_to_zero_real(next_emb3b_grad_T->flat<real>().data(),nt_couple*nsmooth_a);
+    set_tensor_to_zero_real(next_emb3b_grad_T->flat<real>().data(),nt_couple*nsmooth_a, stream);
 
     alphagrad_ang_Launcher(radial_descriptor.data(),angular_descriptor.data(),
                      nr,na,prevgrad.data(),dimbat,
                      Nlocal,intmap3b.data(),alpha3b.data(),nsmooth_a,
                      next_alpha3b_grad_T->flat<real>().data(),
                      type_emb3b.data(),type_map.data(),
-                     next_emb3b_grad_T->flat<real>().data(),num_triplet.data(),nt_couple);
+                     next_emb3b_grad_T->flat<real>().data(),num_triplet.data(),nt_couple, stream);
 }
 
 };

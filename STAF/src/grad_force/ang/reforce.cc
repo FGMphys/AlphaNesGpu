@@ -3,6 +3,10 @@
 #include "tensorflow/core/framework/op_kernel.h"
 #include "staf_real.h"
 
+#define EIGEN_USE_GPU
+#include "unsupported/Eigen/CXX11/Tensor"
+
+
 using namespace tensorflow;
 
 void init_block_dim(int buffdim);
@@ -15,7 +19,7 @@ REGISTER_OP("InitGradForceTripl")
      public:
       explicit InitGradForceTriplOp(OpKernelConstruction* context) : OpKernel(context) {}
       void Compute(OpKernelContext* context) override {
-           const Tensor& buffdim = context->input(0);
+const Tensor& buffdim = context->input(0);
 
            init_block_dim(buffdim.flat<int>()(0));
 
@@ -59,15 +63,17 @@ REGISTER_OP("ComputeForceTriplGrad")
                                       const int* tipos_T,const int* actual_type,
                                       const int *num_triplets_d,const real* smooth_a_T,
                                       const int* type_map_T_d,int prod,real* gradnet_3b_T_d,
-                                      real* grad_alpha3b_T_d,real* grad_emb3b_T_d);
+                                      real* grad_alpha3b_T_d,real* grad_emb3b_T_d, cudaStream_t stream);
 
 
-void set_tensor_to_zero_real(real* tensor,int dim);
+void set_tensor_to_zero_real(real* tensor,int dim, cudaStream_t stream);
 
 class ComputeForceTriplGradOp : public OpKernel {
  public:
   explicit ComputeForceTriplGradOp(OpKernelConstruction* context) : OpKernel(context) {}
   void Compute(OpKernelContext* context) override {
+    const cudaStream_t stream = context->eigen_device<Eigen::GpuDevice>().stream();
+
     // Grab the input tensor
     const Tensor& prevgrad_T = context->input(0);
     const Tensor& netderiv_T = context->input(1);
@@ -129,7 +135,7 @@ class ComputeForceTriplGradOp : public OpKernel {
     gradnet_3b_shape.AddDim (num_finger);
     OP_REQUIRES_OK(context, context->allocate_output(0, gradnet_3b_shape,
                                                      &gradnet_3b_T));
-    set_tensor_to_zero_real(gradnet_3b_T->flat<real>().data(),dimbat*Nlocal*num_finger);
+    set_tensor_to_zero_real(gradnet_3b_T->flat<real>().data(),dimbat*Nlocal*num_finger, stream);
     // Create an output tensor for DL/Dalpha
     Tensor* grad_alpha3b_T = NULL;
     TensorShape grad_alpha3b_shape ;
@@ -138,7 +144,7 @@ class ComputeForceTriplGradOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(1, grad_alpha3b_shape,
                                                      &grad_alpha3b_T));
     int dimnow=nt_couple*3*num_finger;
-    set_tensor_to_zero_real(grad_alpha3b_T->flat<real>().data(),dimnow);
+    set_tensor_to_zero_real(grad_alpha3b_T->flat<real>().data(),dimnow, stream);
     // Create an output tensor for DL/Dck
     Tensor* grad_emb3b_T = NULL;
     TensorShape grad_emb3b_shape;
@@ -146,7 +152,7 @@ class ComputeForceTriplGradOp : public OpKernel {
     grad_emb3b_shape.AddDim (num_finger);
     OP_REQUIRES_OK(context, context->allocate_output(2, grad_emb3b_shape,
                                                      &grad_emb3b_T));
-    set_tensor_to_zero_real(grad_emb3b_T->flat<real>().data(),nt_couple*num_finger);
+    set_tensor_to_zero_real(grad_emb3b_T->flat<real>().data(),nt_couple*num_finger, stream);
 
 
     int prod=dimbat*Nlocal*na;
@@ -157,7 +163,7 @@ class ComputeForceTriplGradOp : public OpKernel {
                         actual_type,num_triplets_T_d.data(),smooth_a_T_d.data(),
                         type_map_T_d.data(),prod,gradnet_3b_T->flat<real>().data(),
                         grad_alpha3b_T->flat<real>().data(),
-  			grad_emb3b_T->flat<real>().data());
+  			grad_emb3b_T->flat<real>().data(), stream);
 
 }
 };

@@ -7,6 +7,10 @@
 #include <ctype.h>
 #include "staf_real.h"
 
+#define EIGEN_USE_GPU
+#include "unsupported/Eigen/CXX11/Tensor"
+
+
 #include "vector.h"
 #include "interaction_map.h"
 #include "cell_list.h"
@@ -117,19 +121,19 @@ void construct_descriptor(const real* box,int N,int max_batch){
                        real* descriptor_d,int* intmap2b_d,real* der2b_d,
                        real* des3bsupp_d,
                        real* der3bsupp_d, int nf,int* numtriplet_d,
-                       real rs, real coeffa,real coeffb,real coeffc,real pow_alpha, real pow_beta);
+                       real rs, real coeffa,real coeffb,real coeffc,real pow_alpha, real pow_beta, cudaStream_t stream);
  void fill_angular_launcher(real R_c,int radbuff,real R_a,int angbuff,int N,
                        real* inopos_d,const real* box_d,
                        int *howmany_d,int *with_d,
                        real* ang_descr_d,int* intmap3b_d,
                        real* des3bsupp_d,real* der3b_d,
-                       real* der3bsupp_d, int nf,int* numtriplet_d);
+                       real* der3bsupp_d, int nf,int* numtriplet_d, cudaStream_t stream);
 
-void set_tensor_to_zero_int(int* tensor,int dimten);
+void set_tensor_to_zero_int(int* tensor,int dimten, cudaStream_t stream);
 
-void set_tensor_to_zero_real(real* tensor,int dimten);
+void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream);
 
-void check_max_launcher(int* tensor,int dim,int maxval,int* resval);
+void check_max_launcher(int* tensor,int dim,int maxval,int* resval, cudaStream_t stream);
 
 using namespace tensorflow;
 
@@ -209,6 +213,8 @@ class ComputeDescriptorsLightOp : public OpKernel {
   }
 
   void Compute(OpKernelContext* context) override {
+    const cudaStream_t stream = context->eigen_device<Eigen::GpuDevice>().stream();
+
     // Grab the input tensor
     const Tensor& positions_T = context->input(0);
     const Tensor& box_T = context->input(1);
@@ -290,7 +296,7 @@ class ComputeDescriptorsLightOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(1,angdescr_shape,
                                                      &angdescr_tensor));
 
-    set_tensor_to_zero_real(angdescr_tensor->flat<real>().data(),nf*N*Angbuff);
+    set_tensor_to_zero_real(angdescr_tensor->flat<real>().data(),nf*N*Angbuff, stream);
     ///////////////DESCRIPTORS 3B SUPP///////////////
     // Create an output tensor
     Tensor* des3bsupp_tensor = NULL;
@@ -309,7 +315,7 @@ class ComputeDescriptorsLightOp : public OpKernel {
     intmap2b_shape.AddDim (Radbuff+1);
     OP_REQUIRES_OK(context, context->allocate_output(3,intmap2b_shape,
                                                      &intmap2b_tensor));
-    set_tensor_to_zero_int(intmap2b_tensor->flat<int>().data(),nf*N*(Radbuff+1));
+    set_tensor_to_zero_int(intmap2b_tensor->flat<int>().data(),nf*N*(Radbuff+1), stream);
     /////////////////////////////
     ///////////////INTMAP3B///////////////
     // Create an output tensor
@@ -320,7 +326,7 @@ class ComputeDescriptorsLightOp : public OpKernel {
     intmap3b_shape.AddDim (Angbuff*2);
     OP_REQUIRES_OK(context, context->allocate_output(4,intmap3b_shape,
                                                      &intmap3b_tensor));
-    set_tensor_to_zero_int(intmap3b_tensor->flat<int>().data(),nf*N*Angbuff*2);
+    set_tensor_to_zero_int(intmap3b_tensor->flat<int>().data(),nf*N*Angbuff*2, stream);
     /////////////////////////////
     ///////////////DER2B///////////////
     // Create an output tensor
@@ -365,7 +371,7 @@ class ComputeDescriptorsLightOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(8,numtriplet_shape,
                                                      &numtriplet_tensor));
 
-    set_tensor_to_zero_int(numtriplet_tensor->flat<int>().data(),nf*N);
+    set_tensor_to_zero_int(numtriplet_tensor->flat<int>().data(),nf*N, stream);
 
     real* rad_descr_d=raddescr_tensor->flat<real>().data();
     int* intmap2b_d=intmap2b_tensor->flat<int>().data();
@@ -384,9 +390,9 @@ class ComputeDescriptorsLightOp : public OpKernel {
                       rad_descr_d,intmap2b_d,der2b_d,
                       des3bsupp_d,
                       der3bsupp_d,nf,numtriplet_d,
-                      Rs,coeffA,coeffB,coeffC,Pow_alpha,Pow_beta);
+                      Rs,coeffA,coeffB,coeffC,Pow_alpha,Pow_beta, stream);
     //cudaMemset(code_ret_d,sizeof(int),0);
-    //check_max_launcher(numtriplet_d,N*nf,Angbuff,code_ret_d);
+    //check_max_launcher(numtriplet_d,N*nf,Angbuff,code_ret_d, stream);
     //cudaMemcpy(code_ret,code_ret_d,sizeof(int),cudaMemcpyDeviceToHost);
     //if (code_ret[0]!=0){
     //   printf("alpha_nes: Buffer angolare saturato, %d vs %d",code_ret[0],Angbuff);
@@ -395,7 +401,7 @@ class ComputeDescriptorsLightOp : public OpKernel {
     fill_angular_launcher(R_c, Radbuff, R_a, Angbuff, N, nowinopos_d,
 		         nowbox, howmany_d, with_d, ang_descr_d,
 			 intmap3b_d, des3bsupp_d, der3b_d, der3bsupp_d,
-			 nf, numtriplet_d);
+			 nf, numtriplet_d, stream);
      }
 
 

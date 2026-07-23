@@ -2,6 +2,10 @@
 #include "tensorflow/core/framework/shape_inference.h"
 #include "tensorflow/core/framework/op_kernel.h"
 #include "staf_real.h"
+
+#define EIGEN_USE_GPU
+#include "unsupported/Eigen/CXX11/Tensor"
+
 //#include <cuda.h>
 using namespace tensorflow;
 
@@ -15,7 +19,7 @@ REGISTER_OP("InitForceTripl")
      public:
       explicit InitForceTriplOp(OpKernelConstruction* context) : OpKernel(context) {}
       void Compute(OpKernelContext* context) override {
-           const Tensor& buffdim = context->input(0);
+const Tensor& buffdim = context->input(0);
 
            init_block_dim(buffdim.flat<int>()(0));
 
@@ -59,14 +63,16 @@ REGISTER_OP("ComputeForceTripl")
                         int nr, int na, int N, int dimbat,int num_finger,const real* type_emb3b_d,int nt,
                         const int* tipos_T,
                         const int* actual_type,real* forces3b_T_d,const int *num_triplets_d,const real* smooth_a_T,const int* type_map_T_d,
-                        int prod);
+                        int prod, cudaStream_t stream);
 
-void set_tensor_to_zero_real(real* tensor,int dimten);
+void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream);
 
 class ComputeForceTriplOp : public OpKernel {
  public:
   explicit ComputeForceTriplOp(OpKernelConstruction* context) : OpKernel(context) {}
   void Compute(OpKernelContext* context) override {
+    const cudaStream_t stream = context->eigen_device<Eigen::GpuDevice>().stream();
+
     // Grab the input tensor
     const Tensor& netderiv_T = context->input(0);
     const Tensor& desr_T = context->input(1);
@@ -129,14 +135,14 @@ class ComputeForceTriplOp : public OpKernel {
     OP_REQUIRES_OK(context, context->allocate_output(0, grad_net_shape,
                                                      &forces3b_T));
 
-    set_tensor_to_zero_real(forces3b_T->flat<real>().data(),dimbat*3*N);
+    set_tensor_to_zero_real(forces3b_T->flat<real>().data(),dimbat*3*N, stream);
     int prod=netderiv_T.shape().dim_size(0)*netderiv_T.shape().dim_size(1)*desa_T.shape().dim_size(2);//dimbat*Nlocal*na
     computeforce_tripl_Launcher(netderiv_T_d.data(), desr_T_d.data(), desa_T_d.data(),
                         intderiv_r_T_d.data(),intderiv_a_T_d.data(),
                         intmap_r_T_d.data(),intmap_a_T_d.data(),
                         nr, na, N, dimbat,num_finger,type_emb3b_T_d.data(),nt,
                         tipos_T_d.data(),
-                        actual_type,forces3b_T->flat<real>().data(),num_triplets_T_d.data(),smooth_a_T_d.data(),type_map_T_d.data(),prod);
+                        actual_type,forces3b_T->flat<real>().data(),num_triplets_T_d.data(),smooth_a_T_d.data(),type_map_T_d.data(),prod, stream);
 
 }
 };

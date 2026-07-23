@@ -7,10 +7,9 @@
  * allocations (sizeof(real)) stay correct for both trees.
  */
 #include <math.h>
-
-#if defined(__CUDACC__)
 #include <cuda_runtime.h>
-#else
+
+#if !defined(__CUDACC__)
 #ifndef __host__
 #define __host__
 #endif

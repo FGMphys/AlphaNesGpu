@@ -73,17 +73,16 @@ void angularAFs_Launcher(const real* radial_descriptor,const real* angular_descr
                           real* three_body_AFs,int dimbat,int N_local,
                           const int* interaction_map_angular,const real* alpha3b_parameters,
                           int nsmooth_a,const real* type_emb3b,
-                          const int* type_map,const int* num_triplets){
+                          const int* type_map,const int* num_triplets, cudaStream_t stream){
 
                           dim3 dimGrid(ceil(real(dimbat*N_local*na)/real(BLOCK_DIM)),1,1);
                           dim3 dimBlock(BLOCK_DIM,1,1);
 
-                          TF_CHECK_OK(::tensorflow::GpuLaunchKernel(angularAFs_kernel,                      dimGrid, dimBlock, 0, nullptr,radial_descriptor,angular_descriptor,               nr,na,three_body_AFs,dimbat,N_local,
+                          TF_CHECK_OK(::tensorflow::GpuLaunchKernel(angularAFs_kernel,                      dimGrid, dimBlock, 0, stream,radial_descriptor,angular_descriptor,               nr,na,three_body_AFs,dimbat,N_local,
                            interaction_map_angular,alpha3b_parameters,
                           nsmooth_a,type_emb3b,
                           type_map,num_triplets));
 
-                    cudaDeviceSynchronize();
 }
 
 __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
@@ -93,11 +92,11 @@ __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
              tensor[t]=real(0.);
 }
 
-void set_tensor_to_zero_real(real* tensor,int dimten){
+void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream){
      int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
      // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
-     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
+     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, stream,tensor,dimten));
 }
 #endif

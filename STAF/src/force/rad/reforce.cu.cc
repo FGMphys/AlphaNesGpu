@@ -120,12 +120,11 @@ void computeforce_doublets_Launcher(const real*  netderiv, const real* des_r,
                     const real* intderiv_r,const int* intmap_r,
                     int nr, int N, int dimbat,int num_alpha_radiale,
                     const real* alpha_radiale,const real* type_emb2b,int nt,
-                    const int* tipos_T,const int* actual_type,real* forces2b,const int* type_map,int prod)
-{
+                    const int* tipos_T,const int* actual_type,real* forces2b,const int* type_map,int prod, cudaStream_t stream){
                       dim3 dimGrid(ceil(real(prod)/real(BLOCK_DIM)),1,1);
      		      dim3 dimBlock(BLOCK_DIM,1,1);
 
-     		      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(computeforce_doublets_kernel, dimGrid, dimBlock, BLOCK_DIM*sizeof(real3), nullptr,netderiv,des_r,
+     		      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(computeforce_doublets_kernel, dimGrid, dimBlock, BLOCK_DIM*sizeof(real3), stream,netderiv,des_r,
                           intderiv_r,intmap_r,
                           nr,N,dimbat,
                           num_alpha_radiale,alpha_radiale,
@@ -133,7 +132,6 @@ void computeforce_doublets_Launcher(const real*  netderiv, const real* des_r,
                           actual_type,type_map,forces2b,BLOCK_DIM));
 
 
-         cudaDeviceSynchronize();
 }
 
 
@@ -144,12 +142,12 @@ __global__ void set_tensor_to_zero_real_kernel(real* tensor,int dim){
              tensor[t]=real(0.);
 }
 
-void set_tensor_to_zero_real(real* tensor,int dimten){
+void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream){
      int grids=ceil(real(dimten)/real(300));
      dim3 dimGrid(grids,1,1);
      dim3 dimBlock(300,1,1);
      // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
-     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, nullptr,tensor,dimten));
+     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, stream,tensor,dimten));
 }
 
 #endif

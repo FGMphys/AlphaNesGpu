@@ -4,6 +4,10 @@
 #include <iostream>
 #include "staf_real.h"
 
+#define EIGEN_USE_GPU
+#include "unsupported/Eigen/CXX11/Tensor"
+
+
 using namespace tensorflow;
 
 void init_block_dim(int buffdim);
@@ -16,7 +20,7 @@ REGISTER_OP("InitGradForceRadial")
      public:
       explicit InitGradForceRadialOp(OpKernelConstruction* context) : OpKernel(context) {}
       void Compute(OpKernelContext* context) override {
-           const Tensor& buffdim = context->input(0);
+const Tensor& buffdim = context->input(0);
 
            init_block_dim(buffdim.flat<int>()(0));
 
@@ -33,7 +37,7 @@ REGISTER_OP("InitGradForceRadial")
       };
       REGISTER_KERNEL_BUILDER(Name("InitGradForceRadial").Device(DEVICE_CPU), InitGradForceRadialOp);
 
-void set_tensor_to_zero_real(real* tensor_data,int dimension);
+void set_tensor_to_zero_real(real* tensor_data,int dimension, cudaStream_t stream);
 
 REGISTER_OP("ComputeForceRadialGrad")
     .Input("prevgrad: " STAF_TF_DTYPE)
@@ -56,7 +60,7 @@ void back_prop_grad_force2b_Launcher(const real* prevgrad,const real* radiale,
                            int dimbat,int N,int N_local,const real*netderiv,
                            const real* type_emb2b,int nt,const int* type_map,
                            const int* tipos,const int* actual_type,real* grad_net,
-                           real* grad_alpha2b,real* grad_emb2b);
+                           real* grad_alpha2b,real* grad_emb2b, cudaStream_t stream);
 
 
 class ComputeForceRadialGradOp : public OpKernel {
@@ -64,6 +68,8 @@ class ComputeForceRadialGradOp : public OpKernel {
   explicit ComputeForceRadialGradOp(OpKernelConstruction* context) : OpKernel(context) {}
 
   void Compute(OpKernelContext* context) override {
+    const cudaStream_t stream = context->eigen_device<Eigen::GpuDevice>().stream();
+
       // Grab the input tensor
       const Tensor& prevgrad_T=context->input(0);
       const Tensor& netderiv_T = context->input(1);
@@ -109,7 +115,7 @@ class ComputeForceRadialGradOp : public OpKernel {
       grad_net_shape.AddDim (num_finger);
       OP_REQUIRES_OK(context, context->allocate_output(0, grad_net_shape,
                                                        &grad_net_T));
-      set_tensor_to_zero_real(grad_net_T->flat<real>().data(),dimbat*N_local*num_finger);
+      set_tensor_to_zero_real(grad_net_T->flat<real>().data(),dimbat*N_local*num_finger, stream);
 
       Tensor* grad_alpha2b_T = NULL;
       TensorShape grad_alpha2b_shape ;
@@ -117,7 +123,7 @@ class ComputeForceRadialGradOp : public OpKernel {
       grad_alpha2b_shape.AddDim (num_finger);
       OP_REQUIRES_OK(context, context->allocate_output(1, grad_alpha2b_shape,
                                                        &grad_alpha2b_T));
-      set_tensor_to_zero_real(grad_alpha2b_T->flat<real>().data(),nt*num_finger);
+      set_tensor_to_zero_real(grad_alpha2b_T->flat<real>().data(),nt*num_finger, stream);
 
       Tensor* grad_emb2b_T = NULL;
       TensorShape grad_emb2b_shape;
@@ -125,7 +131,7 @@ class ComputeForceRadialGradOp : public OpKernel {
       grad_emb2b_shape.AddDim (num_finger);
       OP_REQUIRES_OK(context, context->allocate_output(2,grad_emb2b_shape,
                                                        &grad_emb2b_T));
-      set_tensor_to_zero_real(grad_emb2b_T->flat<real>().data(),nt*num_finger);
+      set_tensor_to_zero_real(grad_emb2b_T->flat<real>().data(),nt*num_finger, stream);
 
 
 
@@ -133,7 +139,7 @@ class ComputeForceRadialGradOp : public OpKernel {
       back_prop_grad_force2b_Launcher(prevgrad.data(),radiale.data(),nr,alpha_radiale.data(),num_finger,
                            desder.data(),intmap2b.data(),dimbat,N,N_local,netderiv.data(),type_emb2b.data(),
                            nt,type_map.data(),tipos.data(),actual_type,grad_net_T->flat<real>().data(),
-                           grad_alpha2b_T->flat<real>().data(),grad_emb2b_T->flat<real>().data());
+                           grad_alpha2b_T->flat<real>().data(),grad_emb2b_T->flat<real>().data(), stream);
 
 
   }
