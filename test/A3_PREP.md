@@ -92,3 +92,39 @@ Gates after D+E (V100): float **76.4 ms/frame** (×0.84); double **142.8 ms/fram
 A/B on `test/test-inference-pipeline` frames (10 frames, float and double):
 `int2b` / `int3b` (howmany, neighbor set, order) are **bit-identical** between pre-C CPU neighbor list and current GPU NL.
 Harness: `test/test-inference-pipeline/compare_intmap_cpu_vs_gpu.py`.
+
+## A3 slice — per-device CUDA ctx + `distribute` (2026-07-24)
+
+**CUDA (same-process multi-GPU prep)**
+
+- `descriptor_builder/reforce.cc`: file-scope static buffers → `StafDescriptorConfig` + per-device `StafDescriptorCtx` (mutex + `unordered_map` keyed by `cudaGetDevice()`).
+- `force|grad_force/{rad,ang}/reforce.cu.cc`: `BLOCK_DIM` is per-device (`init_block_dim` / `current_block_dim`).
+
+**Training YAML**
+
+```yaml
+distribute: none          # none | mirrored | horovod (stub exits)
+# devices: [0, 1]         # optional; default = all TF-visible GPUs
+```
+
+- `none`: current single-device path.
+- `mirrored`: `tf.distribute.MirroredStrategy`; model/opts under `strategy.scope()`.
+  - **1 GPU:** train step is the normal path (no `strategy.run`) so Huber
+    `SUM_OVER_BATCH_SIZE` stays valid; smoke YAML:
+    `test/test-training-pipeline/run_float/input_mirrored_smoke.yaml`.
+  - **≥2 GPU:** `strategy.run` + Huber `Reduction.SUM` (mean across replicas
+    in the wrapper). Full scaling / global-batch LR equivalence still TBD on
+    Leonardo.
+- `horovod`: reserved for multi-node (Leonardo); clear exit until wired (A5).
+
+**Not done here:** true multi-GPU scaling validation (needs ≥2 GPUs); Horovod/MPI; MultiWorker.
+
+### Gates after A3 slice (V100, 2026-07-24)
+
+| Gate | float | double |
+| --- | --- | --- |
+| Force FD δ=0.001 | corr=0.99981 | corr=0.99994 |
+| Grad-param dw=1e-3 | families ≈1 | families ≈1 |
+| Inference float↔double | Compatible | Compatible |
+| `time_story` 1-epoch (none) | **~77.7 ms/frame** (×0.85 vs 91.5) | — |
+| Mirrored 1-GPU smoke | OK (`distribute=mirrored`, save `model_log0`) | — |

@@ -4,25 +4,41 @@
 #include "tensorflow/core/util/gpu_kernel_helper.h"
 #include "tensorflow/core/util/gpu_launch_config.h"
 #include "staf_real.h"
+#include <mutex>
+#include <unordered_map>
+#include <cuda_runtime.h>
 
+static std::mutex g_bd_mu;
+static std::unordered_map<int, int> g_block_dim;
 
+static int choose_block_dim(int buffdim) {
+  for (int i = buffdim; i > 0; i--) {
+    if ((buffdim % i == 0) && (i < 512)) return i;
+  }
+  printf("STAF: No integer divisor found for the given radial buffer size \n");
+  exit(0);
+}
 
-static int BLOCK_DIM;
-void init_block_dim(int buffdim){
-     int i;
-     for (i=buffdim;i>0;i--){
-         if ((buffdim%i==0) && (i<512)){
-            BLOCK_DIM=i;
-            i=0;
-	    }
-     }
-     if (i!=-1){
-        printf("STAF: No integer divisor found for the given radial buffer size \n");
-        exit(0);
-     }
-     else{
-        printf("STAF: Blocks for radial forces set to %d\n",BLOCK_DIM);
-      }
+void init_block_dim(int buffdim) {
+  int dev = 0;
+  cudaGetDevice(&dev);
+  int bd = choose_block_dim(buffdim);
+  std::lock_guard<std::mutex> lock(g_bd_mu);
+  g_block_dim[dev] = bd;
+  printf("STAF: Blocks for radial forces set to %d (device %d)\n", bd, dev);
+}
+
+static int current_block_dim() {
+  int dev = 0;
+  cudaGetDevice(&dev);
+  std::lock_guard<std::mutex> lock(g_bd_mu);
+  auto it = g_block_dim.find(dev);
+  if (it == g_block_dim.end()) {
+    fprintf(stderr, "STAF: grad radial BLOCK_DIM not init for device %d\n",
+            dev);
+    exit(1);
+  }
+  return it->second;
 }
 
 __global__ void back_prop_grad_force2b_kernel(const real* prevgrad,const real* ds,
@@ -112,6 +128,7 @@ void back_prop_grad_force2b_Launcher(const real* prevgrad,const real* radiale,
                            const int* tipos,const int* actual_type,real* grad_net,
                            real* grad_alpha2b,real* grad_emb2b, cudaStream_t stream){
 
+              const int BLOCK_DIM = current_block_dim();
               dim3 dimGrid(ceil(real(dimbat*N_local*nr)/real(BLOCK_DIM)),1,1);
      		      dim3 dimBlock(BLOCK_DIM,1,1);
 

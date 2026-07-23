@@ -320,10 +320,11 @@ class staf_full(tf.Module):
             np.savetxt(folder_ou+'/type'+str(k)+'_type_emb_2b_sq.dat',self.physics_layer[k].type_emb_2b.numpy()**2)
             np.savetxt(folder_ou+'/type'+str(k)+'_type_emb_3b_sq.dat',self.physics_layer[k].type_emb_3b.numpy()**2)
             np.savetxt(folder_ou+'/type'+str(k)+'_alpha_mu.dat',self.lognorm_layer[k].mu.numpy())
+            # numpy arrays are pickle-safe under MirroredStrategy (raw Variable refs are not)
             with open(folder_ou+'/opt_net_weights','wb') as dest:
-                 pickle.dump(self.opt_net.variables(),dest)
+                 pickle.dump([v.numpy() for v in self.opt_net.variables()],dest)
             with open(folder_ou+'/opt_phys_weights','wb') as dest:
-                 pickle.dump(self.opt_phys.variables(),dest)
+                 pickle.dump([v.numpy() for v in self.opt_phys.variables()],dest)
             with open(folder_ou+'/opt_net_conf','wb') as dest:
                  pickle.dump(self.opt_net.get_config(),dest)
             with open(folder_ou+'/opt_phys_conf','wb') as dest:

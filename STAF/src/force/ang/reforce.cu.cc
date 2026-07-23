@@ -4,24 +4,40 @@
 #include "tensorflow/core/util/gpu_kernel_helper.h"
 #include "tensorflow/core/util/gpu_launch_config.h"
 #include "staf_real.h"
+#include <mutex>
+#include <unordered_map>
+#include <cuda_runtime.h>
 
+static std::mutex g_bd_mu;
+static std::unordered_map<int, int> g_block_dim;
 
-static int BLOCK_DIM;
-void init_block_dim(int buffdim){
-     int i;
-     for (i=buffdim;i>0;i--){
-         if ((buffdim%i==0) && (i<512)){
-            BLOCK_DIM=i;
-            i=0;
-         }
-     }
-     if (i!=-1){
-        printf("STAF: No integer divisor found for the given angular buffer size\n");
-        exit(0);
-     }
-     else{
-        printf("STAF: Blocks for angular forces set to %d\n",BLOCK_DIM);
-      }
+static int choose_block_dim(int buffdim) {
+  for (int i = buffdim; i > 0; i--) {
+    if ((buffdim % i == 0) && (i < 512)) return i;
+  }
+  printf("STAF: No integer divisor found for the given angular buffer size\n");
+  exit(0);
+}
+
+void init_block_dim(int buffdim) {
+  int dev = 0;
+  cudaGetDevice(&dev);
+  int bd = choose_block_dim(buffdim);
+  std::lock_guard<std::mutex> lock(g_bd_mu);
+  g_block_dim[dev] = bd;
+  printf("STAF: Blocks for angular forces set to %d (device %d)\n", bd, dev);
+}
+
+static int current_block_dim() {
+  int dev = 0;
+  cudaGetDevice(&dev);
+  std::lock_guard<std::mutex> lock(g_bd_mu);
+  auto it = g_block_dim.find(dev);
+  if (it == g_block_dim.end()) {
+    fprintf(stderr, "STAF: angular BLOCK_DIM not init for device %d\n", dev);
+    exit(1);
+  }
+  return it->second;
 }
 
 
@@ -217,6 +233,7 @@ void computeforce_tripl_Launcher(const real*  netderiv_T_d, const real* desr_T_d
                         const int* intmap_r_T_d,const int* intmap_a_T_d,
                          int nr, int na, int N, int dimbat,int num_finger,const real* type_emb3b_d,int nt,const int* tipos_T,const int* actual_type,real* forces3b_T_d,const int *num_triplets_d,const real* smooth_a_T,const int* type_map_T_d,int prod, cudaStream_t stream){
 
+    const int BLOCK_DIM = current_block_dim();
     dim3 dimGrid(ceil(real(prod)/real(BLOCK_DIM)),1,1);
     dim3 dimBlock(BLOCK_DIM,1,1);
     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(computeforce_tripl_kernel, dimGrid, dimBlock, BLOCK_DIM*sizeof(real3), stream,netderiv_T_d,desr_T_d,desa_T_d,

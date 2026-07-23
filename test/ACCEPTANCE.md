@@ -56,7 +56,7 @@ Do **not** run float and double GPU jobs in parallel on a single GPU.
 |------|--------|
 | Parity vs `neuralmdGPU` / `jmd_nn` export | Deferred to Linea **B** (LAMMPS / libstaf) |
 | CPU OpenMP parity | Deferred to **A4** |
-| Multi-GPU | Deferred to **A3/A5** |
+| Multi-GPU | **A3** started: per-device CUDA ctx + `distribute: mirrored` (1-GPU smoke); multi-GPU / Horovod → Leonardo (**A5**) |
 | DEV/ CG trees | Deferred to Linea **C** |
 
 ## A1 residual

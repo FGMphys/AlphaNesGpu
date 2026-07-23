@@ -1,6 +1,7 @@
 import os
 import time
 import sys
+import contextlib
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
@@ -60,6 +61,65 @@ if gpus:
   except RuntimeError as e:
     # Memory growth must be set before GPUs have been initialized
     print(e)
+
+def build_distribute_strategy(full_param):
+    """Return (mode, strategy|None). devices: optional list of logical GPU indices."""
+    mode = str(full_param.get('distribute', 'none')).strip().lower()
+    if mode in ('', 'none', 'null', 'single'):
+        print("STAF: distribute=none (single device)")
+        return 'none', None
+    if mode == 'horovod':
+        sys.exit(
+            "STAF: distribute=horovod is for multi-node (e.g. Leonardo + mpirun). "
+            "Not enabled in this slice; use distribute: mirrored on one node."
+        )
+    if mode != 'mirrored':
+        sys.exit(
+            "STAF: unknown distribute=%r (use none | mirrored | horovod)" % mode
+        )
+    devices_yaml = full_param.get('devices', None)
+    if devices_yaml is not None:
+        dev_names = ['/GPU:%d' % int(i) for i in devices_yaml]
+        strategy = tf.distribute.MirroredStrategy(devices=dev_names)
+        print(
+            "STAF: distribute=mirrored replicas=%d devices=%s"
+            % (strategy.num_replicas_in_sync, dev_names)
+        )
+    else:
+        strategy = tf.distribute.MirroredStrategy()
+        print(
+            "STAF: distribute=mirrored replicas=%d devices=all_visible"
+            % strategy.num_replicas_in_sync
+        )
+    return 'mirrored', strategy
+
+def wrap_train_method(trainmeth, strategy):
+    """Call trainmeth under strategy.run; unwrap PerReplica for host logging.
+
+    With 1 replica, skip strategy.run so Keras losses keep SUM_OVER_BATCH_SIZE
+    (allowed only outside Strategy.run). Multi-replica uses SUM losses + mean.
+    """
+    if strategy is None or strategy.num_replicas_in_sync <= 1:
+        return trainmeth
+
+    @tf.function(reduce_retracing=True)
+    def _distributed(*args):
+        return strategy.run(trainmeth, args=args)
+
+    def _call(*args):
+        out = _distributed(*args)
+        unwrapped = []
+        for x in out:
+            parts = strategy.experimental_local_results(x)
+            if len(parts) == 1:
+                unwrapped.append(parts[0])
+            else:
+                unwrapped.append(
+                    tf.add_n(list(parts)) / float(len(parts))
+                )
+        return tuple(unwrapped)
+
+    return _call
 
 @tf.function()
 def MSE(ypred,y):
@@ -129,11 +189,16 @@ def order_folder(x):
         res=-1
     return res
 
-def make_loss(full_param):
+def make_loss(full_param, distribute_mode='none', n_replicas=1):
+    # MirroredStrategy.run forbids SUM_OVER_BATCH_SIZE; use SUM only with ≥2 GPUs.
+    if distribute_mode == 'mirrored' and n_replicas > 1:
+        huber_red = tf.keras.losses.Reduction.SUM
+    else:
+        huber_red = tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE
     try:
         loss_meth=full_param['loss_method']
         if loss_meth=='huber':
-           HUBER = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE)
+           HUBER = tf.keras.losses.Huber(reduction=huber_red)
            model_loss=HUBER
            val_loss=MSE
            print("STAF: the loss function is huber loss and validation loss is MSE")
@@ -142,7 +207,7 @@ def make_loss(full_param):
            val_loss=MSE
            print("STAF: the loss function is MSE loss as the validation loss")
     except:
-        HUBER = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE)
+        HUBER = tf.keras.losses.Huber(reduction=huber_red)
         model_loss=HUBER
         val_loss=MSE
         print("STAF: the loss function is huber loss and validation loss is MSE")
@@ -184,6 +249,12 @@ def make_method(full_param,model):
 with open(sys.argv[1]) as file:
     full_param = yaml.load(file, Loader=yaml.FullLoader)
 set_precision(full_param.get("precision"))
+distribute_mode, strategy = build_distribute_strategy(full_param)
+
+def dist_scope():
+    """Fresh strategy.scope() each time (context managers are single-use)."""
+    return strategy.scope() if strategy is not None else contextlib.nullcontext()
+
 base_pattern=full_param['dataset_folder']
 try:
     tipos=np.loadtxt(base_pattern+"/type.dat",dtype='int').reshape(-1,1)
@@ -303,27 +374,29 @@ except:
 restart=restart_par
 
 ##If we are not restarting, we initialiaze the optimizer and the learning rate
-if restart_par=='no' or restart_par=='only_afs':
-    lr_net_param=full_param['lr_dense_net'].split()
-    lr_net=build_learning_rate(lr_net_param,ne,nb,idx_str_tr.shape[0],'net',0)
+## (under MirroredStrategy.scope when distribute=mirrored)
+with dist_scope():
+    if restart_par=='no' or restart_par=='only_afs':
+        lr_net_param=full_param['lr_dense_net'].split()
+        lr_net=build_learning_rate(lr_net_param,ne,nb,idx_str_tr.shape[0],'net',0)
 
-    opt_net_param=full_param['optimizer_net'].split()
-    opt_net=build_optimizer(opt_net_param,lr_net,0)
+        opt_net_param=full_param['optimizer_net'].split()
+        opt_net=build_optimizer(opt_net_param,lr_net,0)
 
-    lr_phys_param=full_param['lr_phys_net'].split()
-    lr_phys=build_learning_rate(lr_phys_param,ne,nb,idx_str_tr.shape[0],'phys',0)
-    opt_phys_param=full_param['optimizer_phys'].split()
-    opt_phys=build_optimizer(opt_phys_param,lr_phys,0)
-##else we load the internal state of optimizer at the given point of previous training
-else:
-    with open(restart+'/opt_net_conf','rb') as source:
-         config_net=pickle.load(source)
-    opt_net=tf.keras.optimizers.Adam()
-    opt_net=opt_net.from_config(config_net)
-    with open(restart+'/opt_phys_conf','rb') as source:
-         config_phys=pickle.load(source)
-    opt_phys=tf.keras.optimizers.Adam()
-    opt_phys=opt_phys.from_config(config_phys)
+        lr_phys_param=full_param['lr_phys_net'].split()
+        lr_phys=build_learning_rate(lr_phys_param,ne,nb,idx_str_tr.shape[0],'phys',0)
+        opt_phys_param=full_param['optimizer_phys'].split()
+        opt_phys=build_optimizer(opt_phys_param,lr_phys,0)
+    ##else we load the internal state of optimizer at the given point of previous training
+    else:
+        with open(restart+'/opt_net_conf','rb') as source:
+             config_net=pickle.load(source)
+        opt_net=tf.keras.optimizers.Adam()
+        opt_net=opt_net.from_config(config_net)
+        with open(restart+'/opt_phys_conf','rb') as source:
+             config_phys=pickle.load(source)
+        opt_phys=tf.keras.optimizers.Adam()
+        opt_phys=opt_phys.from_config(config_phys)
 
 ##Here we fix the value that prevents the explosion of the exponential
 try:
@@ -348,21 +421,25 @@ np.random.set_state(new_rng_state)
 #######Initialise Descriptor Layer###################################################
 max_batch=int(np.max([buffer_stream_tr,buffer_stream_ts]))
 Descriptor_Layer=descriptor_layer(rc,rad_buff,rc_ang,ang_buff,N,box_map_tr[0],Rs,max_batch)
-#######Initialise AFS Layer
-Physics_Layers=[physics_layer(init_alpha2b[num_type],init_alpha3b[num_type],
-                                initial_type_emb[num_type]) for num_type
-                                in range(nt)]
-##Initialise Log layer
-Lognorm_Layers=[lognorm_layer(init_mu[num_type]) for num_type in range(nt)]
-##Initialise force layer
-Force_Layer=force_layer(rad_buff,ang_buff)
-########Define Loss
-[model_loss,val_loss,pe,pf,pb]=make_loss(full_param)
-###Compose the model by concatenation of layers
-model=staf_full(Physics_Layers,Force_Layer,nhl,nD,actfun,1,model_loss,
-             val_loss,opt_net,opt_phys,alpha_bound,Lognorm_Layers,tipos,
-             type_map,restart,seed_par)
+########Define Loss (host-side constants; safe outside strategy.scope)
+_n_replicas = strategy.num_replicas_in_sync if strategy is not None else 1
+[model_loss,val_loss,pe,pf,pb]=make_loss(full_param, distribute_mode, _n_replicas)
+### Layers + model under MirroredStrategy.scope when distribute=mirrored
+with dist_scope():
+    #######Initialise AFS Layer
+    Physics_Layers=[physics_layer(init_alpha2b[num_type],init_alpha3b[num_type],
+                                    initial_type_emb[num_type]) for num_type
+                                    in range(nt)]
+    ##Initialise Log layer
+    Lognorm_Layers=[lognorm_layer(init_mu[num_type]) for num_type in range(nt)]
+    ##Initialise force layer
+    Force_Layer=force_layer(rad_buff,ang_buff)
+    ###Compose the model by concatenation of layers
+    model=staf_full(Physics_Layers,Force_Layer,nhl,nD,actfun,1,model_loss,
+                 val_loss,opt_net,opt_phys,alpha_bound,Lognorm_Layers,tipos,
+                 type_map,restart,seed_par)
 [trainmeth,testmeth]=make_method(full_param,model)
+trainmeth=wrap_train_method(trainmeth, strategy)
 #################################################################################
 #################################################################################
 

@@ -3,6 +3,11 @@
 # float32 | float64 (aliases: float|double). If omitted, inferred from code tree name.
 precision: float
 
+# Multi-GPU (same node). none | mirrored | horovod (stub → exit).
+# Optional devices: list of logical GPU indices (default = all TF-visible).
+distribute: none
+# devices: [0, 1]
+
 #Dataset Path
 dataset_folder: dataset
 
