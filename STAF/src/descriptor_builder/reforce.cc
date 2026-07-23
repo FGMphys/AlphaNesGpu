@@ -10,12 +10,7 @@
 #define EIGEN_USE_GPU
 #include "unsupported/Eigen/CXX11/Tensor"
 
-
-#include "vector.h"
-#include "interaction_map.h"
-#include "cell_list.h"
-#include "smart_allocator.h"
-#include "utilities.h"
+#include "celle_gpu.h"
 #include <cuda_runtime.h>
 
 #include "tensorflow/core/framework/op.h"
@@ -25,17 +20,22 @@
 #define PI real(3.141592654)
 #define SQR(x) ((x)*(x))
 #define Power(x,n) (staf_pow((real)(x),(real)(n)))
+/* Must match BLOCK_DIM in celle_gpu.cu.cc (threads per cell). */
+#define BLOCK_DIM_SAFE 256
 
 static int Radbuff,Angbuff;
 static real R_c,Rs,R_a,coeffA,coeffB,coeffC,Pow_alpha,Pow_beta;
 
-static real box[6],Inobox[6];
-static vector* Nowinopos;
-static interactionmap *Ime;
-static listcell *Cells;
-
-static real* Full_pos;
 static real* Full_box;
+static real* nowinobox;
+static real* nowinobox_d;
+static real* with_dist2_d;
+
+static int *Cells;
+static int *Cells_howmany;
+static int cells_capacity_num;
+static int cells_capacity_mpc;
+static int MAX_PARTICLE_CELLS;
 
 static int *howmany_d;
 static int *with_d;
@@ -88,31 +88,26 @@ void construct_repulsion(){
 
 }
 
-void construct_descriptor(const real* box,int N,int max_batch){
+void construct_descriptor(const real* /*box*/,int N,int max_batch){
+          MAX_PARTICLE_CELLS=N/3;
+          if (MAX_PARTICLE_CELLS < 1) MAX_PARTICLE_CELLS = 1;
+          if (MAX_PARTICLE_CELLS > BLOCK_DIM_SAFE) MAX_PARTICLE_CELLS = BLOCK_DIM_SAFE;
+          int nf=max_batch;
+          Full_box=(real*)calloc(nf*6,sizeof(real));
+          nowinobox=(real*)calloc(nf*6,sizeof(real));
+          cudaMalloc(&nowinobox_d,nf*6*sizeof(real));
 
-          Inobox[0]=1./box[0];
-          Inobox[1]=-box[1]/(box[0]*box[3]);
-          Inobox[2]=(box[1]*box[4])/(box[0]*box[3]*box[5])-box[2]/(box[0]*box[5]);
-          Inobox[3]=1./box[3];
-          Inobox[4]=-box[4]/(box[3]*box[5]);
-          Inobox[5]=1./box[5];
-
-          Cells=getList(box,R_c,N);
-
-          // INTERACTION MAPS
-          Ime=createInteractionMap(N,Radbuff);
-          //Memory for reticular positions
-          Nowinopos=(vector*)calloc(N,sizeof(vector));
-	  //Memory to copy input on CPU
-	  int nf=max_batch;
-	  Full_pos=(real*)calloc(nf*N*3,sizeof(real));
-	  Full_box=(real*)calloc(nf*6,sizeof(real));
-          
-	  cudaMalloc(&howmany_d,nf*N*sizeof(int));
+          cudaMalloc(&with_dist2_d,nf*N*Radbuff*sizeof(real));
+          cudaMalloc(&howmany_d,nf*N*sizeof(int));
           cudaMalloc(&with_d,nf*N*Radbuff*sizeof(int));
           cudaMalloc(&nowinopos_d,nf*N*3*sizeof(real));
           cudaMalloc(&code_ret_d,sizeof(int));
-	  code_ret=(int*)calloc(1,sizeof(int));
+          code_ret=(int*)calloc(1,sizeof(int));
+
+          Cells=nullptr;
+          Cells_howmany=nullptr;
+          cells_capacity_num=0;
+          cells_capacity_mpc=0;
  }
 
  void fill_radial_launcher(real R_c,int radbuff,real R_a,int angbuff,int N,
@@ -221,8 +216,8 @@ class ComputeDescriptorsLightOp : public OpKernel {
 
 
     auto positions = positions_T.flat<real>();
-    const real* nowpos=positions.data();
-    const real* nowbox = box_T.flat<real>().data();
+    const real* nowpos_d=positions.data();
+    const real* nowbox_d = box_T.flat<real>().data();
 
 
 
@@ -230,51 +225,61 @@ class ComputeDescriptorsLightOp : public OpKernel {
     int nf=box_T.shape().dim_size(0);
     int N=int(positions_T.shape().dim_size(1)/3);
 
-    cudaMemcpy(Full_pos,nowpos,nf*N*3*sizeof(real),cudaMemcpyDeviceToHost);
-    cudaMemcpy(Full_box,nowbox,nf*6*sizeof(real),cudaMemcpyDeviceToHost);
-    //////////BUILDING CELL LIST AND IME (FULL ORDERED INTERACTION MAP)////
-    int ii;
-    for (ii=0;ii<nf;ii++)
+    // Host box only (tiny): cell grid sizing. Positions stay on GPU.
+    cudaMemcpyAsync(Full_box, nowbox_d, sizeof(real)*nf*6,
+                    cudaMemcpyDeviceToHost, stream);
+    cudaStreamSynchronize(stream);
+
+    for (int fr=0; fr<nf; fr++){
+      nowinobox[0+fr*6]=real(1.)/Full_box[0+fr*6];
+      nowinobox[1+fr*6]=-Full_box[1+fr*6]/(Full_box[0+fr*6]*Full_box[3+fr*6]);
+      nowinobox[2+fr*6]=(Full_box[1+fr*6]*Full_box[4+fr*6])/(Full_box[0+fr*6]*Full_box[3+fr*6]*Full_box[5+fr*6])-Full_box[2+fr*6]/(Full_box[0+fr*6]*Full_box[5+fr*6]);
+      nowinobox[3+fr*6]=real(1.)/Full_box[3+fr*6];
+      nowinobox[4+fr*6]=-Full_box[4+fr*6]/(Full_box[3+fr*6]*Full_box[5+fr*6]);
+      nowinobox[5+fr*6]=real(1.)/Full_box[5+fr*6];
+    }
+    cudaMemcpyAsync(nowinobox_d, nowinobox, sizeof(real)*nf*6,
+                    cudaMemcpyHostToDevice, stream);
+
+    convert_carte_to_int_launcher(nowinobox_d, nowpos_d, nowinopos_d, N, nf,
+                                  stream);
+
+    MAX_PARTICLE_CELLS=N/3;
+    if (MAX_PARTICLE_CELLS < 1) MAX_PARTICLE_CELLS = 1;
+    if (MAX_PARTICLE_CELLS > BLOCK_DIM_SAFE) MAX_PARTICLE_CELLS = BLOCK_DIM_SAFE;
+
+    for (int fr=0; fr<nf; fr++){
+      int c_nx,c_ny,c_nz;
+      celleCompute(N, Full_box+fr*6, nowinopos_d+fr*3*N, R_c,
+                   &Cells, &Cells_howmany, &c_nx, &c_ny, &c_nz,
+                   MAX_PARTICLE_CELLS, &cells_capacity_num, &cells_capacity_mpc,
+                   stream);
+      imeCompute(N, nowbox_d+fr*6, nowinopos_d+fr*3*N, R_c,
+                 Cells, Cells_howmany, c_nx, c_ny, c_nz,
+                 with_d+fr*N*Radbuff, howmany_d+N*fr,
+                 with_dist2_d+fr*N*Radbuff, MAX_PARTICLE_CELLS, Radbuff,
+                 stream);
+    }
+
+    // Overflow check: howmany > Radbuff
+    cudaMemsetAsync(code_ret_d, 0, sizeof(int), stream);
     {
-      Inobox[0] = real(1.) / Full_box[ii*6+0];
-      Inobox[1] = -Full_box[ii*6+1] / (Full_box[ii*6+0] * Full_box[ii*6+3]);
-      Inobox[2] = (Full_box[ii*6+1] * Full_box[ii*6+4]) /
-                  (Full_box[ii*6+0] * Full_box[ii*6+3] * Full_box[ii*6+5]) -
-                  Full_box[ii*6+2] / (Full_box[ii*6+0] * Full_box[ii*6+5]);
-      Inobox[3] = real(1.) / Full_box[ii*6+3];
-      Inobox[4] = -Full_box[ii*6+4] / (Full_box[ii*6+3] * Full_box[ii*6+5]);
-      Inobox[5] = real(1.) / Full_box[ii*6+5];
-
-      for (int i=0;i<N;i++){
-        real px=Full_pos[ii*N*3+i*3];
-        real py=Full_pos[ii*N*3+i*3+1];
-        real pz=Full_pos[ii*N*3+i*3+2];
-
-        Nowinopos[i].x=(Inobox[0]*px+Inobox[1]*py+Inobox[2]*pz);
-        Nowinopos[i].y=(Inobox[3]*py+Inobox[4]*pz);
-        Nowinopos[i].z=(Inobox[5]*pz);
-      }
-
-      // calcolo delle celle e dei neighbour list
-      fullUpdateList(Cells,Nowinopos,N,&Full_box[ii*6],R_c);
-      resetInteractionMap(Ime);
-      calculateInteractionMapWithCutoffDistanceOrdered(Cells,Ime,Nowinopos,&Full_box[ii*6],R_c);
-
-      cudaMemcpy(howmany_d+ii*N,Ime->howmany,N*sizeof(int),cudaMemcpyHostToDevice);
-      cudaMemcpy(with_d+ii*N*Radbuff,Ime->with[0],N*Radbuff*sizeof(int),cudaMemcpyHostToDevice);
-      cudaMemcpy(nowinopos_d+ii*N*3,Nowinopos,N*3*sizeof(real),cudaMemcpyHostToDevice);
-
-      for (int i=0;i<N;i++)
-      {
-        if (Ime->howmany[i]>Radbuff)
-        {
-          printf("Buffer radiale saturato by \n");
-	  printf("Particle %d at frame %d with %d neighbours \n",i,ii,Ime->howmany[i]);
+      // Reuse check_max only for triplets; do a compact host scan of howmany.
+      int* howmany_h = (int*)malloc(sizeof(int)*nf*N);
+      cudaMemcpyAsync(howmany_h, howmany_d, sizeof(int)*nf*N,
+                      cudaMemcpyDeviceToHost, stream);
+      cudaStreamSynchronize(stream);
+      for (int i=0;i<nf*N;i++){
+        if (howmany_h[i] > Radbuff){
+          printf("Buffer radiale saturato by\n");
+          printf("Particle slot %d with %d neighbours (Radbuff=%d)\n",
+                 i, howmany_h[i], Radbuff);
           fflush(stdout);
-	  exit(0);
+          free(howmany_h);
+          exit(0);
         }
       }
-
+      free(howmany_h);
     }
 
     ///////////////DESCRIPTORS///////////////
@@ -385,21 +390,14 @@ class ComputeDescriptorsLightOp : public OpKernel {
     real* der3b_d=der3b_tensor->flat<real>().data();
 
     fill_radial_launcher(R_c,Radbuff,R_a,Angbuff,N,
-                      nowinopos_d,nowbox,
+                      nowinopos_d,nowbox_d,
                       howmany_d,with_d,
                       rad_descr_d,intmap2b_d,der2b_d,
                       des3bsupp_d,
                       der3bsupp_d,nf,numtriplet_d,
                       Rs,coeffA,coeffB,coeffC,Pow_alpha,Pow_beta, stream);
-    //cudaMemset(code_ret_d,sizeof(int),0);
-    //check_max_launcher(numtriplet_d,N*nf,Angbuff,code_ret_d, stream);
-    //cudaMemcpy(code_ret,code_ret_d,sizeof(int),cudaMemcpyDeviceToHost);
-    //if (code_ret[0]!=0){
-    //   printf("alpha_nes: Buffer angolare saturato, %d vs %d",code_ret[0],Angbuff);
-    //   exit(0);
-    // }
     fill_angular_launcher(R_c, Radbuff, R_a, Angbuff, N, nowinopos_d,
-		         nowbox, howmany_d, with_d, ang_descr_d,
+		         nowbox_d, howmany_d, with_d, ang_descr_d,
 			 intmap3b_d, des3bsupp_d, der3b_d, der3bsupp_d,
 			 nf, numtriplet_d, stream);
      }

@@ -59,4 +59,18 @@ Gates after stream wiring (V100, sequential float→double):
 | Inference float↔double | Compatible | Compatible |
 | `time_story` 1-epoch | 87.2 ms (×0.95 vs 91.5) | 154.0 ms (×1.03 vs 149.7) |
 
-Next single-GPU win after this: wire/fix GPU neighbor list (`celle_gpu` / descriptor cell list) — still D2H→CPU→H2D per frame today.
+## C — GPU neighbor list (2026-07-23)
+
+- Descriptor `ComputeDescriptorsLight` uses `celle_gpu.cu.cc` (cell build + IME + per-particle insertion sort).
+- No thrust-in-kernel; positions stay on GPU; only box (6×nf) touches the host for cell sizing.
+- `compila.sh` links `celle_gpu` instead of CPU `cell_list` / `interaction_map` (sources kept).
+- Streams: all NL launches on TF Eigen stream.
+
+Gates after C (V100):
+
+| Gate | float | double |
+| --- | --- | --- |
+| Force FD δ=0.001 | corr=0.99980 | corr=0.99994 |
+| Grad-param dw=1e-3 | families ≈1 | families ≈1 |
+| Inference float↔double | Compatible | Compatible |
+| `time_story` 1-epoch | **80.1 ms** (×0.88 vs 91.5) | **145.5 ms** (×0.97 vs 149.7) |
