@@ -37,12 +37,12 @@ def main():
     args = parser.parse_args()
 
     if args.precision == "float":
-        code_root = REPO / "AlphaNesGpu_float"
+        code_root = REPO / "STAF"
         dtype = np.float32
         model_dir = Path(args.model) if args.model else ROOT / "model_float"
         out_dir = ROOT / "inference_float"
     else:
-        code_root = REPO / "AlphaNesGpu_double"
+        code_root = REPO / "STAF"
         dtype = np.float64
         model_dir = Path(args.model) if args.model else ROOT / "model_double"
         out_dir = ROOT / "inference_double"
@@ -51,7 +51,7 @@ def main():
     sys.path.insert(0, str(REPO))
     from staf.dtype import set_precision
     set_precision(args.precision)
-    from staf_models.mixture.staf_model_inference_full import (
+    from staf_models.staf_model_inference_full import (
         staf_full_inference,
     )
 

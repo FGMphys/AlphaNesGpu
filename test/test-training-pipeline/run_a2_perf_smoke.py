@@ -30,9 +30,7 @@ def main():
     args = p.parse_args()
 
     run_dir = TRAIN / f"run_{args.precision}"
-    code_root = REPO / (
-        "AlphaNesGpu_float" if args.precision == "float" else "AlphaNesGpu_double"
-    )
+    code_root = REPO / "STAF"
     sys.path = [str(code_root)] + [x for x in sys.path if x != str(code_root)]
 
     import tensorflow as tf
@@ -52,13 +50,13 @@ def main():
     # keep local aliases for arrays
     assert tf.keras.backend.floatx() == dtype
 
-    from gradient_utility.mixture import register_force_3bAFs_grad  # noqa: F401
-    from gradient_utility.mixture import register_force_2bAFs_grad  # noqa: F401
-    from gradient_utility.mixture import register_3bAFs_grad  # noqa: F401
-    from gradient_utility.mixture import register_2bAFs_grad  # noqa: F401
-    from staf_models.mixture.staf_model import staf_full
-    from source_routine.mixture.physics_layer_mod import physics_layer, lognorm_layer
-    from source_routine.mixture.force_layer_mod import force_layer
+    from gradient_utility import register_force_3bAFs_grad  # noqa: F401
+    from gradient_utility import register_force_2bAFs_grad  # noqa: F401
+    from gradient_utility import register_3bAFs_grad  # noqa: F401
+    from gradient_utility import register_2bAFs_grad  # noqa: F401
+    from staf_models.staf_model import staf_full
+    from source_routine.physics_layer_mod import physics_layer, lognorm_layer
+    from source_routine.force_layer_mod import force_layer
     from source_routine.descriptor_builder import descriptor_layer
     from init_params.init_AFs_param import init_AFs_param
 

@@ -68,7 +68,7 @@ def main():
         "--precision",
         choices=["float", "double"],
         required=True,
-        help="float → AlphaNesGpu_float + model_float; double → double + model_double",
+        help="float|double → STAF/ (+ model_float|model_double); ops via precision",
     )
     p.add_argument(
         "--frame",
@@ -99,11 +99,11 @@ def main():
 
     # Scelta codice + modello esportato in base alla precisione.
     if args.precision == "float":
-        code_root = REPO / "AlphaNesGpu_float"
+        code_root = REPO / "STAF"
         dtype = np.float32
         model_dir = INFER / "model_float"
     else:
-        code_root = REPO / "AlphaNesGpu_double"
+        code_root = REPO / "STAF"
         dtype = np.float64
         model_dir = INFER / "model_double"
 
@@ -113,7 +113,7 @@ def main():
     from staf.dtype import set_precision
 
     set_precision(args.precision)
-    from staf_models.mixture.staf_model_inference_full import (
+    from staf_models.staf_model_inference_full import (
         staf_full_inference,
     )
 

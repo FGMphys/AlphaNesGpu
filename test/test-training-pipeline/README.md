@@ -4,9 +4,10 @@ Smoke test and float32/float64 compatibility check for STAF training on the MB-p
 
 ## Layout
 
-- `run_float/` — float32 training (`AlphaNesGpu_float`), dataset float32, `input_4test.yaml`
-- `run_double/` — float64 training (`AlphaNesGpu_double`), dataset float64, `input_4test.yaml`
+- `run_float/` — float32 training data + YAML (`precision: float`), uses `STAF/`
+- `run_double/` — float64 training data + YAML (`precision: double`), uses `STAF/`
 - `comparison/` — overlays, plots, performance baseline from `time_story`
+
 
 ## What we did
 
@@ -21,8 +22,7 @@ Smoke test and float32/float64 compatibility check for STAF training on the MB-p
 ```bash
 source ../../.venv/bin/activate
 cd run_float   # or run_double
-python ../../AlphaNesGpu_float/staf_train.py input_4test.yaml
-# double: ../../AlphaNesGpu_double/staf_train.py
+python ../../STAF/staf_train.py input_4test.yaml
 ```
 
 Dataset `.npy` files are gitignored; regenerate with the conversion used in the initial setup if needed.

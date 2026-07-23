@@ -41,7 +41,7 @@ def set_precision(
     code_root: Optional[Union[str, Path]] = None,
     default: Optional[PrecisionName] = None,
 ) -> PrecisionName:
-    """Set keras floatx and return the resolved TF dtype name."""
+    """Set keras floatx, select ops tree, and return the TF dtype name."""
     if raw is not None and str(raw).strip() != "":
         dtype = normalize_precision(raw)
     elif default is not None:
@@ -51,6 +51,18 @@ def set_precision(
     else:
         dtype = "float32"
     tf.keras.backend.set_floatx(dtype)
+    # Prefer selecting ops from the resolved dtype (unified STAF/).
+    try:
+        import sys
+
+        staf_dir = Path(__file__).resolve().parents[1] / "STAF"
+        if staf_dir.is_dir() and str(staf_dir) not in sys.path:
+            sys.path.insert(0, str(staf_dir))
+        from staf_paths import set_ops_root
+
+        set_ops_root("double" if dtype == "float64" else "float")
+    except Exception as exc:  # pragma: no cover - paths may be mid-migration
+        print(f"STAF: warning: could not set ops root ({exc})")
     print(f"STAF: precision set to {dtype}")
     return dtype
 

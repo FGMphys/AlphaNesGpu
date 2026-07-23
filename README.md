@@ -6,15 +6,18 @@
 
 > DOI: **10.1063/5.0139245**
 
-Official GPU trees (legacy directory names; Python package is ``staf_models``):
+Official code lives in **`STAF/`** (one tree; precision from YAML):
 
-- `AlphaNesGpu_float/` — float32 STAF (`staf_train.py`)
-- `AlphaNesGpu_double/` — float64 STAF (`staf_train.py`)
+```bash
+cd STAF
+bash install_path.sh all          # ops_float + ops_double
+python staf_train.py input_staf.yaml   # precision: float|double
+```
 
-Experimental variants live under `DEV/`. Runtime `.so` roots resolve via
-`staf_paths.code_root()` (`STAF_FLOAT_ROOT` / `STAF_DOUBLE_ROOT`).
+`AlphaNesGpu_float/` and `AlphaNesGpu_double/` are deprecated thin redirects.
+Experimental variants remain under `DEV/`.
 
-See `test/A2_PROGRESS.md` for the consolidation checklist.
+See `STAF/README.md`, `test/ACCEPTANCE.md`, and `test/A2_PROGRESS.md`.
 
 ## Performance baseline (reference)
 
@@ -38,23 +41,14 @@ Steady-state timings from `time_story.dat` (`displ_freq = 10` → each sample co
 
 float64 / float32 wall-time ratio on this workload: **≈ 1.64×**.
 
-Raw logs and notes: `test/test-training-pipeline/comparison/performance_baseline.txt`, `time_story_baseline_float.txt`, `time_story_baseline_double.txt`.
-
-See also `test/ACCEPTANCE.md` (gates before any refactor), `test/A2_PROGRESS.md`,
-`test/test-training-pipeline/README.md`, and `test/test-inference-pipeline/README.md`.
+Raw logs and notes: `test/test-training-pipeline/comparison/performance_baseline.txt`.
 
 ## Citation
 
 If you use this code, please cite:
 
 ```
-DOI: 10.1063/5.0139245
+Francesco Guidarelli Mattioli, Federico Dogo, Franz Saija, and Marco Fabrizio,
+"A Soft Two-Body Angular Fingerprint approach for the development of neural network potentials for water and biomolecular systems",
+J. Chem. Phys. 158, 104101 (2023). https://doi.org/10.1063/5.0139245
 ```
-
-## License
-
-BSD 3-Clause License
-
-## Contact
-
-francesco.guidarellimattioli@gmail.com
