@@ -1,0 +1,487 @@
+{
+  "flags": {
+    "precision": "double",
+    "n_frames": 16,
+    "n_per_family": 100,
+    "frame_indices": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15
+    ],
+    "seed": 0,
+    "deltas": [
+      0.01,
+      0.001,
+      0.0001
+    ],
+    "model_dir": "/home/francegm/AlphaNesGpu/test/test-training-pipeline/run_double/model_log1",
+    "yaml": "/home/francegm/AlphaNesGpu/test/test-training-pipeline/run_double/input_4test.yaml",
+    "code_root": "/home/francegm/AlphaNesGpu/AlphaNesGpu_double",
+    "loss": "MSE (energy and force separately)",
+    "method": "forward FD  g_num=(L(w+dw)-L(w))/dw",
+    "analytic": "tf.gradients mirroring full_train_e_f (no apply)",
+    "family_counts": {
+      "dense_kernel": {
+        "requested": 100,
+        "available": 56280,
+        "used": 100
+      },
+      "dense_bias": {
+        "requested": 100,
+        "available": 562,
+        "used": 100
+      },
+      "alpha2b": {
+        "requested": 100,
+        "available": 80,
+        "used": 80
+      },
+      "alpha3b_beta": {
+        "requested": 100,
+        "available": 240,
+        "n_active_eps": 160,
+        "used": 100
+      },
+      "alpha3b_gamma": {
+        "requested": 100,
+        "available": 240,
+        "n_active_eps": 160,
+        "used": 100
+      },
+      "alpha3b_delta": {
+        "requested": 100,
+        "available": 240,
+        "n_active_eps": 160,
+        "used": 100
+      }
+    }
+  },
+  "L_E": 9.495968832317862e-06,
+  "L_F": 0.05590061401941875,
+  "family_counts": {
+    "dense_kernel": {
+      "requested": 100,
+      "available": 56280,
+      "used": 100
+    },
+    "dense_bias": {
+      "requested": 100,
+      "available": 562,
+      "used": 100
+    },
+    "alpha2b": {
+      "requested": 100,
+      "available": 80,
+      "used": 80
+    },
+    "alpha3b_beta": {
+      "requested": 100,
+      "available": 240,
+      "n_active_eps": 160,
+      "used": 100
+    },
+    "alpha3b_gamma": {
+      "requested": 100,
+      "available": 240,
+      "n_active_eps": 160,
+      "used": 100
+    },
+    "alpha3b_delta": {
+      "requested": 100,
+      "available": 240,
+      "n_active_eps": 160,
+      "used": 100
+    }
+  },
+  "n_probes": 580,
+  "by_delta": [
+    {
+      "delta": 0.01,
+      "families": [
+        {
+          "family": "dense_kernel",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9910750060300875,
+            "slope": 1.1919009122502011,
+            "mae": 8.720273346509623e-06,
+            "rmse": 3.947396809691945e-05,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.9997687337809428,
+            "slope": 0.9701526139901026,
+            "mae": 0.0001644154233824059,
+            "rmse": 0.0009063384758682973,
+            "n_used": 100,
+            "n_total": 100
+          }
+        },
+        {
+          "family": "dense_bias",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9974445859306856,
+            "slope": 1.0179726507702167,
+            "mae": 6.378647040781963e-06,
+            "rmse": 1.202169052611985e-05,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.9999576775681298,
+            "slope": 1.0018753527296285,
+            "mae": 6.07947160200973e-05,
+            "rmse": 0.0001648223653876268,
+            "n_used": 100,
+            "n_total": 100
+          }
+        },
+        {
+          "family": "alpha2b",
+          "n": 80,
+          "loss_E": {
+            "correlation": 0.9867773041521212,
+            "slope": 0.9828506322000023,
+            "mae": 4.466703092104025e-06,
+            "rmse": 1.9134829505384327e-05,
+            "n_used": 80,
+            "n_total": 80
+          },
+          "loss_F": {
+            "correlation": 0.9999019107136171,
+            "slope": 1.045177567531798,
+            "mae": 0.0005923009843953536,
+            "rmse": 0.0027651092206038585,
+            "n_used": 80,
+            "n_total": 80
+          }
+        },
+        {
+          "family": "alpha3b_beta",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9974897073011948,
+            "slope": 0.9308861800378582,
+            "mae": 9.580230570246214e-07,
+            "rmse": 5.1350292326244896e-06,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.3850677692901618,
+            "slope": 0.14100771293000516,
+            "mae": 0.008337071896187199,
+            "rmse": 0.017457718309531915,
+            "n_used": 100,
+            "n_total": 100
+          }
+        },
+        {
+          "family": "alpha3b_gamma",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9982167798550811,
+            "slope": 0.9926976703118154,
+            "mae": 1.471726808422657e-06,
+            "rmse": 4.250920091139928e-06,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.3882540307694182,
+            "slope": 0.1570662400829616,
+            "mae": 0.009598136980160803,
+            "rmse": 0.020131521775044445,
+            "n_used": 100,
+            "n_total": 100
+          }
+        },
+        {
+          "family": "alpha3b_delta",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9998114242010678,
+            "slope": 0.9639020369095245,
+            "mae": 1.439014368045072e-07,
+            "rmse": 8.549609091901995e-07,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.05780987022516728,
+            "slope": 0.006316546743632397,
+            "mae": 0.007599216620003822,
+            "rmse": 0.01826015322245348,
+            "n_used": 100,
+            "n_total": 100
+          }
+        }
+      ]
+    },
+    {
+      "delta": 0.001,
+      "families": [
+        {
+          "family": "dense_kernel",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9998808522385844,
+            "slope": 1.01879165606499,
+            "mae": 8.58467017175201e-07,
+            "rmse": 3.873462066473368e-06,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.9999979475174968,
+            "slope": 0.9971452791029772,
+            "mae": 1.6018350207603322e-05,
+            "rmse": 8.704978173325742e-05,
+            "n_used": 100,
+            "n_total": 100
+          }
+        },
+        {
+          "family": "dense_bias",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9999738220985277,
+            "slope": 1.0017658124186182,
+            "mae": 6.362296615201472e-07,
+            "rmse": 1.1984030691740081e-06,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.9999995747206535,
+            "slope": 1.0001934779990693,
+            "mae": 6.08634387301972e-06,
+            "rmse": 1.651955790627023e-05,
+            "n_used": 100,
+            "n_total": 100
+          }
+        },
+        {
+          "family": "alpha2b",
+          "n": 80,
+          "loss_E": {
+            "correlation": 0.9998696310085046,
+            "slope": 0.9981902867276495,
+            "mae": 4.4684279124876353e-07,
+            "rmse": 1.9204722751220473e-06,
+            "n_used": 80,
+            "n_total": 80
+          },
+          "loss_F": {
+            "correlation": 0.9999989385102718,
+            "slope": 1.0045127370866758,
+            "mae": 5.915148146836245e-05,
+            "rmse": 0.000276218647939617,
+            "n_used": 80,
+            "n_total": 80
+          }
+        },
+        {
+          "family": "alpha3b_beta",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9999777597554439,
+            "slope": 0.9930754455617609,
+            "mae": 9.585132204591777e-08,
+            "rmse": 5.143033652885126e-07,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.38502855847073064,
+            "slope": 0.14074581226107832,
+            "mae": 0.008329358101755115,
+            "rmse": 0.01745772044518775,
+            "n_used": 100,
+            "n_total": 100
+          }
+        },
+        {
+          "family": "alpha3b_gamma",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9999823892511664,
+            "slope": 0.9992610199370356,
+            "mae": 1.4697402083420391e-07,
+            "rmse": 4.246837948540018e-07,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.388295447500949,
+            "slope": 0.15693807566024512,
+            "mae": 0.009587221084540793,
+            "rmse": 0.02013161127408658,
+            "n_used": 100,
+            "n_total": 100
+          }
+        },
+        {
+          "family": "alpha3b_delta",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9999982359812286,
+            "slope": 0.9963915843249946,
+            "mae": 1.4383652275785571e-08,
+            "rmse": 8.546117046695516e-08,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.057586669794362194,
+            "slope": 0.00628167064915001,
+            "mae": 0.007598709669919245,
+            "rmse": 0.01826049363485488,
+            "n_used": 100,
+            "n_total": 100
+          }
+        }
+      ]
+    },
+    {
+      "delta": 0.0001,
+      "families": [
+        {
+          "family": "dense_kernel",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9999987730638518,
+            "slope": 1.001874773177517,
+            "mae": 8.56980519312274e-08,
+            "rmse": 3.8652731448516857e-07,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.9999999797277768,
+            "slope": 0.9997159427345947,
+            "mae": 1.597452081056865e-06,
+            "rmse": 8.665903928772283e-06,
+            "n_used": 100,
+            "n_total": 100
+          }
+        },
+        {
+          "family": "dense_bias",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9999997376909909,
+            "slope": 1.0001762668313148,
+            "mae": 6.360648155685515e-08,
+            "rmse": 1.1980245025576022e-07,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.9999999957451858,
+            "slope": 1.0000194069517914,
+            "mae": 6.086984359927195e-07,
+            "rmse": 1.652318763259765e-06,
+            "n_used": 100,
+            "n_total": 100
+          }
+        },
+        {
+          "family": "alpha2b",
+          "n": 80,
+          "loss_E": {
+            "correlation": 0.9999987006645644,
+            "slope": 0.9998180802546419,
+            "mae": 4.468609276361047e-08,
+            "rmse": 1.9211772953675617e-07,
+            "n_used": 80,
+            "n_total": 80
+          },
+          "loss_F": {
+            "correlation": 0.9999999892993288,
+            "slope": 1.0004512228968137,
+            "mae": 5.914355088253564e-06,
+            "rmse": 2.7618902970310945e-05,
+            "n_used": 80,
+            "n_total": 80
+          }
+        },
+        {
+          "family": "alpha3b_beta",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9999997802595445,
+            "slope": 0.9993074129496208,
+            "mae": 9.58562277665478e-09,
+            "rmse": 5.1438336941387416e-08,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.3850244913504727,
+            "slope": 0.14071961744639475,
+            "mae": 0.008328667148340354,
+            "rmse": 0.017457722408157125,
+            "n_used": 100,
+            "n_total": 100
+          }
+        },
+        {
+          "family": "alpha3b_gamma",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.9999998241566873,
+            "slope": 0.9999260147145944,
+            "mae": 1.4695417786875962e-08,
+            "rmse": 4.2464307287142956e-08,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.38829922868469524,
+            "slope": 0.15692522869798706,
+            "mae": 0.009586135787491692,
+            "rmse": 0.02013162424816371,
+            "n_used": 100,
+            "n_total": 100
+          }
+        },
+        {
+          "family": "alpha3b_delta",
+          "n": 100,
+          "loss_E": {
+            "correlation": 0.999999982475469,
+            "slope": 0.9996391722444088,
+            "mae": 1.4383004286050382e-09,
+            "rmse": 8.545767748991957e-09,
+            "n_used": 100,
+            "n_total": 100
+          },
+          "loss_F": {
+            "correlation": 0.0575643312939093,
+            "slope": 0.006278187402853331,
+            "mae": 0.007598659031153079,
+            "rmse": 0.018260527690548665,
+            "n_used": 100,
+            "n_total": 100
+          }
+        }
+      ]
+    }
+  ]
+}

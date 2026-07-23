@@ -1,9 +1,35 @@
 {
+  "flags": {
+    "precision": "float",
+    "frame": 0,
+    "dataset_index": 4,
+    "n_atoms": 40,
+    "n_atoms_requested": 40,
+    "n_atoms_total": 768,
+    "seed": 0,
+    "deltas": [
+      0.1,
+      0.01,
+      0.001
+    ],
+    "model_dir": "/home/francegm/AlphaNesGpu/test/test-inference-pipeline/model_float",
+    "frames_dir": "/home/francegm/AlphaNesGpu/test/test-inference-pipeline/frames",
+    "method": "forward FD  F_num=-(E_f-E_i)/delta",
+    "consistency": "E_i \u2248 E_f + F_ana*delta"
+  },
   "precision": "float",
   "frame": 0,
   "dataset_index": 4,
-  "E_i": -106.36087036132812,
+  "seed": 0,
+  "n_atoms": 40,
   "n_atoms_probed": 40,
+  "deltas_requested": [
+    0.1,
+    0.01,
+    0.001
+  ],
+  "model_dir": "/home/francegm/AlphaNesGpu/test/test-inference-pipeline/model_float",
+  "E_i": -106.36087036132812,
   "atoms": [
     2,
     12,
@@ -49,53 +75,27 @@
   "deltas": [
     {
       "delta": 0.1,
-      "correlation": 0.604417696579423,
-      "slope": 0.5327972409200846,
-      "mae": 1.0795130827464163,
-      "rmse": 1.3714433438970426,
-      "E_i_consistency_mae": 0.10795130827464187
+      "correlation": 0.6043987313082894,
+      "slope": 0.5327817319316721,
+      "mae": 1.0795239811685557,
+      "rmse": 1.3714628147567396,
+      "E_i_consistency_mae": 0.10795239811685538
     },
     {
       "delta": 0.01,
-      "correlation": 0.9940877991689231,
-      "slope": 0.9545378914992694,
-      "mae": 0.11018112894768516,
-      "rmse": 0.138492269710102,
-      "E_i_consistency_mae": 0.0011018112894768469
+      "correlation": 0.9940703622876415,
+      "slope": 0.9548773654135355,
+      "mae": 0.1103783121254916,
+      "rmse": 0.13871586079349585,
+      "E_i_consistency_mae": 0.0011037831212557117
     },
     {
       "delta": 0.001,
-      "correlation": 0.9998221853884243,
-      "slope": 0.9934968777025316,
-      "mae": 0.01734072364245852,
-      "rmse": 0.021910356850742062,
-      "E_i_consistency_mae": 1.7340723642197037e-05
+      "correlation": 0.9998327422901934,
+      "slope": 0.9946945806631962,
+      "mae": 0.017853045517889164,
+      "rmse": 0.02158158656746874,
+      "E_i_consistency_mae": 1.7853045517431573e-05
     }
-  ],
-  "flags": {
-    "precision": "float",
-    "frame": 0,
-    "dataset_index": 4,
-    "n_atoms": 40,
-    "n_atoms_requested": 40,
-    "n_atoms_total": 768,
-    "seed": 0,
-    "deltas": [
-      0.1,
-      0.01,
-      0.001
-    ],
-    "frames_dir": "/home/francegm/AlphaNesGpu/test/test-inference-pipeline/frames",
-    "method": "forward FD  F_num=-(E_f-E_i)/delta",
-    "consistency": "E_i \u2248 E_f + F_ana*delta",
-    "model_dir": "/home/francegm/AlphaNesGpu/test/test-inference-pipeline/model_float"
-  },
-  "seed": 0,
-  "n_atoms": 40,
-  "deltas_requested": [
-    0.1,
-    0.01,
-    0.001
-  ],
-  "model_dir": "/home/francegm/AlphaNesGpu/test/test-inference-pipeline/model_float"
+  ]
 }

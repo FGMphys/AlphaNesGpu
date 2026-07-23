@@ -1,0 +1,46 @@
+# Input flags (CLI)
+precision=float
+n_frames=16
+n_per_family=100
+seed=0
+deltas=0.01 0.001 0.0001
+model_dir=/home/francegm/AlphaNesGpu/test/test-training-pipeline/run_float/model_log1
+yaml=/home/francegm/AlphaNesGpu/test/test-training-pipeline/run_float/input_4test.yaml
+code_root=/home/francegm/AlphaNesGpu/AlphaNesGpu_float
+loss=MSE (Loss_E and Loss_F separately)
+method=forward FD  g_num=(L(w+dw)-L(w))/dw
+
+# Family counts
+dense_kernel: used=100 available=56280 requested=100
+dense_bias: used=100 available=562 requested=100
+alpha2b: used=80 available=80 requested=100
+alpha3b_beta: used=100 available=240 requested=100
+alpha3b_gamma: used=100 available=240 requested=100
+alpha3b_delta: used=100 available=240 requested=100
+
+# Reference losses
+L_E=5.841710371897e-04
+L_F=4.376758635044e-02
+
+# Results per delta / family
+delta=0.01
+  dense_kernel n=100  E: corr=0.99142002 slope=0.91701586 mae=1.227948e-04 rmse=6.782157e-04 used=100/100  F: corr=0.99854694 slope=0.88755725 mae=9.691319e-04 rmse=5.349029e-03 used=100/100
+  dense_bias n=100  E: corr=0.99990224 slope=1.00574448 mae=1.494658e-05 rmse=2.925387e-05 used=100/100  F: corr=0.99988710 slope=0.98796222 mae=5.358552e-05 rmse=2.070983e-04 used=100/100
+  alpha2b n=80  E: corr=0.99984850 slope=1.00270120 mae=8.151646e-06 rmse=2.282840e-05 used=80/80  F: corr=0.99983934 slope=1.06309259 mae=5.583105e-04 rmse=2.495966e-03 used=80/80
+  alpha3b_beta n=100  E: corr=0.99984504 slope=0.98491053 mae=6.544243e-06 rmse=2.749984e-05 used=100/100  F: corr=0.99998409 slope=1.00650077 mae=1.574568e-05 rmse=5.738548e-05 used=100/100
+  alpha3b_gamma n=100  E: corr=0.99989175 slope=0.98821917 mae=8.431174e-06 rmse=2.597821e-05 used=100/100  F: corr=0.99997224 slope=1.00536663 mae=1.742333e-05 rmse=6.470072e-05 used=100/100
+  alpha3b_delta n=100  E: corr=0.99999372 slope=0.99631692 mae=2.708256e-07 rmse=1.266137e-06 used=100/100  F: corr=0.99999884 slope=1.00134106 mae=7.407435e-07 rmse=2.238684e-06 used=100/100
+delta=0.001
+  dense_kernel n=100  E: corr=0.99992168 slope=0.99098605 mae=1.268080e-05 rmse=7.079694e-05 used=100/100  F: corr=0.99998849 slope=0.98878359 mae=9.811199e-05 rmse=5.328849e-04 used=100/100
+  dense_bias n=100  E: corr=0.99999902 slope=1.00057751 mae=1.489727e-06 rmse=2.887258e-06 used=100/100  F: corr=0.99999889 slope=0.99880072 mae=6.140402e-06 rmse=2.063919e-05 used=100/100
+  alpha2b n=80  E: corr=0.99999846 slope=1.00031843 mae=8.552362e-07 rmse=2.284390e-06 used=80/80  F: corr=0.99999814 slope=1.00633082 mae=5.618259e-05 rmse=2.507674e-04 used=80/80
+  alpha3b_beta n=100  E: corr=0.99999857 slope=0.99849845 mae=6.717097e-07 rmse=2.689856e-06 used=100/100  F: corr=0.99999979 slope=1.00060589 mae=2.437731e-06 rmse=5.777451e-06 used=100/100
+  alpha3b_gamma n=100  E: corr=0.99999894 slope=0.99880755 mae=8.520252e-07 rmse=2.593094e-06 used=100/100  F: corr=0.99999965 slope=1.00053659 mae=2.859556e-06 rmse=6.826540e-06 used=100/100
+  alpha3b_delta n=100  E: corr=0.99999977 slope=0.99973638 mae=1.228015e-07 rmse=1.845732e-07 used=100/100  F: corr=0.99999790 slope=0.99996750 mae=1.593535e-06 rmse=2.243609e-06 used=100/100
+delta=0.0001
+  dense_kernel n=100  E: corr=0.99999914 slope=0.99915486 mae=2.047812e-06 rmse=7.179492e-06 used=100/100  F: corr=0.99999977 slope=0.99893531 mae=2.698566e-05 rmse=5.535016e-05 used=100/100
+  dense_bias n=100  E: corr=0.99999967 slope=1.00003213 mae=1.250332e-06 rmse=1.486135e-06 used=100/100  F: corr=0.99999777 slope=0.99976988 mae=2.019431e-05 rmse=2.489157e-05 used=100/100
+  alpha2b n=80  E: corr=0.99999914 slope=1.00024928 mae=1.282810e-06 rmse=1.713548e-06 used=80/80  F: corr=0.99999926 slope=1.00138933 mae=2.127739e-05 rmse=6.957893e-05 used=80/80
+  alpha3b_beta n=100  E: corr=0.99999921 slope=1.00017558 mae=1.308044e-06 rmse=1.678899e-06 used=100/100  F: corr=0.99999502 slope=1.00033469 mae=1.581213e-05 rmse=2.171999e-05 used=100/100
+  alpha3b_gamma n=100  E: corr=0.99999928 slope=1.00011021 mae=1.444300e-06 rmse=1.843330e-06 used=100/100  F: corr=0.99999603 slope=0.99934776 mae=1.502907e-05 rmse=2.049484e-05 used=100/100
+  alpha3b_delta n=100  E: corr=0.99998893 slope=1.00009377 mae=1.216464e-06 rmse=1.488888e-06 used=100/100  F: corr=0.99980610 slope=0.99800018 mae=1.717873e-05 rmse=2.305774e-05 used=100/100

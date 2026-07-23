@@ -16,6 +16,6 @@ method=forward FD  F_num=-(E_f-E_i)/delta
 consistency: E_i ≈ E_f + F_ana*delta
 
 # Results per delta
-delta=0.1  corr=0.60441770  slope=0.53279724  mae=1.079513e+00  rmse=1.371443e+00  E_i_consist_mae=1.079513e-01
-delta=0.01  corr=0.99408780  slope=0.95453789  mae=1.101811e-01  rmse=1.384923e-01  E_i_consist_mae=1.101811e-03
-delta=0.001  corr=0.99982219  slope=0.99349688  mae=1.734072e-02  rmse=2.191036e-02  E_i_consist_mae=1.734072e-05
+delta=0.1  corr=0.60439873  slope=0.53278173  mae=1.079524e+00  rmse=1.371463e+00  E_i_consist_mae=1.079524e-01
+delta=0.01  corr=0.99407036  slope=0.95487737  mae=1.103783e-01  rmse=1.387159e-01  E_i_consist_mae=1.103783e-03
+delta=0.001  corr=0.99983274  slope=0.99469458  mae=1.785305e-02  rmse=2.158159e-02  E_i_consist_mae=1.785305e-05
