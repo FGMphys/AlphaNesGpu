@@ -1,11 +1,11 @@
 #yaml input file
 
 # float32 | float64 (aliases: float|double). If omitted, inferred from code tree name.
-precision: float
+precision: double
 
 # Multi-GPU. none | mirrored | horovod (MPI×GPU; mpirun -np N).
 # Optional devices: logical GPU indices for mirrored only (default = all visible).
-distribute: none
+distribute: horovod
 # devices: [0, 1]
 
 #Dataset Path
@@ -43,7 +43,7 @@ map_ang_afs: {0: [14,13,13],1: [14,13,13]} #Dictionary for angular fingerprint
 ##Net parmater
 number_of_decoding_layers: 2 #number of hidden layer
 number_of_decoding_nodes: 140 140 #number of nodes for each layer
-number_of_epochs: 8000 #number of epochs (one epoch is when the entire training dataset has been optimizized
+number_of_epochs: 1 #number of epochs (one epoch is when the entire training dataset has been optimizized
 activation_function: tanh #Activation function
 
 #Training parameters

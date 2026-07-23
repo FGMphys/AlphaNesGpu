@@ -103,8 +103,8 @@ Harness: `test/test-inference-pipeline/compare_intmap_cpu_vs_gpu.py`.
 **Training YAML**
 
 ```yaml
-distribute: none          # none | mirrored | horovod (stub exits)
-# devices: [0, 1]         # optional; default = all TF-visible GPUs
+distribute: none          # none | mirrored | horovod
+# devices: [0, 1]         # mirrored only; horovod uses hvd.local_rank()
 ```
 
 - `none`: current single-device path.
@@ -115,9 +115,9 @@ distribute: none          # none | mirrored | horovod (stub exits)
   - **≥2 GPU:** `strategy.run` + Huber `Reduction.SUM` (mean across replicas
     in the wrapper). Full scaling / global-batch LR equivalence still TBD on
     Leonardo.
-- `horovod`: reserved for multi-node (Leonardo); clear exit until wired (A5).
+- `horovod`: see **A5** below.
 
-**Not done here:** true multi-GPU scaling validation (needs ≥2 GPUs); Horovod/MPI; MultiWorker.
+**Not done in A3:** true multi-GPU scaling validation (needs ≥2 GPUs); MultiWorker.
 
 ### Gates after A3 slice (V100, 2026-07-24)
 
@@ -126,5 +126,45 @@ distribute: none          # none | mirrored | horovod (stub exits)
 | Force FD δ=0.001 | corr=0.99981 | corr=0.99994 |
 | Grad-param dw=1e-3 | families ≈1 | families ≈1 |
 | Inference float↔double | Compatible | Compatible |
-| `time_story` 1-epoch (none) | **~77.7 ms/frame** (×0.85 vs 91.5) | — |
-| Mirrored 1-GPU smoke | OK (`distribute=mirrored`, save `model_log0`) | — |
+| `time_story` 1-epoch (none) | **~77.7 ms/frame** (×0.85 vs 91.5) | **~142.1 ms/frame** (×0.95 vs 149.7) |
+| Mirrored 1-GPU smoke | OK (~78.5 ms/frame, `model_log0`) | OK (~145.8 ms/frame, `model_log0`) |
+
+## A5 — Horovod MPI+GPU (2026-07-24)
+
+Same repo / YAML switch. Requires `horovod` + MPI launcher.
+
+```bash
+# smoke (1 rank / 1 GPU)
+cd test/test-training-pipeline/run_float
+mpirun -np 1 python ../../../STAF/staf_train.py input_horovod_smoke.yaml
+# Leonardo example (4 GPU/node):
+# mpirun -np 4 python staf_train.py input.yaml
+```
+
+Wiring in `STAF/staf_train.py`:
+- GPU init deferred until after YAML; `hvd.init()` + pin `gpus[local_rank]`
+- `hvd.DistributedOptimizer` on net/phys opts; initial LR × `hvd.size()`
+- train buffer shard `idx_str_tr[rank::size]`; test/save/logs on rank 0 only
+- `hvd.broadcast_variables` after first train step (or restart warm-up)
+
+Smoke YAMLs: `run_{float,double}/input_horovod_smoke.yaml`.
+
+Local gates (V100, `mpirun -np 1`, Horovod 0.28.1): float OK + `model_log0`; double OK + `model_log0`. Multi-rank scaling still Leonardo.
+
+### Distribute loss parity (`lcurve_notmean`)
+
+Same Seed / 1 epoch / every-step `log_batch_freq=1`, compare `none` vs `mirrored` vs `horovod` (`mpirun -np 1`):
+
+```bash
+python test/test-training-pipeline/compare_distribute_lcurve.py --precision float
+python test/test-training-pipeline/compare_distribute_lcurve.py --precision double
+```
+
+Results (V100, 2026-07-24), 125 steps:
+
+| precision | none vs mirrored | none vs horovod | notes |
+| --- | --- | --- | --- |
+| **double** | max‖ΔF‖ ≈ 1.6e-13 | max‖ΔF‖ ≈ 3.3e-14 | bit-identical within tol |
+| **float** | max‖ΔF‖ ≈ 2.0e-6 | max‖ΔF‖ ≈ 3.9e-6 | GPU order noise; all ‖ΔF‖ under 1e-5 |
+
+Artifacts: `test/test-training-pipeline/parity_distribute/{float,double}/`.

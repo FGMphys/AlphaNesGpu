@@ -50,35 +50,65 @@ except:
 tf.config.threading.set_intra_op_parallelism_threads(numthreads)
 print("STAF: tensorflow intra threads set to work with %d threads"%tf.config.threading.get_intra_op_parallelism_threads())
 
-gpus = tf.config.list_physical_devices('GPU')
-if gpus:
-  try:
-    # Currently, memory growth needs to be the same across GPUs
-    for gpu in gpus:
-      tf.config.experimental.set_memory_growth(gpu, True)
-    logical_gpus = tf.config.list_logical_devices('GPU')
-    print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
-  except RuntimeError as e:
-    # Memory growth must be set before GPUs have been initialized
-    print(e)
+def _configure_gpu_memory_growth(gpus):
+    if not gpus:
+        print("STAF: no GPU detected")
+        return
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        logical_gpus = tf.config.list_logical_devices('GPU')
+        print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+    except RuntimeError as e:
+        # Memory growth must be set before GPUs have been initialized
+        print(e)
 
-def build_distribute_strategy(full_param):
-    """Return (mode, strategy|None). devices: optional list of logical GPU indices."""
+def init_distribute(full_param):
+    """Return (mode, strategy|None, hvd_module|None).
+
+    GPU memory growth / visibility is configured here (after YAML) so Horovod
+    can pin each MPI rank to gpus[local_rank] before TF initializes devices.
+    """
     mode = str(full_param.get('distribute', 'none')).strip().lower()
     if mode in ('', 'none', 'null', 'single'):
+        _configure_gpu_memory_growth(tf.config.list_physical_devices('GPU'))
         print("STAF: distribute=none (single device)")
-        return 'none', None
+        return 'none', None, None
+
     if mode == 'horovod':
-        sys.exit(
-            "STAF: distribute=horovod is for multi-node (e.g. Leonardo + mpirun). "
-            "Not enabled in this slice; use distribute: mirrored on one node."
+        try:
+            import horovod.tensorflow as hvd
+        except ImportError:
+            sys.exit(
+                "STAF: distribute=horovod requires the horovod package.\n"
+                "  Install (example): HOROVOD_WITH_TENSORFLOW=1 pip install horovod\n"
+                "  Launch: mpirun -np <N> python staf_train.py <input.yaml>"
+            )
+        hvd.init()
+        gpus = tf.config.list_physical_devices('GPU')
+        _configure_gpu_memory_growth(gpus)
+        if gpus:
+            if hvd.local_rank() >= len(gpus):
+                sys.exit(
+                    "STAF: horovod local_rank=%d but only %d GPU(s) visible"
+                    % (hvd.local_rank(), len(gpus))
+                )
+            tf.config.set_visible_devices(gpus[hvd.local_rank()], 'GPU')
+        print(
+            "STAF: distribute=horovod size=%d rank=%d local_rank=%d"
+            % (hvd.size(), hvd.rank(), hvd.local_rank())
         )
+        return 'horovod', None, hvd
+
     if mode != 'mirrored':
         sys.exit(
             "STAF: unknown distribute=%r (use none | mirrored | horovod)" % mode
         )
+
+    _configure_gpu_memory_growth(tf.config.list_physical_devices('GPU'))
     devices_yaml = full_param.get('devices', None)
     if devices_yaml is not None:
+        # devices: optional list of logical GPU indices (ignored for horovod).
         dev_names = ['/GPU:%d' % int(i) for i in devices_yaml]
         strategy = tf.distribute.MirroredStrategy(devices=dev_names)
         print(
@@ -91,13 +121,14 @@ def build_distribute_strategy(full_param):
             "STAF: distribute=mirrored replicas=%d devices=all_visible"
             % strategy.num_replicas_in_sync
         )
-    return 'mirrored', strategy
+    return 'mirrored', strategy, None
 
 def wrap_train_method(trainmeth, strategy):
     """Call trainmeth under strategy.run; unwrap PerReplica for host logging.
 
     With 1 replica, skip strategy.run so Keras losses keep SUM_OVER_BATCH_SIZE
     (allowed only outside Strategy.run). Multi-replica uses SUM losses + mean.
+    Horovod uses DistributedOptimizer instead (no strategy.run).
     """
     if strategy is None or strategy.num_replicas_in_sync <= 1:
         return trainmeth
@@ -121,6 +152,57 @@ def wrap_train_method(trainmeth, strategy):
 
     return _call
 
+def scale_lr_param_for_horovod(lr_param_split, hvd_mod):
+    """Scale initial LR by hvd.size() (global-batch convention)."""
+    if hvd_mod is None or hvd_mod.size() <= 1:
+        return lr_param_split
+    out = list(lr_param_split)
+    try:
+        out[1] = str(float(out[1]) * float(hvd_mod.size()))
+        print(
+            "STAF: horovod scaled initial LR by size=%d → %s"
+            % (hvd_mod.size(), out[1])
+        )
+    except (IndexError, ValueError):
+        pass
+    return out
+
+def shard_idx_str(idx_str, hvd_mod, name):
+    """Frame-buffer sharding across MPI ranks (train path)."""
+    if hvd_mod is None or hvd_mod.size() <= 1:
+        return idx_str
+    shard = idx_str[hvd_mod.rank()::hvd_mod.size()]
+    if shard.shape[0] == 0:
+        sys.exit(
+            "STAF: horovod shard empty for %s on rank %d (size=%d); "
+            "use fewer ranks or a larger dataset"
+            % (name, hvd_mod.rank(), hvd_mod.size())
+        )
+    print(
+        "STAF: horovod sharded %s buffers %d → %d (rank %d/%d)"
+        % (name, idx_str.shape[0], shard.shape[0], hvd_mod.rank(), hvd_mod.size())
+    )
+    return shard
+
+def collect_broadcast_variables(model):
+    """Model + optimizer variables for hvd.broadcast_variables."""
+    vars_ = []
+    for net in model.nets:
+        vars_.extend(list(net.variables))
+    for phys in model.physics_layer:
+        vars_.extend([phys.alpha2b, phys.alpha3b, phys.type_emb_2b, phys.type_emb_3b])
+    for logn in model.lognorm_layer:
+        vars_.append(logn.mu)
+    try:
+        vars_.extend(list(model.opt_net.variables()))
+    except Exception:
+        pass
+    try:
+        vars_.extend(list(model.opt_phys.variables()))
+    except Exception:
+        pass
+    return vars_
+
 @tf.function()
 def MSE(ypred,y):
    loss_function=tf.reduce_mean(tf.square((ypred-y)))
@@ -142,7 +224,7 @@ def check_dimension(buffdim,dimension,mode):
        print("STAF: buffdim in ",mode," mode is bigger than number of frames in the dataset. We set buffdim=datasetdim!")
        res=dimension
     return res
-def make_idx_str(dimension,buffdim,mode):
+def make_idx_str(dimension,buffdim,mode,save_shuffle=True):
     buffdim=check_dimension(buffdim,dimension,mode)
     truedim=dimension//buffdim*buffdim
     rejected=dimension%buffdim
@@ -151,7 +233,7 @@ def make_idx_str(dimension,buffdim,mode):
     vec=np.arange(0,dimension)
     np.random.shuffle(vec)
     vec=np.reshape(vec[:truedim],(dimension//buffdim,buffdim))
-    if mode=='test':
+    if mode=='test' and save_shuffle:
        np.savetxt("shuffle_dataset_vec",vec)
     return buffdim,vec
 
@@ -249,7 +331,8 @@ def make_method(full_param,model):
 with open(sys.argv[1]) as file:
     full_param = yaml.load(file, Loader=yaml.FullLoader)
 set_precision(full_param.get("precision"))
-distribute_mode, strategy = build_distribute_strategy(full_param)
+distribute_mode, strategy, hvd_mod = init_distribute(full_param)
+is_chief = (hvd_mod is None) or (hvd_mod.rank() == 0)
 
 def dist_scope():
     """Fresh strategy.scope() each time (context managers are single-use)."""
@@ -261,11 +344,13 @@ try:
     if tipos.shape[0]>1:
        tipos=[n_per_type for n_per_type in tipos[:,0]]
        type_map=make_typemap(tipos)
-       np.savetxt('type_map.dat',np.array(type_map,dtype='int'),fmt='%d')
+       if is_chief:
+           np.savetxt('type_map.dat',np.array(type_map,dtype='int'),fmt='%d')
     else:
        tipos=[tipos[0,0]]
        type_map=make_typemap(tipos)
-       np.savetxt('type_map.dat',np.array(type_map,dtype='int'),fmt='%d')
+       if is_chief:
+           np.savetxt('type_map.dat',np.array(type_map,dtype='int'),fmt='%d')
     nt=len(tipos)
     print("STAF: detected ",nt," types of atoms.")
     N=len(type_map)
@@ -321,9 +406,12 @@ if subsamp!='no':
 else:
    dimtr=pos_map_tr.shape[0]
    dimts=pos_map_ts.shape[0]
-[buffer_stream_tr,idx_str_tr]=make_idx_str(dimtr,buffer_stream_tr,'train')
-[buffer_stream_ts,idx_str_ts]=make_idx_str(dimts,buffer_stream_ts,'test')
-
+[buffer_stream_tr,idx_str_tr]=make_idx_str(dimtr,buffer_stream_tr,'train',
+                                             save_shuffle=is_chief)
+[buffer_stream_ts,idx_str_ts]=make_idx_str(dimts,buffer_stream_ts,'test',
+                                             save_shuffle=is_chief)
+# Horovod: shard train buffers across ranks (test stays full; only rank 0 evaluates).
+idx_str_tr = shard_idx_str(idx_str_tr, hvd_mod, 'train')
 
 ### Loop parameters
 ne=int(full_param['number_of_epochs'])
@@ -377,13 +465,15 @@ restart=restart_par
 ## (under MirroredStrategy.scope when distribute=mirrored)
 with dist_scope():
     if restart_par=='no' or restart_par=='only_afs':
-        lr_net_param=full_param['lr_dense_net'].split()
+        lr_net_param=scale_lr_param_for_horovod(
+            full_param['lr_dense_net'].split(), hvd_mod)
         lr_net=build_learning_rate(lr_net_param,ne,nb,idx_str_tr.shape[0],'net',0)
 
         opt_net_param=full_param['optimizer_net'].split()
         opt_net=build_optimizer(opt_net_param,lr_net,0)
 
-        lr_phys_param=full_param['lr_phys_net'].split()
+        lr_phys_param=scale_lr_param_for_horovod(
+            full_param['lr_phys_net'].split(), hvd_mod)
         lr_phys=build_learning_rate(lr_phys_param,ne,nb,idx_str_tr.shape[0],'phys',0)
         opt_phys_param=full_param['optimizer_phys'].split()
         opt_phys=build_optimizer(opt_phys_param,lr_phys,0)
@@ -397,6 +487,10 @@ with dist_scope():
              config_phys=pickle.load(source)
         opt_phys=tf.keras.optimizers.Adam()
         opt_phys=opt_phys.from_config(config_phys)
+    if hvd_mod is not None:
+        opt_net = hvd_mod.DistributedOptimizer(opt_net)
+        opt_phys = hvd_mod.DistributedOptimizer(opt_phys)
+        print("STAF: optimizers wrapped with hvd.DistributedOptimizer")
 
 ##Here we fix the value that prevents the explosion of the exponential
 try:
@@ -440,49 +534,57 @@ with dist_scope():
                  type_map,restart,seed_par)
 [trainmeth,testmeth]=make_method(full_param,model)
 trainmeth=wrap_train_method(trainmeth, strategy)
+_hvd_need_bcast = (hvd_mod is not None)
 #################################################################################
 #################################################################################
 
 bestval=10**5
-if restart_par!='no' and restart_par!='only_afs':
-   fileOU=open('lcurve.out','a')
-   print("STAF: learning curve restart from ",restart_par)
-   out_time=open("time_story_restart.dat",'a')
-   lr_file=open("lr_step.dat",'a')
+_devnull = open(os.devnull, 'w')
+if is_chief:
+    if restart_par!='no' and restart_par!='only_afs':
+       fileOU=open('lcurve.out','a')
+       print("STAF: learning curve restart from ",restart_par)
+       out_time=open("time_story_restart.dat",'a')
+       lr_file=open("lr_step.dat",'a')
+    else:
+       fileOU=open('lcurve.out','w')
+       # xmgrace: xmgrace -nxy lcurve.out
+       print("# STAF epoch validation curve (test-set RMSE + training loss)", file=fileOU)
+       print("# Columns: step RMSE_e RMSE_f Loss_Tot lr_net lr_phys epoch", file=fileOU)
+       print("# Plot: xmgrace -nxy lcurve.out", file=fileOU)
+       print("@    title \"STAF validation curve\"", file=fileOU)
+       print("@    xaxis  label \"Global step\"", file=fileOU)
+       print("@    yaxis  label \"RMSE / Loss\"", file=fileOU)
+       print("@    s0 legend \"RMSE_e (test)\"", file=fileOU)
+       print("@    s1 legend \"RMSE_f (test)\"", file=fileOU)
+       print("@    s2 legend \"Loss_Tot (train)\"", file=fileOU)
+       print("@    s3 legend \"lr_net\"", file=fileOU)
+       print("@    s4 legend \"lr_phys\"", file=fileOU)
+       print("@    s5 legend \"epoch\"", file=fileOU)
+       out_time=open("time_story.dat",'w')
+       print("#Time per epoch training  #Time per epoch test\n",file=out_time)
+       lr_file=open("lr_step.dat",'w')
+       print("# STAF learning-rate schedule (net)", file=lr_file)
+       print("# Columns: lr_net", file=lr_file)
+       print("@    title \"STAF lr_net\"", file=lr_file)
+       print("@    s0 legend \"lr_net\"", file=lr_file)
 else:
-   fileOU=open('lcurve.out','w')
-   # xmgrace: xmgrace -nxy lcurve.out
-   print("# STAF epoch validation curve (test-set RMSE + training loss)", file=fileOU)
-   print("# Columns: step RMSE_e RMSE_f Loss_Tot lr_net lr_phys epoch", file=fileOU)
-   print("# Plot: xmgrace -nxy lcurve.out", file=fileOU)
-   print("@    title \"STAF validation curve\"", file=fileOU)
-   print("@    xaxis  label \"Global step\"", file=fileOU)
-   print("@    yaxis  label \"RMSE / Loss\"", file=fileOU)
-   print("@    s0 legend \"RMSE_e (test)\"", file=fileOU)
-   print("@    s1 legend \"RMSE_f (test)\"", file=fileOU)
-   print("@    s2 legend \"Loss_Tot (train)\"", file=fileOU)
-   print("@    s3 legend \"lr_net\"", file=fileOU)
-   print("@    s4 legend \"lr_phys\"", file=fileOU)
-   print("@    s5 legend \"epoch\"", file=fileOU)
-   out_time=open("time_story.dat",'w')
-   print("#Time per epoch training  #Time per epoch test\n",file=out_time)
-   lr_file=open("lr_step.dat",'w')
-   print("# STAF learning-rate schedule (net)", file=lr_file)
-   print("# Columns: lr_net", file=lr_file)
-   print("@    title \"STAF lr_net\"", file=lr_file)
-   print("@    s0 legend \"lr_net\"", file=lr_file)
+    fileOU = _devnull
+    out_time = _devnull
+    lr_file = _devnull
 
-metrics_log = MetricsLog(full_param.get("metrics_log"))
+metrics_log = MetricsLog(full_param.get("metrics_log") if is_chief else None)
 
 model_name=full_param['model_name']
 if restart_par=='no' or restart_par=='only_afs' or restart_par=='all_params':
     restart_ep=0
-    os.mkdir(model_name)
-    model.save_model_init(model_name)
-    for k in range(nt):
-       Physics_Layers[k].savealphas(model_name,"type"+str(k)+"initial_")
-       Lognorm_Layers[k].savemu(model_name,"type"+str(k)+"initial_")
-       accumul=0
+    if is_chief:
+        os.mkdir(model_name)
+        model.save_model_init(model_name)
+        for k in range(nt):
+           Physics_Layers[k].savealphas(model_name,"type"+str(k)+"initial_")
+           Lognorm_Layers[k].savemu(model_name,"type"+str(k)+"initial_")
+    accumul=0
 else:
     restart_ep=int(restart_par.split('log')[-1])+1
     accumul=restart_ep*nb*idx_str_tr.shape[0]
@@ -495,19 +597,26 @@ else:
     [dummyloss,dummylosse,dummylossb,dummylossf]=trainmeth(raddescr[k*bs:(k+1)*bs],angdescr[k*bs:(k+1)*bs],des3bsupp[k*bs:(k+1)*bs],intmap2b[k*bs:(k+1)*bs],intder2b[k*bs:(k+1)*bs],intmap3b[k*bs:(k+1)*bs],intder3b[k*bs:(k+1)*bs],intder3bsupp[k*bs:(k+1)*bs],numtriplet[k*bs:(k+1)*bs],e_map_tr[index][k*bs:(k+1)*bs],f_map_tr[index][k*bs:(k+1)*bs],0.,0.,0.)
     model.build_opt_weights()
     model.set_opt_weight()
+    if _hvd_need_bcast:
+        hvd_mod.broadcast_variables(collect_broadcast_variables(model), root_rank=0)
+        _hvd_need_bcast = False
+        print("STAF: horovod broadcast after restart warm-up (root=0)")
 
 
-lcurve_notmean=open('lcurve_notmean','w')
-# xmgrace: xmgrace -nxy lcurve_notmean
-print("# STAF per-batch losses (not epoch-averaged)", file=lcurve_notmean)
-print("# Columns: step Loss_E Loss_F Loss_Bound", file=lcurve_notmean)
-print("# Plot: xmgrace -nxy lcurve_notmean", file=lcurve_notmean)
-print("@    title \"STAF batch losses (lcurve_notmean)\"", file=lcurve_notmean)
-print("@    xaxis  label \"Global step\"", file=lcurve_notmean)
-print("@    yaxis  label \"Batch loss\"", file=lcurve_notmean)
-print("@    s0 legend \"Loss_E\"", file=lcurve_notmean)
-print("@    s1 legend \"Loss_F\"", file=lcurve_notmean)
-print("@    s2 legend \"Loss_Bound\"", file=lcurve_notmean)
+if is_chief:
+    lcurve_notmean=open('lcurve_notmean','w')
+    # xmgrace: xmgrace -nxy lcurve_notmean
+    print("# STAF per-batch losses (not epoch-averaged)", file=lcurve_notmean)
+    print("# Columns: step Loss_E Loss_F Loss_Bound", file=lcurve_notmean)
+    print("# Plot: xmgrace -nxy lcurve_notmean", file=lcurve_notmean)
+    print("@    title \"STAF batch losses (lcurve_notmean)\"", file=lcurve_notmean)
+    print("@    xaxis  label \"Global step\"", file=lcurve_notmean)
+    print("@    yaxis  label \"Batch loss\"", file=lcurve_notmean)
+    print("@    s0 legend \"Loss_E\"", file=lcurve_notmean)
+    print("@    s1 legend \"Loss_F\"", file=lcurve_notmean)
+    print("@    s2 legend \"Loss_Bound\"", file=lcurve_notmean)
+else:
+    lcurve_notmean = _devnull
 try:
    displ_freq=int(full_param['displ_freq'])
 except:
@@ -582,15 +691,20 @@ for ep in range(restart_ep,ne):
                 intder3b[k*bs:(k+1)*bs], intder3bsupp[k*bs:(k+1)*bs],
                 numtriplet[k*bs:(k+1)*bs], e_t[k*bs:(k+1)*bs], f_t[k*bs:(k+1)*bs],
                 pe, pf, pb)
+            if _hvd_need_bcast:
+                hvd_mod.broadcast_variables(
+                    collect_broadcast_variables(model), root_rank=0)
+                _hvd_need_bcast = False
+                print("STAF: horovod broadcast after first train step (root=0)")
             lrnow=model.get_lrnet()
             lrnow2=model.get_lrphys()
             accumul=accumul+1
             loss_buffer+=loss
-            if accumul % log_batch_freq == 0:
+            if is_chief and accumul % log_batch_freq == 0:
                 print(accumul, float(losse.numpy()), float(lossf.numpy()),
                       float(loss_bound.numpy()), file=lcurve_notmean)
                 lr_file.write(str(float(lrnow.numpy())) + '\n')
-            if accumul % displ_freq == 0:
+            if is_chief and accumul % displ_freq == 0:
                 lcurve_notmean.flush()
                 lr_file.flush()
                 print("Epoch ",ep," step ",accumul,". Time to elaborate ",displ_freq," batch of ",bs," frames is",(time.time()-start_loc))
@@ -599,9 +713,11 @@ for ep in range(restart_ep,ne):
         losstot+=loss_buffer
     losstot*=1/(k+1)/(numbuf+1)
     stop_tr=time.time()
-    lcurve_notmean.flush()
-    lr_file.flush()
-    if (ep%freq_test==0):
+    if is_chief:
+        lcurve_notmean.flush()
+        lr_file.flush()
+    # Test + checkpoint: rank 0 only under Horovod (avoids racing model_log*).
+    if is_chief and (ep%freq_test==0):
        nbuf_ts = idx_str_ts.shape[0]
        fut_ts = _prefetch_pool.submit(
            _load_buffer_host, pos_map_ts, box_map_ts, e_map_ts, f_map_ts, idx_str_ts[0]

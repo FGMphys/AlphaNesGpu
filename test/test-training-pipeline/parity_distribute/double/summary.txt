@@ -1,0 +1,14 @@
+precision=double epochs=1
+rtol=1e-08 atol=1e-10
+n_rows_ref=125
+OVERALL_OK=True
+
+none_vs_mirrored: ok=True steps_match=True n=125
+  Loss_E: max_abs=1.738925e-16 max_rel=1.406062e-11 allclose=True
+  Loss_F: max_abs=1.592546e-13 max_rel=3.108587e-12 allclose=True
+  Loss_Bound: max_abs=0.000000e+00 max_rel=0.000000e+00 allclose=True
+
+none_vs_horovod: ok=True steps_match=True n=125
+  Loss_E: max_abs=5.809968e-17 max_rel=4.538647e-12 allclose=True
+  Loss_F: max_abs=3.314710e-14 max_rel=6.470184e-13 allclose=True
+  Loss_Bound: max_abs=0.000000e+00 max_rel=0.000000e+00 allclose=True

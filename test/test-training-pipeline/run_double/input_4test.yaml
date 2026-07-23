@@ -3,8 +3,8 @@
 # float32 | float64 (aliases: float|double). If omitted, inferred from code tree name.
 precision: double
 
-# Multi-GPU (same node). none | mirrored | horovod (stub → exit).
-# Optional devices: list of logical GPU indices (default = all TF-visible).
+# Multi-GPU. none | mirrored | horovod (MPI×GPU; mpirun -np N).
+# Optional devices: logical GPU indices for mirrored only (default = all visible).
 distribute: none
 # devices: [0, 1]
 
