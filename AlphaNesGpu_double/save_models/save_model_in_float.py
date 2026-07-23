@@ -89,7 +89,7 @@ call = [
     for k in range(nt)
 ]
 
-# Ancillary files required by alpha_nes_model_inference_full
+# Ancillary files required by staf_model_inference_full
 for aux in ("model_error", "type.dat", "cutoff_info"):
     src = os.path.join(input_model, aux)
     if os.path.exists(src):

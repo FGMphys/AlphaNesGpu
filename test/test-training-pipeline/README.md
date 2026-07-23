@@ -21,8 +21,8 @@ Smoke test and float32/float64 compatibility check for STAF training on the MB-p
 ```bash
 source ../../.venv/bin/activate
 cd run_float   # or run_double
-python ../../AlphaNesGpu_float/alpha_nnpes_full_main.py input_4test.yaml
-# double: ../../AlphaNesGpu_double/alpha_nnpes_full_main.py
+python ../../AlphaNesGpu_float/staf_train.py input_4test.yaml
+# double: ../../AlphaNesGpu_double/staf_train.py
 ```
 
 Dataset `.npy` files are gitignored; regenerate with the conversion used in the initial setup if needed.

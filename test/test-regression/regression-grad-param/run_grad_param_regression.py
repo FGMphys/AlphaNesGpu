@@ -456,7 +456,7 @@ def _build_model(precision: str, n_frames: int, tf):
     from gradient_utility.mixture import register_3bAFs_grad  # noqa: F401
     from gradient_utility.mixture import register_2bAFs_grad  # noqa: F401
 
-    from alphanes_models.mixture.alpha_nes_model import alpha_nes_full
+    from staf_models.mixture.staf_model import staf_full
     from source_routine.mixture.physics_layer_mod import physics_layer, lognorm_layer
     from source_routine.mixture.force_layer_mod import force_layer
     from source_routine.descriptor_builder import descriptor_layer
@@ -513,7 +513,7 @@ def _build_model(precision: str, n_frames: int, tf):
     def mse(ypred, y):
         return tf.reduce_mean(tf.square(ypred - y))
 
-    model = alpha_nes_full(
+    model = staf_full(
         Physics_Layers,
         Force_Layer,
         nhl,

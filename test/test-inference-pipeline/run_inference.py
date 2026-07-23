@@ -48,8 +48,8 @@ def main():
         out_dir = ROOT / "inference_double"
 
     sys.path.insert(0, str(code_root))
-    from alphanes_models.mixture.alpha_nes_model_inference_full import (
-        alpha_nes_full_inference,
+    from staf_models.mixture.staf_model_inference_full import (
+        staf_full_inference,
     )
 
     gpus = tf.config.list_physical_devices("GPU")
@@ -73,7 +73,7 @@ def main():
     n_frames = pos_all.shape[0]
 
     print(f"Loading model from {model_dir}")
-    model = alpha_nes_full_inference(str(model_dir))
+    model = staf_full_inference(str(model_dir))
     out_dir.mkdir(exist_ok=True)
 
     store = {

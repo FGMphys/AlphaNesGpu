@@ -6,15 +6,15 @@
 
 > DOI: **10.1063/5.0139245**
 
-Official GPU trees (legacy directory names, renamed in A2 packaging):
+Official GPU trees (legacy directory names; Python package is ``staf_models``):
 
-- `AlphaNesGpu_float/` — float32 STAF
-- `AlphaNesGpu_double/` — float64 STAF
+- `AlphaNesGpu_float/` — float32 STAF (`staf_train.py`)
+- `AlphaNesGpu_double/` — float64 STAF (`staf_train.py`)
 
 Experimental variants live under `DEV/`. Runtime `.so` roots resolve via
 `staf_paths.code_root()` (`STAF_FLOAT_ROOT` / `STAF_DOUBLE_ROOT`).
 
-Usage and installation docs will be rewritten as the repository is reorganized.
+See `test/A2_PROGRESS.md` for the consolidation checklist.
 
 ## Performance baseline (reference)
 
@@ -40,7 +40,8 @@ float64 / float32 wall-time ratio on this workload: **≈ 1.64×**.
 
 Raw logs and notes: `test/test-training-pipeline/comparison/performance_baseline.txt`, `time_story_baseline_float.txt`, `time_story_baseline_double.txt`.
 
-See also `test/ACCEPTANCE.md` (gates before any refactor), `test/test-training-pipeline/README.md`, and `test/test-inference-pipeline/README.md`.
+See also `test/ACCEPTANCE.md` (gates before any refactor), `test/A2_PROGRESS.md`,
+`test/test-training-pipeline/README.md`, and `test/test-inference-pipeline/README.md`.
 
 ## Citation
 

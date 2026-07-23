@@ -109,8 +109,8 @@ def main():
 
     sys.path.insert(0, str(code_root))
     import tensorflow as tf
-    from alphanes_models.mixture.alpha_nes_model_inference_full import (
-        alpha_nes_full_inference,
+    from staf_models.mixture.staf_model_inference_full import (
+        staf_full_inference,
     )
 
     gpus = tf.config.list_physical_devices("GPU")
@@ -143,7 +143,7 @@ def main():
     comps = np.array(comps, dtype=int)  # colonne: atom, xyz, flat_idx in (3N,)
 
     print(f"Loading {model_dir}")
-    model = alpha_nes_full_inference(str(model_dir))
+    model = staf_full_inference(str(model_dir))
     # Warm-up GPU / graph, poi misura di riferimento (E_i, F_ana).
     _ = _energy_and_force(model, pos0, box0)
     e_i, f_ana = _energy_and_force(model, pos0, box0)
