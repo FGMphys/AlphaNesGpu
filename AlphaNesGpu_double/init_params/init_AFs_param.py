@@ -37,10 +37,10 @@ def init_AFs_param(restart,full_param,nt,seed_par):
     nt_couple=int(nt*(nt+1)/2)
     try:
         alpha_bound=float(full_param['alpha_bound'])
-        print("alpha_nes: alphas will be upper-bound to custom",alpha_bound,sep=' ',end='\n')
+        print("STAF: alphas will be upper-bound to custom",alpha_bound,sep=' ',end='\n')
     except:
         alpha_bound=1.
-        print("alpha_nes: alphas will be upper-bound to default",alpha_bound,sep=' ',end='\n')
+        print("STAF: alphas will be upper-bound to default",alpha_bound,sep=' ',end='\n')
     limit=alpha_bound
     limit3b=alpha_bound
     if restart=='no':
@@ -103,13 +103,13 @@ def init_AFs_param(restart,full_param,nt,seed_par):
            initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype('float64') for k in range(nt)]
            initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float64') for k in range(nt)]
            initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
-    print("alpha_nes: Two-Body Atomic fingerprints are ",end='\n')
-    print("alpha_nes: atom type   number\n")
+    print("STAF: Two-Body Atomic fingerprints are ",end='\n')
+    print("STAF: atom type   number\n")
     for k in range(nt):
-        print("alpha_nes:     ",nalpha_r_arr[k,0],"        ",nalpha_r_arr[k,1])
-        print("alpha_nes: Three-Body Atomic fingerprints are ",end='\n')
-        print("alpha_nes: atom type   number\n")
+        print("STAF:     ",nalpha_r_arr[k,0],"        ",nalpha_r_arr[k,1])
+        print("STAF: Three-Body Atomic fingerprints are ",end='\n')
+        print("STAF: atom type   number\n")
     for k in range(nt):
-        print("alpha_nes:      ",nalpha_a_arr[k,0],"        ",nalpha_a_arr[k,1])
+        print("STAF:      ",nalpha_a_arr[k,0],"        ",nalpha_a_arr[k,1])
 
     return init_alpha2b,init_alpha3b,init_mu,initial_type_emb,np.random.get_state()

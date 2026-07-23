@@ -1,6 +1,6 @@
 import tensorflow as tf
 
-from alphanes_paths import code_root
+from staf_paths import code_root
 root_path = str(code_root())
 force2b_sopath=root_path+'/src/mixture/force/rad/reforce.so'
 force3b_sopath=root_path+'/src/mixture/force/ang/reforce.so'

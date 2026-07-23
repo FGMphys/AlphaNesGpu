@@ -20,9 +20,11 @@ ACCEPTANCE gates 2–3 (refresh perf baseline if timings move).
 
 ## D7 — hardcoded `root_path` — **fixed**
 
-Loaders use `alphanes_paths.code_root()` with optional
-`ALPHANES_DOUBLE_ROOT` / `ALPHANES_FLOAT_ROOT`.
-`install_path.sh` no longer `sed`s Python sources.
+Loaders use `staf_paths.code_root()` with preferred
+`STAF_DOUBLE_ROOT` / `STAF_FLOAT_ROOT` (deprecated aliases
+`ALPHANES_*_ROOT` still work). `install_path.sh` no longer `sed`s Python
+sources. Module `alphanes_paths` remains a thin re-export until A2 renames
+packages (`alphanes_models` → STAF packaging).
 
 ## D8 — divergent `__syncthreads` in angular grads — **mitigated**
 

@@ -7,7 +7,7 @@ from source_routine.mixture.physics_layer_mod import physics_layer
 from source_routine.mixture.physics_layer_mod import lognorm_layer
 from source_routine.descriptor_builder import descriptor_layer
 from source_routine.mixture.force_layer_mod import force_debug_layer
-print("alpha_nes: Inference of AlphaNesGPU_double full")
+print("STAF: Inference (double, full)")
 
 def make_typemap(tipos):
     num=0
@@ -45,13 +45,13 @@ class alpha_nes_full_inference(tf.Module):
           else:
              self.nt_couple=int(self.ntipos*(self.ntipos+1)/2)
           print("Model 4")
-          print("Alpha_inference: Found ",self.ntipos," types of atoms")
-          print("Alpha_inference: Found ",self.N," atoms")
-          print("Alpha_inference: Found ",self.rad_buff," for radial buffer")
-          print("Alpha_inference: Found ",self.ang_buff," for angular buffer")
-          print("Alpha_inference: Found ",self.rc," for cutoff 2body")
-          print("Alpha_inference: Found ",self.rc_ang," for cutoff 3body")
-          print("Alpha_inference: Found ",self.rs," for hard cutoff")
+          print("STAF: Found ",self.ntipos," types of atoms")
+          print("STAF: Found ",self.N," atoms")
+          print("STAF: Found ",self.rad_buff," for radial buffer")
+          print("STAF: Found ",self.ang_buff," for angular buffer")
+          print("STAF: Found ",self.rc," for cutoff 2body")
+          print("STAF: Found ",self.rc_ang," for cutoff 3body")
+          print("STAF: Found ",self.rs," for hard cutoff")
 
           self.descriptor_layer=descriptor_layer(self.rc,self.rad_buff,self.rc_ang,self.ang_buff,self.N,self.boxinit,self.rs,self.max_batch)
 

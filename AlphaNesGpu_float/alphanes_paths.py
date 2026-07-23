@@ -1,14 +1,4 @@
-"""Resolve the AlphaNesGpu_float code root (for loading .so custom ops).
+"""Deprecated alias for ``staf_paths`` (kept for import compatibility)."""
+from staf_paths import code_root  # noqa: F401
 
-Override with env ``ALPHANES_FLOAT_ROOT`` if the tree is relocated.
-"""
-from __future__ import annotations
-
-import os
-from pathlib import Path
-
-_DEFAULT = Path(__file__).resolve().parent
-
-
-def code_root() -> Path:
-    return Path(os.environ.get("ALPHANES_FLOAT_ROOT", _DEFAULT)).resolve()
+__all__ = ["code_root"]

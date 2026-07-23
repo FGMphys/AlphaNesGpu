@@ -31,18 +31,18 @@ from init_params.init_AFs_param import init_AFs_param
 print("\n RUNNING ON TF VERSION ",tf.__version__)
 try:
    numthreads=int(os.environ['TF_INTER_THREADS'])
-   print("alpha_nes: tensorflow inter threads set to work with %d threads"%numthreads)
+   print("STAF: tensorflow inter threads set to work with %d threads"%numthreads)
 except:
    numthreads=1
-#   print("alpha_nes: tensorflow set to work with %d threads"%numthreads)
+#   print("STAF: tensorflow set to work with %d threads"%numthreads)
 tf.config.threading.set_inter_op_parallelism_threads(numthreads)
-print("alpha_nes: tensorflow inter threads set to work with %d threads"%tf.config.threading.get_inter_op_parallelism_threads())
+print("STAF: tensorflow inter threads set to work with %d threads"%tf.config.threading.get_inter_op_parallelism_threads())
 try:
    numthreads=int(os.environ['TF_INTRA_THREADS'])
 except:
    numthreads=1
 tf.config.threading.set_intra_op_parallelism_threads(numthreads)
-print("alpha_nes: tensorflow intra threads set to work with %d threads"%tf.config.threading.get_intra_op_parallelism_threads())
+print("STAF: tensorflow intra threads set to work with %d threads"%tf.config.threading.get_intra_op_parallelism_threads())
 
 gpus = tf.config.list_physical_devices('GPU')
 if gpus:
@@ -74,15 +74,15 @@ def make_dataset_stream(base_pattern,mode):
 def check_dimension(buffdim,dimension,mode):
     res=buffdim
     if buffdim>dimension:
-       print("alpha_nes: buffdim in ",mode," mode is bigger than number of frames in the dataset. We set buffdim=datasetdim!")
+       print("STAF: buffdim in ",mode," mode is bigger than number of frames in the dataset. We set buffdim=datasetdim!")
        res=dimension
     return res
 def make_idx_str(dimension,buffdim,mode):
     buffdim=check_dimension(buffdim,dimension,mode)
     truedim=dimension//buffdim*buffdim
     rejected=dimension%buffdim
-    print("\nalpha_nes: Dataset in mode ",mode," has frames ",dimension,"\n")
-    print("\nalpha_nes: It will be rejected ",rejected,' frames picked randomly to ensure batch size and buffer requested.\n')
+    print("\nSTAF: Dataset in mode ",mode," has frames ",dimension,"\n")
+    print("\nSTAF: It will be rejected ",rejected,' frames picked randomly to ensure batch size and buffer requested.\n')
     vec=np.arange(0,dimension)
     np.random.shuffle(vec)
     vec=np.reshape(vec[:truedim],(dimension//buffdim,buffdim))
@@ -113,7 +113,7 @@ def read_cutoff_info(full_param):
     rc_ang=float(full_param['Rc_Angular'])
     maxneigh=int(full_param['Max_Angular_Neigh'])
     ang_buff=int(maxneigh*(maxneigh-1)/2)
-    print("alpha_nes: Rc ",rc," Radial_Buffer ",rad_buff," Rc_Angular ",
+    print("STAF: Rc ",rc," Radial_Buffer ",rad_buff," Rc_Angular ",
            rc_ang,"Angular_Buffer ",ang_buff,"Hard cut-off ",rs)
     return [rc,rad_buff,rc_ang,ang_buff,rs]
 
@@ -131,26 +131,26 @@ def make_loss(full_param):
            HUBER = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE)
            model_loss=HUBER
            val_loss=MSE
-           print("alpha_nes: the loss function is huber loss and validation loss is MSE")
+           print("STAF: the loss function is huber loss and validation loss is MSE")
         else:
            model_loss=MSE
            val_loss=MSE
-           print("alpha_nes: the loss function is MSE loss as the validation loss")
+           print("STAF: the loss function is MSE loss as the validation loss")
     except:
         HUBER = tf.keras.losses.Huber(reduction=tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE)
         model_loss=HUBER
         val_loss=MSE
-        print("alpha_nes: the loss function is huber loss and validation loss is MSE")
+        print("STAF: the loss function is huber loss and validation loss is MSE")
     try:
         pe=tf.constant(float(full_param['loss_energy_prefactor']),dtype='float64')
         pf=tf.constant(float(full_param['loss_force_prefactor']),dtype='float64')
         pb=tf.constant(1.,dtype='float64')
-        print("alpha_nes: pe and pf set to custom values",pe.numpy(),pf.numpy(),sep=' ',end='\n')
+        print("STAF: pe and pf set to custom values",pe.numpy(),pf.numpy(),sep=' ',end='\n')
     except:
         pe=tf.constant(1.,dtype='float64')
         pf=tf.constant(1.,dtype='float64')
         pb=tf.constant(1.,dtype='float64')
-        print("alpha_nes: pe and pf set to default value 1 1",sep=' ',end='\n')
+        print("STAF: pe and pf set to default value 1 1",sep=' ',end='\n')
 
     return model_loss,val_loss,pe,pf,pb
 
@@ -162,13 +162,13 @@ def make_method(full_param,model):
     if train_meth=='energy+force':
        trainmeth=model.full_train_e_f
        testmeth=model.full_test_e_f
-       print("alpha_nes: training will be on both energies and forces")
+       print("STAF: training will be on both energies and forces")
     elif train_meth=='energy':
          trainmeth=model.full_train_e
          testmeth=model.full_test_e
-         print("alpha_nes: training will be on  energies only")
+         print("STAF: training will be on  energies only")
     else:
-        sys.exit("alpha_nes: Error in type_of_training key. Possible choices are energy+force or energy")
+        sys.exit("STAF: Error in type_of_training key. Possible choices are energy+force or energy")
     return trainmeth,testmeth
 
 
@@ -189,10 +189,10 @@ try:
        type_map=make_typemap(tipos)
        np.savetxt('type_map.dat',np.array(type_map,dtype='int'),fmt='%d')
     nt=len(tipos)
-    print("alpha_nes: detected ",nt," types of atoms.")
+    print("STAF: detected ",nt," types of atoms.")
     N=len(type_map)
 except:
-    sys.exit("alpha_nes: In the dataset folder it is expected to have a type.dat file with the code for the atom type!")
+    sys.exit("STAF: In the dataset folder it is expected to have a type.dat file with the code for the atom type!")
 
 
 from gradient_utility.mixture import register_force_3bAFs_grad
@@ -218,13 +218,13 @@ try:
     seed(seed_par)
     tf.random.set_seed(seed_par+1)
     os.environ['PYTHONHASHSEED']=str(seed_par)
-    print("alpha_nes: seed fixed to custom value ", seed_par,end='\n')
+    print("STAF: seed fixed to custom value ", seed_par,end='\n')
 except:
     seed_par=12345
     seed(seed_par)
     tf.random.set_seed(seed_par+1)
     os.environ['PYTHONHASHSEED']=str(seed_par)
-    print("alpha_nes: seed fixed by default 12345\n")
+    print("STAF: seed fixed by default 12345\n")
 #Read dataset map on disk
 [e_map_tr,f_map_tr,pos_map_tr,box_map_tr]=make_dataset_stream(base_pattern,'training')
 [e_map_ts,f_map_ts,pos_map_ts,box_map_ts]=make_dataset_stream(base_pattern,'test')
@@ -251,14 +251,14 @@ ne=int(full_param['number_of_epochs'])
 
 bs=int(full_param['batch_size'])
 if ((buffer_stream_tr%bs)!=0.):
-   sys.exit("alpha_nes: batch size must be a divisor of buffer stream train dimension")
+   sys.exit("STAF: batch size must be a divisor of buffer stream train dimension")
 else:
-   print("alpha_nes: batch selected for train is ",bs)
+   print("STAF: batch selected for train is ",bs)
 bs_test=int(full_param['batch_size_test'])
 if ((buffer_stream_ts%bs_test)!=0.):
-   sys.exit("alpha_nes: batch size must be a divisor of buffer stream test dimension")
+   sys.exit("STAF: batch size must be a divisor of buffer stream test dimension")
 else:
-   print("alpha_nes: batch selected for test is ",bs_test)
+   print("STAF: batch selected for test is ",bs_test)
 
 #nb=idx_str_tr.shape[1]//bs+idx_str_tr.shape[1]%bs
 nb=int(buffer_stream_tr/bs)
@@ -278,21 +278,21 @@ tf.keras.backend.set_floatx('float64')
 try:
     restart_par=full_param['restart']
     if os.path.isdir(restart_par):
-        print("alpha_nes: Training will restart from state of folder ",restart_par)
-        print("alpha_nes: Be sure of using the same input file of previous run")
+        print("STAF: Training will restart from state of folder ",restart_par)
+        print("STAF: Be sure of using the same input file of previous run")
     elif restart_par=='from_last':
         folders=gl.glob('model_log*')
         folders.sort(key=order_folder)
         restart_par=folders[-2]
-        print("alpha_nes: Training will restart from last previous state ",restart_par)
+        print("STAF: Training will restart from last previous state ",restart_par)
     elif restart_par=='only_afs':
-        print("alpha_nes: AFs will be initialised by user. Be sure to have defined afs_param_folder key.")
+        print("STAF: AFs will be initialised by user. Be sure to have defined afs_param_folder key.")
     else:
         restart_par='no'
-        print("alpha_nes: Not indicated or not existing restart folder. It will be begun a new run")
+        print("STAF: Not indicated or not existing restart folder. It will be begun a new run")
 except:
     restart_par='no'
-    print("alpha_nes: Not indicated or not existing restart folder. It will be begun a new run")
+    print("STAF: Not indicated or not existing restart folder. It will be begun a new run")
 restart=restart_par
 
 ##If we are not restarting, we initialiaze the optimizer and the learning rate
@@ -321,10 +321,10 @@ else:
 ##Here we fix the value that prevents the explosion of the exponential
 try:
     alpha_bound=float(full_param['alpha_bound'])
-    print("alpha_nes: alphas will be upper-bound to custom",alpha_bound,sep=' ',end='\n')
+    print("STAF: alphas will be upper-bound to custom",alpha_bound,sep=' ',end='\n')
 except:
     alpha_bound=1.
-    print("alpha_nes: alphas will be upper-bound to default",alpha_bound,sep=' ',end='\n')
+    print("STAF: alphas will be upper-bound to default",alpha_bound,sep=' ',end='\n')
 
 limit=alpha_bound
 limit3b=alpha_bound
@@ -362,7 +362,7 @@ model=alpha_nes_full(Physics_Layers,Force_Layer,nhl,nD,actfun,1,model_loss,
 bestval=10**5
 if restart_par!='no' and restart_par!='only_afs':
    fileOU=open('lcurve.out','a')
-   print("alpha_nes: learning curve restart from ",restart_par)
+   print("STAF: learning curve restart from ",restart_par)
    out_time=open("time_story_restart.dat",'a')
    lr_file=open("lr_step.dat",'a')
 else:
@@ -428,10 +428,10 @@ except:
    displ_freq=1
 try:
    freq_test=int(full_param['freq_test'])
-   print("alpha_nes: test will be ever ",freq_test," epochs")
+   print("STAF: test will be ever ",freq_test," epochs")
 except:
    freq_test=1
-   print("alpha_nes: test will be ever ",freq_test," epochs")
+   print("STAF: test will be ever ",freq_test," epochs")
 start_loc=time.time()
 for ep in range(restart_ep,ne):
     losstot=tf.constant(0.,dtype='float64')
@@ -447,7 +447,7 @@ for ep in range(restart_ep,ne):
         max_ang=np.max(numtriplet.numpy())
         max_buff=int(max_ang*(max_ang-1)/2)
         if (max_buff>ang_buff):
-            print("alpha_nes: found angular neighbours beyond the buffer (%d vs %d)"%(max_buff,ang_buff))
+            print("STAF: found angular neighbours beyond the buffer (%d vs %d)"%(max_buff,ang_buff))
             sys.exit()
         nb=int(buffer_stream_tr/bs)
         for k in range(nb):

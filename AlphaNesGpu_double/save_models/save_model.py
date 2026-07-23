@@ -47,7 +47,7 @@ for guess in range(100):
        nt=nt+1
     else:
        guess=100
-print("Alphanes: detected ",nt," atom species system")
+print("STAF: detected ",nt," atom species system")
 
 
 mean=[np.loadtxt(input_model+'/type'+str(k)+'_alpha_mu.dat',dtype='float64') for k in range(nt)]

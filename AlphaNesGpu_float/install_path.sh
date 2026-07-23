@@ -16,8 +16,8 @@ COMPCAP=$($PYTHON_PATH get_compcap.py)
 # Ensure bare `python` in legacy compila.sh resolves to the same interpreter
 export PATH="$(dirname "$PYTHON_PATH"):$PATH"
 
-# Custom-op .so paths are resolved at runtime via alphanes_paths.code_root()
-# (optional override: ALPHANES_FLOAT_ROOT). No sed of Python sources.
+# Custom-op .so paths are resolved at runtime via staf_paths.code_root()
+# (optional override: STAF_FLOAT_ROOT or ALPHANES_FLOAT_ROOT). No sed of Python sources.
 
 
 

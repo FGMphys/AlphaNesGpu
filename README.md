@@ -6,7 +6,13 @@
 
 > DOI: **10.1063/5.0139245**
 
-GPU implementations for single and double precision live in `AlphaNesGpu_float` and `AlphaNesGpu_double`. Experimental models are under `DEV/`.
+Official GPU trees (legacy directory names, renamed in A2 packaging):
+
+- `AlphaNesGpu_float/` — float32 STAF
+- `AlphaNesGpu_double/` — float64 STAF
+
+Experimental variants live under `DEV/`. Runtime `.so` roots resolve via
+`staf_paths.code_root()` (`STAF_FLOAT_ROOT` / `STAF_DOUBLE_ROOT`).
 
 Usage and installation docs will be rewritten as the repository is reorganized.
 

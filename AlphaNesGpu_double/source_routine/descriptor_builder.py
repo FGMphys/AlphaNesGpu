@@ -7,7 +7,7 @@ import sys
 
 
 
-from alphanes_paths import code_root
+from staf_paths import code_root
 root_path = str(code_root())
 descriptor_sopath=root_path+'/src/descriptor_builder/reforce.so'
 

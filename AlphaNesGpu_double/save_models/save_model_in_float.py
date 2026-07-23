@@ -51,7 +51,7 @@ for guess in range(100):
         nt = nt + 1
     else:
         break
-print("Alphanes: detected ", nt, " atom species system")
+print("STAF: detected ", nt, " atom species system")
 
 mean = [
     np.loadtxt(input_model + "/type" + str(k) + "_alpha_mu.dat", dtype="float32")
@@ -107,4 +107,4 @@ for k in range(nt):
         sh.copy(input_model + "/type" + str(k) + "_type_emb_2b.dat", namemodel)
         sh.copy(input_model + "/type" + str(k) + "_type_emb_3b.dat", namemodel)
 
-print("Alphanes: float32 inference model written to", namemodel)
+print("STAF: float32 inference model written to", namemodel)

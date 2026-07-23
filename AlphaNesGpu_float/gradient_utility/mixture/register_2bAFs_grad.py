@@ -4,7 +4,7 @@ from tensorflow.python.framework import ops
 from tensorflow.python.ops import array_ops
 from tensorflow.python.ops import sparse_ops
 
-from alphanes_paths import code_root
+from staf_paths import code_root
 root_path = str(code_root())
 compute_2b_pargrad = tf.load_op_library(root_path+'/src/mixture/grad_finger/rad/reforce.so')
 

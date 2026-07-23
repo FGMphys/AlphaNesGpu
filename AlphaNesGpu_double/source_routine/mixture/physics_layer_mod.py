@@ -1,7 +1,7 @@
 import tensorflow as tf
 import numpy as np
 
-from alphanes_paths import code_root
+from staf_paths import code_root
 root_path = str(code_root())
 proj2b_sopath=root_path+'/src/mixture/fingerprint/rad/reforce.so'
 proj3b_sopath=root_path+'/src/mixture/fingerprint/ang/reforce.so'

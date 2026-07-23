@@ -177,7 +177,7 @@ REGISTER_OP("ConstructDescriptorsLight")
 
 	   int numpar=numpar_T.flat<int>()(0);
            int max_batch=max_batch_T.flat<int>()(0);
-           printf("\nAlpha_nes: Descriptor constructor found Rc %f\n",R_c);
+           printf("\nSTAF: Descriptor constructor found Rc %f\n",R_c);
 	   printf("          Ra %f Rs %f Radbuff %d Angbuff %d max_batch %d N_max %d\n",R_a,Rs,Radbuff,Angbuff,max_batch,numpar);
            construct_repulsion();
            construct_descriptor(box_T.flat<float>().data(),numpar,max_batch);

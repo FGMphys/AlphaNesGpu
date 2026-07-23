@@ -19,8 +19,8 @@ fi
 COMPCAP=$($PYTHON_PATH get_compcap.py)
 export PATH="$(dirname "$PYTHON_PATH"):$PATH"
 
-# Custom-op .so paths are resolved at runtime via alphanes_paths.code_root()
-# (optional override: ALPHANES_DOUBLE_ROOT). No sed of Python sources.
+# Custom-op .so paths are resolved at runtime via staf_paths.code_root()
+# (optional override: STAF_DOUBLE_ROOT or ALPHANES_DOUBLE_ROOT). No sed of Python sources.
 
 
 

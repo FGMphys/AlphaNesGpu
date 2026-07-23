@@ -1,6 +1,6 @@
 # Acceptance gates (pre-refactor freeze)
 
-Any modification, integration, or refactor of STAF / AlphaNesGpu must stay
+Any modification, integration, or refactor of **STAF** must stay
 comparable to these baselines **before** it is considered acceptable.
 
 Frozen reference: git tag **`pre-refactor`** (see `git describe --tags`).
