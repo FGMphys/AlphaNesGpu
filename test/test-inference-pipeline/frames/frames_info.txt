@@ -1,0 +1,6 @@
+split=test
+n_frames=10
+seed=0
+indices=[4, 12, 22, 52, 79, 90, 149, 185, 243, 247]
+source=/home/francegm/AlphaNesGpu/test/test-training-pipeline/run_double/dataset/test
+natoms=768

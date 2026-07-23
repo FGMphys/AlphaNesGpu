@@ -12,7 +12,7 @@ Usage and installation docs will be rewritten as the repository is reorganized.
 
 ## Performance baseline (reference)
 
-Measured on **Tesla V100-PCIE-16GB** (driver 470.256.02, CUDA 11.8, TensorFlow 2.14) with the MB-pol water test in `test/run_{float,double}` (`dataset_MBPOL_278_223_248_full`).
+Measured on **Tesla V100-PCIE-16GB** (driver 470.256.02, CUDA 11.8, TensorFlow 2.14) with the MB-pol water test in `test/test-training-pipeline/run_{float,double}` (`dataset_MBPOL_278_223_248_full`).
 
 | Quantity | Value |
 | --- | --- |
@@ -32,7 +32,9 @@ Steady-state timings from `time_story.dat` (`displ_freq = 10` → each sample co
 
 float64 / float32 wall-time ratio on this workload: **≈ 1.64×**.
 
-Raw logs and notes: `test/comparison/performance_baseline.txt`, `time_story_baseline_float.txt`, `time_story_baseline_double.txt`.
+Raw logs and notes: `test/test-training-pipeline/comparison/performance_baseline.txt`, `time_story_baseline_float.txt`, `time_story_baseline_double.txt`.
+
+See also `test/test-training-pipeline/README.md` and `test/test-inference-pipeline/README.md`.
 
 ## Citation
 

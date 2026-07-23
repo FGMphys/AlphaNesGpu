@@ -1,0 +1,101 @@
+{
+  "precision": "double",
+  "frame": 0,
+  "dataset_index": 4,
+  "E_i": -106.36092171239508,
+  "n_atoms_probed": 40,
+  "atoms": [
+    2,
+    12,
+    16,
+    25,
+    30,
+    55,
+    61,
+    67,
+    129,
+    133,
+    197,
+    207,
+    225,
+    229,
+    296,
+    324,
+    368,
+    373,
+    405,
+    413,
+    418,
+    450,
+    464,
+    471,
+    479,
+    503,
+    542,
+    553,
+    579,
+    600,
+    611,
+    620,
+    642,
+    646,
+    657,
+    675,
+    699,
+    721,
+    740,
+    754
+  ],
+  "deltas": [
+    {
+      "delta": 0.1,
+      "correlation": 0.6044021668804577,
+      "slope": 0.532802011946914,
+      "mae": 1.0794522783474059,
+      "rmse": 1.3714045311954801,
+      "E_i_consistency_mae": 0.10794522783474049
+    },
+    {
+      "delta": 0.01,
+      "correlation": 0.9940435542312497,
+      "slope": 0.9548558386914623,
+      "mae": 0.10955582477544927,
+      "rmse": 0.1381808474321598,
+      "E_i_consistency_mae": 0.001095558247755098
+    },
+    {
+      "delta": 0.001,
+      "correlation": 0.9999406423293542,
+      "slope": 0.9955897070318921,
+      "mae": 0.010820178761406824,
+      "rmse": 0.013742012589739127,
+      "E_i_consistency_mae": 1.0820178760676905e-05
+    }
+  ],
+  "flags": {
+    "precision": "double",
+    "frame": 0,
+    "dataset_index": 4,
+    "n_atoms": 40,
+    "n_atoms_requested": 40,
+    "n_atoms_total": 768,
+    "seed": 0,
+    "deltas": [
+      0.1,
+      0.01,
+      0.001
+    ],
+    "frames_dir": "/home/francegm/AlphaNesGpu/test/test-inference-pipeline/frames",
+    "method": "forward FD  F_num=-(E_f-E_i)/delta",
+    "consistency": "E_i \u2248 E_f + F_ana*delta",
+    "model_dir": "/home/francegm/AlphaNesGpu/test/test-inference-pipeline/model_double"
+  },
+  "seed": 0,
+  "n_atoms": 40,
+  "deltas_requested": [
+    0.1,
+    0.01,
+    0.001
+  ],
+  "model_dir": "/home/francegm/AlphaNesGpu/test/test-inference-pipeline/model_double"
+}

@@ -16,13 +16,19 @@ env/
 # Test run outputs and converted datasets (keep type.dat / yaml tracked)
 test/**/dataset/**/*.npy
 test/**/model_log*/
-test/run_*/lcurve*
-test/run_*/*.out
-test/run_*/type_map.dat
-test/run_*/cutoff_curve.dat
-test/run_*/lr_step.dat
-test/run_*/time_story*.dat
-test/run_*/shuffle_dataset_vec
+test/**/source_model_log*/
+test/**/model_float/
+test/**/model_double/
+test/test-training-pipeline/run_*/lcurve*
+test/test-training-pipeline/run_*/*.out
+test/test-training-pipeline/run_*/type_map.dat
+test/test-training-pipeline/run_*/cutoff_curve.dat
+test/test-training-pipeline/run_*/lr_step.dat
+test/test-training-pipeline/run_*/time_story*.dat
+test/test-training-pipeline/run_*/shuffle_dataset_vec
+test/test-inference-pipeline/frames/*.npy
+test/test-inference-pipeline/inference_*/**
+test/test-regression/**/results_*/
 **/*.npy
 
 # Editor / OS

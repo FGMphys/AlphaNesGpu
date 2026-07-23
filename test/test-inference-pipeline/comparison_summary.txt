@@ -1,0 +1,47 @@
+STAF inference float32 vs float64 compatibility
+frames: [4, 12, 22, 52, 79, 90, 149, 185, 243, 247]
+overall_compatible: True
+
+== Dense outputs ==
+energy: max_abs=7.171046e-05 mean_abs=5.693561e-05 rms=5.794080e-05 median_rel=5.041036e-07
+force: max_abs=4.184510e-05 mean_abs=4.296374e-06 rms=6.304139e-06 median_rel=7.575988e-06
+force_radial: max_abs=4.129669e-05 mean_abs=4.177038e-06 rms=6.136801e-06 median_rel=7.400719e-06
+force_angular: max_abs=2.437907e-06 mean_abs=2.930031e-07 rms=3.903513e-07 median_rel=1.301092e-06
+
+== Gradients (∂E/∂AF) ==
+grad_radial: max_abs=7.485557e-07 mean_abs=3.105748e-08 median_rel=9.384690e-07
+grad_angular: max_abs=2.252023e-05 mean_abs=1.238980e-07 median_rel=5.793069e-07
+
+== Nested float tensors (unmasked) ==
+fingerprint: max_abs=2.235064e-02 mean_abs=5.906748e-05 median_rel=1.997656e-07 worst=fingerprint[7][1]
+grad_listed: max_abs=2.252023e-05 mean_abs=7.747773e-08 median_rel=7.588880e-07 worst=grad_listed[9][1][1]
+x2b: max_abs=1.033519e+02 mean_abs=6.790266e-01 median_rel=8.353172e-07 worst=x2b[6][0]
+x3b: max_abs=6.973864e-07 mean_abs=2.734161e-09 median_rel=0.000000e+00 worst=x3b[7][1]
+x3bsupp: max_abs=2.354438e+02 mean_abs=4.618689e-01 median_rel=9.109300e-07 worst=x3bsupp[8][1]
+intder2b: max_abs=2.586843e+02 mean_abs=1.582472e-01 median_rel=6.852869e-07 worst=intder2b[5][1]
+intder3b: max_abs=4.932376e-07 mean_abs=2.045068e-09 median_rel=3.008897e-08 worst=intder3b[5][1]
+intder3bsupp: max_abs=1.946346e+02 mean_abs=7.619255e-02 median_rel=6.215354e-07 worst=intder3bsupp[7][1]
+
+== Radial tensors with active-neighbor mask (int2b[:,:,0]=howmany) ==
+x2b: ACTIVE max_abs=1.498338e-06 median_rel=1.544408e-07 | PADDED max_abs=1.033519e+02
+x3bsupp: ACTIVE max_abs=6.854534e-07 median_rel=1.036269e-07 | PADDED max_abs=2.354438e+02
+intder2b: ACTIVE max_abs=3.095542e-06 median_rel=2.699284e-07 | PADDED max_abs=2.586843e+02
+intder3bsupp: ACTIVE max_abs=4.776136e-07 median_rel=2.473560e-07 | PADDED max_abs=1.946346e+02
+
+== Interaction maps (int) ==
+int2b: exact_match=True n_mismatch=0/468480 frac=0.000000e+00
+int3b: exact_match=True n_mismatch=0/27187200 frac=0.000000e+00
+
+== Verdicts ==
+[OK] energy: max|Δ|=7.171e-05
+[OK] force: max|Δ|=4.185e-05
+[OK] grad_radial: max|Δ|=7.486e-07
+[OK] grad_angular: max|Δ|=2.252e-05
+[OK] fingerprint: max|Δ|=2.235e-02
+[OK] x3b: max|Δ|=6.974e-07
+[OK] x2b_active: active max|Δ|=1.498e-06
+[OK] int2b: frac_mismatch=0.0
+[OK] int3b: frac_mismatch=0.0
+
+CONCLUSION: inference float32 ↔ float64 is compatible.
+Large raw descriptor diffs are unused padded neighbor-buffer entries only.
