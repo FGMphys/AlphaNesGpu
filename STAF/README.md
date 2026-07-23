@@ -25,7 +25,9 @@ Layout:
 | `staf_models/` | Training + inference models (no `mixture/` nesting) |
 | `source_routine/` | Descriptor, physics, force layers |
 | `gradient_utility/` | Custom-op gradient registrations |
-| `ops_float/`, `ops_double/` | Compiled CUDA `.so` (until `real` unify) |
+| `ops_float/`, `ops_double/` | Compiled CUDA `.so` via `real` (`STAF/include/staf_real.h`) |
 | `staf_paths.py` | Resolves active ops root from precision |
+| `include/staf_real.h` | `real` / `staf_exp` / `sizeof(real)` for both precisions |
+
 
 Deprecated entry points: `../AlphaNesGpu_float/`, `../AlphaNesGpu_double/` (thin redirects).
