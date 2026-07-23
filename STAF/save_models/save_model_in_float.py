@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Export a double-precision trained STAF checkpoint as a float32 inference model.
 
-Mirror of AlphaNesGpu_float/save_models/save_model_in_double.py.
+Convert checkpoint to float32 inference export.
 Usage:
   python save_model_in_float.py -imodel /path/to/model_logN -modelname /path/to/out_float
 """

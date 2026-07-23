@@ -20,10 +20,7 @@ from numpy.random import seed
 from numpy import random
 from numpy.random import default_rng
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]  # repo root
 _STAF_HOME = Path(__file__).resolve().parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
 if str(_STAF_HOME) not in sys.path:
     sys.path.insert(0, str(_STAF_HOME))
 from staf.dtype import set_precision, tf_dtype, zero  # noqa: E402
@@ -31,6 +28,7 @@ from staf.dtype import set_precision, tf_dtype, zero  # noqa: E402
 from optimizer_learning_rate_utility import build_learning_rate
 from optimizer_learning_rate_utility import build_optimizer
 from init_params.init_AFs_param import init_AFs_param
+from learning_utility.metrics_log import MetricsLog
 
 
 
@@ -396,6 +394,8 @@ else:
    print("@    title \"STAF lr_net\"", file=lr_file)
    print("@    s0 legend \"lr_net\"", file=lr_file)
 
+metrics_log = MetricsLog(full_param.get("metrics_log"))
+
 model_name=full_param['model_name']
 if restart_par=='no' or restart_par=='only_afs' or restart_par=='all_params':
     restart_ep=0
@@ -504,6 +504,15 @@ for ep in range(restart_ep,ne):
        np.savetxt(outfold_name+"/model_error",[np.sqrt(vallosstote),np.sqrt(vallosstotf)],header='RMSE_e  RMSE_f ')
        print(accumul,np.sqrt(vallosstote.numpy()),np.sqrt(vallosstotf.numpy()),losstot.numpy(),lrnow.numpy(),lrnow2.numpy(),ep,sep=' ',end='\n',file=fileOU)
        print("Testing model at global step",accumul," and epoch ",ep," val_lossE ",np.sqrt(vallosstote.numpy())," val_lossF ",np.sqrt(vallosstotf.numpy())," loss_Tot ",losstot.numpy()," lr_net ",lrnow.numpy()," lr_finger ",lrnow2.numpy(),sep=' ',end='\n')
+       metrics_log.log(
+           global_step=int(accumul),
+           epoch=int(ep),
+           rmse_e=float(np.sqrt(vallosstote.numpy())),
+           rmse_f=float(np.sqrt(vallosstotf.numpy())),
+           loss_tot=float(losstot.numpy()),
+           lr_net=float(lrnow.numpy()),
+           lr_finger=float(lrnow2.numpy()),
+       )
        print("We are at epoch ",ep)
        fileOU.flush()
        out_time.flush()

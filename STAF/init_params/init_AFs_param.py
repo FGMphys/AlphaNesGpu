@@ -7,10 +7,8 @@ from numpy import random
 from numpy.random import default_rng
 
 _STAF_HOME = Path(__file__).resolve().parents[1]
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-for _p in (_STAF_HOME, _REPO_ROOT):
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
+if str(_STAF_HOME) not in sys.path:
+    sys.path.insert(0, str(_STAF_HOME))
 from staf.dtype import np_dtype  # noqa: E402
 
 def filtered_matrix(map_to_build):

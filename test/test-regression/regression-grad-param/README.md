@@ -46,7 +46,7 @@ Uses:
 
 - `test/test-training-pipeline/run_{float,double}/model_log1`
 - `input_4test.yaml` + `dataset/test/*.npy`
-- `AlphaNesGpu_{float,double}` with `register_*_grad` loaded
+- `STAF/` with `register_*_grad` loaded (ops under `src/{fingerprint,force,grad_*}/`)
 
 Outputs under `results_{float,double}/`: `summary.txt`, `summary.json`,
 `grad_param_regression.png` (CLI flags always recorded in the summaries).

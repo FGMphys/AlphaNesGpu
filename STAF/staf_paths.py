@@ -1,8 +1,10 @@
 """Resolve STAF custom-op roots (compiled ``.so`` trees).
 
-Python lives under ``STAF/``. CUDA sources live in ``STAF/src/`` and are
-built into ``STAF/ops_float/src`` or ``STAF/ops_double/src`` by
-``install_path.sh`` (``real`` via ``STAF/include/staf_real.h``).
+Python lives under ``STAF/`` (including the ``staf`` helper package).
+CUDA sources live in ``STAF/src/`` (``fingerprint`` / ``force`` / ``grad_*``,
+no ``mixture/`` folder) and are built into ``STAF/ops_float/src`` or
+``STAF/ops_double/src`` by ``install_path.sh`` (``real`` via
+``STAF/include/staf_real.h``).
 Call ``set_ops_root`` / ``set_precision`` before loading layers that
 ``tf.load_op_library``.
 """

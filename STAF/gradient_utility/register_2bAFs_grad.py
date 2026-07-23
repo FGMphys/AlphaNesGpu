@@ -9,7 +9,7 @@ from staf_paths import code_root
 def _ops(rel):
     return str(code_root() / rel)
 
-compute_2b_pargrad = tf.load_op_library(_ops('src/mixture/grad_finger/rad/reforce.so'))
+compute_2b_pargrad = tf.load_op_library(_ops('src/grad_finger/rad/reforce.so'))
 
 @ops.RegisterGradient("ComputeSortProj")
 def _compute_sort_proj_grad(op,grad):

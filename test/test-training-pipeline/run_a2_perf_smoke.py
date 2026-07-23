@@ -43,7 +43,6 @@ def main():
 
     dtype = "float32" if args.precision == "float" else "float64"
     np_dtype = np.float32 if args.precision == "float" else np.float64
-    sys.path = [str(REPO)] + [x for x in sys.path if x != str(REPO)]
     from staf.dtype import set_precision
 
     set_precision(args.precision)

@@ -5,11 +5,12 @@
 | Slice | Deliverable |
 | --- | --- |
 | 1 | Naming: `staf_models`, `staf_train`, STAF logs |
-| 2 | `staf/dtype.py` + YAML `precision` |
+| 2 | `staf/dtype.py` + YAML `precision` (package under `STAF/staf/`) |
 | 3 | Unified Python tree `STAF/` (no `mixture/` nesting) |
 | 4 | `include/staf_real.h` (`real`, `staf_exp`, `sizeof(real)`) |
 | 5 | **Single CUDA `STAF/src/`**; build → `ops_{float,double}/` (gitignored) |
 | — | Removed `AlphaNesGpu_{float,double}/` redirects |
+| 6 | Pre-A3 hygiene: flatten `src/mixture/`, quarantine develop, `staf_infer`, metrics CSV/JSONL |
 
 ### Final gates (post single-`src/` rebuild, V100)
 
@@ -18,12 +19,11 @@
 | Force FD δ=0.001 | corr=0.99983 | corr=0.99994 |
 | `time_story` 1-epoch | 89.0 ms/frame (×0.97 vs 91.5) | 156.5 ms/frame (×1.05 vs 149.7) |
 
-Logs use `STAF:` (no `Alpha_nes:`). Both performance ratios ≤ 1.15.
+See `test/A3_PREP.md` for CUDA static-state audit before multi-GPU.
 
 ## Out of A2 scope (deferred)
 
-- **`DEV/`** CG / RDF forks (Linea C) — not migrated; keep using their local trees
-- Structured CSV/JSON logging, dead-file cleanup polish (A2.2 leftovers)
+- **`DEV/`** CG / RDF forks (Linea C) — not migrated
 - A3+ multi-GPU / A4 CPU MPI
 
 A2 exit criterion for full-atom: one install command, float **or** double, regression + performance gates green — **met**.

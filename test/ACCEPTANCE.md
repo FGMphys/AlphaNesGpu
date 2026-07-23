@@ -5,7 +5,9 @@ Any modification of **STAF** must stay comparable to these baselines
 
 Frozen reference: git tag **`pre-refactor`** (see `git describe --tags`).
 Post-A2 official tree: **`STAF/`** (`precision: float|double` in YAML;
-CUDA from `STAF/src/` → `ops_{float,double}/`).
+CUDA from `STAF/src/{descriptor_builder,fingerprint,force,grad_*}/` →
+`ops_{float,double}/`). Package helpers: `STAF/staf/dtype.py`.
+Infer CLI: `STAF/staf_infer.py`. Prep notes for multi-GPU: `test/A3_PREP.md`.
 
 Longer roadmap: `/home/francegm/PIANO_ALPHANES_DEBUG_LAMMPS_CG.md` (Linea A→B).
 Derivator policy for training: keep **`tf.gradients` inside `@tf.function`**

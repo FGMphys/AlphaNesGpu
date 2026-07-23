@@ -9,7 +9,7 @@ from staf_paths import code_root
 def _ops(rel):
     return str(code_root() / rel)
 
-compforcegradtripl_module = tf.load_op_library(_ops('src/mixture/grad_force/ang/reforce.so'))
+compforcegradtripl_module = tf.load_op_library(_ops('src/grad_force/ang/reforce.so'))
 
 @ops.RegisterGradient("ComputeForceTripl")
 def _compute_force_tripl_grad(op, grad):

@@ -48,7 +48,6 @@ def main():
         out_dir = ROOT / "inference_double"
 
     sys.path.insert(0, str(code_root))
-    sys.path.insert(0, str(REPO))
     from staf.dtype import set_precision
     set_precision(args.precision)
     from staf_models.staf_model_inference_full import (

@@ -10,6 +10,7 @@ bash install_path.sh all
 
 # train (precision from YAML)
 python staf_train.py input_staf.yaml
+python staf_infer.py --model MODEL --precision double --pos pos.npy --box box.npy
 ```
 
 YAML:
@@ -25,7 +26,9 @@ Layout:
 | `staf_models/` | Training + inference models |
 | `source_routine/` | Descriptor, physics, force layers |
 | `gradient_utility/` | Custom-op gradient registrations |
-| `src/` | **Single** CUDA/C++ source tree (`real` via `include/staf_real.h`) |
+| `src/` | **Single** CUDA/C++ source tree (`fingerprint`/`force`/`grad_*`, `real` via `include/staf_real.h`) |
+| `staf/` | Shared helpers (`dtype`, precision) |
+| `experimental/` | Unwired CUDA (not built) |
 | `ops_float/`, `ops_double/` | Build outputs (gitignored); `.so` loaded at runtime |
 | `staf_paths.py` | Resolves active ops root from precision |
 

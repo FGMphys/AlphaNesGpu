@@ -10,8 +10,8 @@ class physics_layer(tf.Module):
       def __init__(self,init_alpha2b,init_alpha3b,
                    initial_type_emb):
           super(physics_layer, self).__init__()
-          self.proj2b=tf.load_op_library(_ops('src/mixture/fingerprint/rad/reforce.so'))
-          self.proj3b=tf.load_op_library(_ops('src/mixture/fingerprint/ang/reforce.so'))
+          self.proj2b=tf.load_op_library(_ops('src/fingerprint/rad/reforce.so'))
+          self.proj3b=tf.load_op_library(_ops('src/fingerprint/ang/reforce.so'))
 
           self.alpha2b=tf.Variable(init_alpha2b)
           self.alpha3b=tf.Variable(init_alpha3b)

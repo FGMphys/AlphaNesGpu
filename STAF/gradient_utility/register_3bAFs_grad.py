@@ -9,7 +9,7 @@ from staf_paths import code_root
 def _ops(rel):
     return str(code_root() / rel)
 
-module_alpha3body_grad = tf.load_op_library(_ops('src/mixture/grad_finger/ang/reforce.so'))
+module_alpha3body_grad = tf.load_op_library(_ops('src/grad_finger/ang/reforce.so'))
 
 @ops.RegisterGradient("ComputeSortProj3body")
 def _compute_sort_proj_3body_grad(op, grad):

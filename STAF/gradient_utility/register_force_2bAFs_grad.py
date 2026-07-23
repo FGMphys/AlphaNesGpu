@@ -9,7 +9,7 @@ from staf_paths import code_root
 def _ops(rel):
     return str(code_root() / rel)
 
-compforcradgrad_module = tf.load_op_library(_ops('src/mixture/grad_force/rad/reforce.so'))
+compforcradgrad_module = tf.load_op_library(_ops('src/grad_force/rad/reforce.so'))
     
 @ops.RegisterGradient("ComputeForceRadial")
 def _compute_force_radial_grad(op, grad):

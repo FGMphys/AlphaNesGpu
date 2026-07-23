@@ -3,43 +3,43 @@ frames: [4, 12, 22, 52, 79, 90, 149, 185, 243, 247]
 overall_compatible: True
 
 == Dense outputs ==
-energy: max_abs=7.171046e-05 mean_abs=5.693561e-05 rms=5.794080e-05 median_rel=5.041036e-07
-force: max_abs=4.184510e-05 mean_abs=4.296374e-06 rms=6.304139e-06 median_rel=7.575988e-06
-force_radial: max_abs=4.129669e-05 mean_abs=4.177038e-06 rms=6.136801e-06 median_rel=7.400719e-06
-force_angular: max_abs=2.437907e-06 mean_abs=2.930031e-07 rms=3.903513e-07 median_rel=1.301092e-06
+energy: max_abs=6.525692e-05 mean_abs=4.538169e-05 rms=4.711950e-05 median_rel=4.454427e-07
+force: max_abs=4.285532e-05 mean_abs=4.299071e-06 rms=6.309495e-06 median_rel=7.489975e-06
+force_radial: max_abs=4.245889e-05 mean_abs=4.183758e-06 rms=6.146861e-06 median_rel=7.333889e-06
+force_angular: max_abs=2.528102e-06 mean_abs=2.956583e-07 rms=3.936966e-07 median_rel=1.319156e-06
 
 == Gradients (∂E/∂AF) ==
-grad_radial: max_abs=7.485557e-07 mean_abs=3.105748e-08 median_rel=9.384690e-07
-grad_angular: max_abs=2.252023e-05 mean_abs=1.238980e-07 median_rel=5.793069e-07
+grad_radial: max_abs=7.609310e-07 mean_abs=3.163974e-08 median_rel=9.521600e-07
+grad_angular: max_abs=2.521729e-05 mean_abs=1.298992e-07 median_rel=6.161882e-07
 
 == Nested float tensors (unmasked) ==
-fingerprint: max_abs=2.235064e-02 mean_abs=5.906748e-05 median_rel=1.997656e-07 worst=fingerprint[7][1]
-grad_listed: max_abs=2.252023e-05 mean_abs=7.747773e-08 median_rel=7.588880e-07 worst=grad_listed[9][1][1]
-x2b: max_abs=1.033519e+02 mean_abs=6.790266e-01 median_rel=8.353172e-07 worst=x2b[6][0]
-x3b: max_abs=6.973864e-07 mean_abs=2.734161e-09 median_rel=0.000000e+00 worst=x3b[7][1]
-x3bsupp: max_abs=2.354438e+02 mean_abs=4.618689e-01 median_rel=9.109300e-07 worst=x3bsupp[8][1]
-intder2b: max_abs=2.586843e+02 mean_abs=1.582472e-01 median_rel=6.852869e-07 worst=intder2b[5][1]
-intder3b: max_abs=4.932376e-07 mean_abs=2.045068e-09 median_rel=3.008897e-08 worst=intder3b[5][1]
-intder3bsupp: max_abs=1.946346e+02 mean_abs=7.619255e-02 median_rel=6.215354e-07 worst=intder3bsupp[7][1]
+fingerprint: max_abs=2.236136e-02 mean_abs=5.951217e-05 median_rel=2.407940e-07 worst=fingerprint[7][1]
+grad_listed: max_abs=2.521729e-05 mean_abs=8.076946e-08 median_rel=7.841741e-07 worst=grad_listed[9][1][1]
+x2b: max_abs=3.632554e+03 mean_abs=9.024197e+00 median_rel=1.700795e-06 worst=x2b[4][1]
+x3b: max_abs=6.754213e-07 mean_abs=2.942695e-09 median_rel=0.000000e+00 worst=x3b[7][1]
+x3bsupp: max_abs=3.632890e+03 mean_abs=1.029021e+01 median_rel=1.677005e-06 worst=x3bsupp[5][0]
+intder2b: max_abs=2.179649e+03 mean_abs=6.151150e-01 median_rel=8.441535e-07 worst=intder2b[8][0]
+intder3b: max_abs=4.948803e-07 mean_abs=2.119074e-09 median_rel=6.978372e-08 worst=intder3b[5][1]
+intder3bsupp: max_abs=2.179614e+03 mean_abs=1.801298e+00 median_rel=7.301902e-07 worst=intder3bsupp[9][0]
 
 == Radial tensors with active-neighbor mask (int2b[:,:,0]=howmany) ==
-x2b: ACTIVE max_abs=1.498338e-06 median_rel=1.544408e-07 | PADDED max_abs=1.033519e+02
-x3bsupp: ACTIVE max_abs=6.854534e-07 median_rel=1.036269e-07 | PADDED max_abs=2.354438e+02
-intder2b: ACTIVE max_abs=3.095542e-06 median_rel=2.699284e-07 | PADDED max_abs=2.586843e+02
-intder3bsupp: ACTIVE max_abs=4.776136e-07 median_rel=2.473560e-07 | PADDED max_abs=1.946346e+02
+x2b: ACTIVE max_abs=1.491312e-06 median_rel=4.811564e-07 | PADDED max_abs=3.632554e+03
+x3bsupp: ACTIVE max_abs=6.771729e-07 median_rel=4.781053e-07 | PADDED max_abs=3.632890e+03
+intder2b: ACTIVE max_abs=3.046496e-06 median_rel=3.184026e-07 | PADDED max_abs=2.179649e+03
+intder3bsupp: ACTIVE max_abs=4.755767e-07 median_rel=3.027088e-07 | PADDED max_abs=2.179614e+03
 
 == Interaction maps (int) ==
 int2b: exact_match=True n_mismatch=0/468480 frac=0.000000e+00
 int3b: exact_match=True n_mismatch=0/27187200 frac=0.000000e+00
 
 == Verdicts ==
-[OK] energy: max|Δ|=7.171e-05
-[OK] force: max|Δ|=4.185e-05
-[OK] grad_radial: max|Δ|=7.486e-07
-[OK] grad_angular: max|Δ|=2.252e-05
-[OK] fingerprint: max|Δ|=2.235e-02
-[OK] x3b: max|Δ|=6.974e-07
-[OK] x2b_active: active max|Δ|=1.498e-06
+[OK] energy: max|Δ|=6.526e-05
+[OK] force: max|Δ|=4.286e-05
+[OK] grad_radial: max|Δ|=7.609e-07
+[OK] grad_angular: max|Δ|=2.522e-05
+[OK] fingerprint: max|Δ|=2.236e-02
+[OK] x3b: max|Δ|=6.754e-07
+[OK] x2b_active: active max|Δ|=1.491e-06
 [OK] int2b: frac_mismatch=0.0
 [OK] int3b: frac_mismatch=0.0
 

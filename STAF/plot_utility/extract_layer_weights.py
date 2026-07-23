@@ -1,4 +1,4 @@
-#!/home/francegm/miniconda3/envs/fsenv/bin/python3
+#!/usr/bin/env python3
 #IMPORT NN and math libraries
 import tensorflow as tf
 import argparse

@@ -7,10 +7,8 @@ from tensorflow.keras import Input
 from tensorflow.keras.layers import Dense
 
 _STAF_HOME = Path(__file__).resolve().parents[1]
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-for _p in (_STAF_HOME, _REPO_ROOT):
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
+if str(_STAF_HOME) not in sys.path:
+    sys.path.insert(0, str(_STAF_HOME))
 from staf.dtype import np_dtype  # noqa: E402
 from staf_paths import set_ops_root  # noqa: E402
 
@@ -138,4 +136,3 @@ class staf_full_inference(tf.Module):
           return self.totenergy,self.force_list,self.grad_listed,self.fingerprint,self.x2b,self.x3b,self.x3bsupp,self.int2b,self.int3b,self.intder2b,self.intder3b,self.intder3bsupp,info
 
 # Temporary aliases (remove after callers migrate)
-alpha_nes_full_inference = staf_full_inference

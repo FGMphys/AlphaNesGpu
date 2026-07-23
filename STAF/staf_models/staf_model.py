@@ -8,10 +8,8 @@ from tensorflow.keras.layers import Dense
 import pickle
 
 _STAF_HOME = Path(__file__).resolve().parents[1]
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-for _p in (_STAF_HOME, _REPO_ROOT):
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
+if str(_STAF_HOME) not in sys.path:
+    sys.path.insert(0, str(_STAF_HOME))
 from staf.dtype import zero  # noqa: E402
 
 
@@ -349,4 +347,3 @@ class staf_full(tf.Module):
         return self.opt_phys.learning_rate
 
 # Temporary aliases (remove after callers migrate)
-alpha_nes_full = staf_full

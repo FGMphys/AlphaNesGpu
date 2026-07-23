@@ -7,11 +7,11 @@ def _ops(rel):
 
 class force_layer(tf.Module):
       def __init__(self,radbuff,angbuff):
-          self.force2b=tf.load_op_library(_ops('src/mixture/force/rad/reforce.so'))
-          self.force3b=tf.load_op_library(_ops('src/mixture/force/ang/reforce.so'))
+          self.force2b=tf.load_op_library(_ops('src/force/rad/reforce.so'))
+          self.force3b=tf.load_op_library(_ops('src/force/ang/reforce.so'))
 
-          self.gradforce2b=tf.load_op_library(_ops('src/mixture/grad_force/rad/reforce.so'))
-          self.gradforce3b=tf.load_op_library(_ops('src/mixture/grad_force/ang/reforce.so'))
+          self.gradforce2b=tf.load_op_library(_ops('src/grad_force/rad/reforce.so'))
+          self.gradforce3b=tf.load_op_library(_ops('src/grad_force/ang/reforce.so'))
 
 
           self.force2b.init_force_radial(radbuff)
@@ -45,8 +45,8 @@ class force_layer(tf.Module):
 
 class force_debug_layer(tf.Module):
       def __init__(self,radbuff,angbuff):
-          self.force2b=tf.load_op_library(_ops('src/mixture/force/rad/reforce.so'))
-          self.force3b=tf.load_op_library(_ops('src/mixture/force/ang/reforce.so'))
+          self.force2b=tf.load_op_library(_ops('src/force/rad/reforce.so'))
+          self.force3b=tf.load_op_library(_ops('src/force/ang/reforce.so'))
 
           self.force2b.init_force_radial(radbuff)
           self.force3b.init_force_tripl(angbuff)
