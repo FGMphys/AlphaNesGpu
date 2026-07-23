@@ -30,7 +30,9 @@ python run_force_regression.py --precision float
 cd ../regression-grad-param
 python run_grad_param_regression.py --precision double --n-per-family 100
 python run_grad_param_regression.py --precision float  --n-per-family 100
-# expect: per-family corr ≈ 1 at dw=1e-3 (alpha2b may be n=80 = all available)
+# expect: per-family corr ≈ 1 at dw=1e-3
+#   alpha2b may be n=80 (= all available)
+#   alpha3b β/γ/δ sample energy-active slots only (|g_E|>0); n may be < requested
 
 # 4) Performance (training wall-time, same hardware class)
 # Compare new time_story.dat steady-state ms/frame to:

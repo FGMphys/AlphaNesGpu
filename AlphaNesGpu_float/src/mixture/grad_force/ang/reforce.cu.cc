@@ -58,6 +58,7 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
 
 
     allgrad[threadIdx.x].w=0.f;
+    __syncthreads();
 
 
     float3 local_alpha= {0.f, 0.f, 0.f};
@@ -71,7 +72,7 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
     int nn=reminder%na;
     int absolute_par=par+tipos_shift;
     int sum;
-    int actgrad;
+    int actgrad=0;
     if (t<N_local*dimbat*na)
     {
         int na_particle=num_triplets[b*N_local+par];
@@ -186,9 +187,10 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
 	     }
 
             }
+    }
+    // Must be reached by every thread in the block (no divergent barrier).
     __syncthreads();
-//Il thread zero deve essere usato fuori dagli if. Infatti se la prima tripletta
-//è tipo sum=1 e io sto calcolando req_sum=0 non entra nel loop e non fa la riduzione
+    // Thread 0 reduces outside the t/nn/sum filters (padding threads keep zeros).
     if (threadIdx.x==0){
        for (int dd=0;dd<BLOCK_DIM;dd++){
            local_alpha.x+=allgrad[dd].x;
@@ -196,12 +198,13 @@ __global__ void gradforce_tripl_kernel(const float*  prevgrad_T_d,const float*  
            local_alpha.z+=allgrad[dd].z;
            local_net+=allgrad[dd].w;
            }
-       atomicAdd((float*)&(gradnet_3b_T_d[actgrad+req_alpha]),local_net);
+       if (t < N_local*dimbat*na){
+         atomicAdd((float*)&(gradnet_3b_T_d[actgrad+req_alpha]),local_net);
+       }
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].x),local_alpha.x);
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].y),local_alpha.y);
        atomicAdd((float*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].z),local_alpha.z);
       }
-     }
 }
 
 

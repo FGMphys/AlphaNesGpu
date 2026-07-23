@@ -92,18 +92,18 @@ __global__ void alphagrad_ang_kernel(const float* radial_descriptor,const float*
 
 	}
       }
-     __syncthreads();
-     if (threadIdx.x==0){
-       for (int dd=0;dd<BLOCK_DIM;dd++){
-           local_alpha.x+=grad_alpha_s[dd].x;
-           local_alpha.y+=grad_alpha_s[dd].y;
-           local_alpha.z+=grad_alpha_s[dd].z;
-           }
-       atomicAdd((float*)&(next_alpha3b_grad[req_sum*nsmooth_a*3+req_alpha*3+0]),local_alpha.x);
-       atomicAdd((float*)&(next_alpha3b_grad[req_sum*nsmooth_a*3+req_alpha*3+1]),local_alpha.y);
-       atomicAdd((float*)&(next_alpha3b_grad[req_sum*nsmooth_a*3+req_alpha*3+2]),local_alpha.z);
-     }
-   }
+  }
+  __syncthreads();
+  if (threadIdx.x==0){
+    for (int dd=0;dd<BLOCK_DIM;dd++){
+        local_alpha.x+=grad_alpha_s[dd].x;
+        local_alpha.y+=grad_alpha_s[dd].y;
+        local_alpha.z+=grad_alpha_s[dd].z;
+        }
+    atomicAdd((float*)&(next_alpha3b_grad[req_sum*nsmooth_a*3+req_alpha*3+0]),local_alpha.x);
+    atomicAdd((float*)&(next_alpha3b_grad[req_sum*nsmooth_a*3+req_alpha*3+1]),local_alpha.y);
+    atomicAdd((float*)&(next_alpha3b_grad[req_sum*nsmooth_a*3+req_alpha*3+2]),local_alpha.z);
+  }
 }
 
 

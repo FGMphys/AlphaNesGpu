@@ -24,6 +24,22 @@ Loaders use `alphanes_paths.code_root()` with optional
 `ALPHANES_DOUBLE_ROOT` / `ALPHANES_FLOAT_ROOT`.
 `install_path.sh` no longer `sed`s Python sources.
 
+## D8 — divergent `__syncthreads` in angular grads — **mitigated**
+
+`grad_force/ang` (and `grad_finger/ang`) had `__syncthreads()` + block
+reduction **inside** `if (t < prod)`. That is illegal CUDA (divergent barrier)
+and showed up after D1 as intermittent **ghost** `∂Loss_F/∂α3b` on
+energy-inactive AF slots (FD = 0, analytic ≠ 0), poisoning the grad-param
+gate when sampling ranked by `|g_E|+|g_F|`.
+
+Mitigation:
+
+- Move barrier + reduction outside the `t` filter; zero shared mem then sync;
+  same change on float tree for parity.
+- Grad-param sampler for α3b now requires `|g_E| > eps` (energy-active slots).
+
+A2 CUDA should replace the thread-0 shared reduction with a proper block reduce.
+
 ## Deferred
 
 - **jmd_nn / neuralmdGPU parity** → Linea B (`PIANO_…` B1–B3).

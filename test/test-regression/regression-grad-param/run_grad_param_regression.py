@@ -354,7 +354,7 @@ def _build_probes_dense_and_radial(model, rng, n_per_family):
 def _fill_active_alpha3b_family(
     model, grads_E, grads_F, var_id_to_slot, rng, n_per_family, eps=1e-12
 ):
-    """Per β/γ/δ prende i top-|g| slot (tutti i tipi), fino a n_per_family."""
+    """Per β/γ/δ prende slot energy-attivi (|g_E|>eps), top-|g_E|+|g_F|."""
     probes = []
     counts = {}
     for comp in (0, 1, 2):
@@ -365,39 +365,42 @@ def _fill_active_alpha3b_family(
             slot = var_id_to_slot[id(v)]
             gE = np.asarray(grads_E[slot].numpy(), dtype=np.float64)
             gF = np.asarray(grads_F[slot].numpy(), dtype=np.float64)
-            score = np.abs(gE) + np.abs(gF)
-            nt_couple, width = score.shape
+            nt_couple, width = gE.shape
             nalpha_a = width // 3
-            cols = np.arange(comp, width, 3)
-            sub = score[:, cols]
             for couple in range(nt_couple):
                 for iaf in range(nalpha_a):
+                    col = 3 * iaf + comp
+                    gE_abs = float(np.abs(gE[couple, col]))
+                    gF_abs = float(np.abs(gF[couple, col]))
                     slots.append(
                         {
                             "variable": v,
                             "type_atom": t,
-                            "index": (couple, 3 * iaf + comp),
+                            "index": (couple, col),
                             "couple": int(couple),
                             "iaf": int(iaf),
                             "ang_component": comp,
                             "ang_component_name": ANG_COMP_NAMES[comp],
-                            "activity": float(sub[couple, iaf]),
+                            "activity": gE_abs + gF_abs,
+                            "activity_E": gE_abs,
                         }
                     )
-        # Preferisci slot attivi; prendi i top-n per |g|.
-        slots.sort(key=lambda s: s["activity"], reverse=True)
-        n_take = min(int(n_per_family), len(slots))
-        # Tra i top 2*n (o tutti), campiona n_take per non prendere solo i massimi estremi.
-        pool = slots[: max(n_take, min(len(slots), 2 * n_take))]
-        active_pool = [s for s in pool if s["activity"] > eps]
-        if len(active_pool) >= n_take:
-            picked = _sample_slots(active_pool, n_take, rng)
+        # Require energy-active AF (guards against ghost g_F on unused couples).
+        e_active = [s for s in slots if s["activity_E"] > eps]
+        e_active.sort(key=lambda s: s["activity"], reverse=True)
+        n_take = min(int(n_per_family), len(e_active) if e_active else len(slots))
+        pool_src = e_active if e_active else slots
+        pool_src = sorted(pool_src, key=lambda s: s["activity"], reverse=True)
+        pool = pool_src[: max(n_take, min(len(pool_src), 2 * n_take))]
+        if len(pool) >= n_take and n_take > 0:
+            picked = _sample_slots(pool, n_take, rng)
         else:
-            picked = slots[:n_take]
+            picked = pool_src[:n_take]
         counts[family] = {
             "requested": n_per_family,
             "available": len(slots),
             "n_active_eps": int(sum(s["activity"] > eps for s in slots)),
+            "n_energy_active": len(e_active),
             "used": len(picked),
         }
         for i, s in enumerate(picked):
@@ -405,7 +408,7 @@ def _fill_active_alpha3b_family(
                 {
                     "name": f"{family}_{i:03d}",
                     "family": family,
-                    **s,
+                    **{k: v for k, v in s.items() if k != "activity_E"},
                 }
             )
     return probes, counts

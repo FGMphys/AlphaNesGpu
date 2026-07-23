@@ -14,9 +14,9 @@ method=forward FD  g_num=(L(w+dw)-L(w))/dw
 dense_kernel: used=100 available=56280 requested=100
 dense_bias: used=100 available=562 requested=100
 alpha2b: used=80 available=80 requested=100
-alpha3b_beta: used=100 available=240 requested=100
-alpha3b_gamma: used=100 available=240 requested=100
-alpha3b_delta: used=100 available=240 requested=100
+alpha3b_beta: used=80 available=240 requested=100
+alpha3b_gamma: used=80 available=240 requested=100
+alpha3b_delta: used=80 available=240 requested=100
 
 # Reference losses
 L_E=9.495968832318e-06
@@ -27,20 +27,20 @@ delta=0.01
   dense_kernel n=100  E: corr=0.99107501 slope=1.19190091 mae=8.720273e-06 rmse=3.947397e-05 used=100/100  F: corr=0.99976873 slope=0.97015261 mae=1.644154e-04 rmse=9.063385e-04 used=100/100
   dense_bias n=100  E: corr=0.99744459 slope=1.01797265 mae=6.378647e-06 rmse=1.202169e-05 used=100/100  F: corr=0.99995768 slope=1.00187535 mae=6.079472e-05 rmse=1.648224e-04 used=100/100
   alpha2b n=80  E: corr=0.98677730 slope=0.98285063 mae=4.466703e-06 rmse=1.913483e-05 used=80/80  F: corr=0.99990191 slope=1.04517757 mae=5.923010e-04 rmse=2.765109e-03 used=80/80
-  alpha3b_beta n=100  E: corr=0.99748971 slope=0.93088618 mae=9.580231e-07 rmse=5.135029e-06 used=100/100  F: corr=0.38506777 slope=0.14100771 mae=8.337072e-03 rmse=1.745772e-02 used=100/100
-  alpha3b_gamma n=100  E: corr=0.99821678 slope=0.99269767 mae=1.471727e-06 rmse=4.250920e-06 used=100/100  F: corr=0.38825403 slope=0.15706624 mae=9.598137e-03 rmse=2.013152e-02 used=100/100
-  alpha3b_delta n=100  E: corr=0.99981142 slope=0.96390204 mae=1.439014e-07 rmse=8.549609e-07 used=100/100  F: corr=0.05780987 slope=0.00631655 mae=7.599217e-03 rmse=1.826015e-02 used=100/100
+  alpha3b_beta n=80  E: corr=0.99421740 slope=0.85948306 mae=5.274330e-06 rmse=2.143912e-05 used=80/80  F: corr=0.99999231 slope=1.00084539 mae=2.653748e-05 rmse=5.588803e-05 used=80/80
+  alpha3b_gamma n=80  E: corr=0.99568150 slope=0.92121735 mae=4.619361e-06 rmse=1.414029e-05 used=80/80  F: corr=0.99998695 slope=1.00407689 mae=3.332583e-05 rmse=9.546838e-05 used=80/80
+  alpha3b_delta n=80  E: corr=0.99977244 slope=0.96769273 mae=2.041429e-07 rmse=9.593202e-07 used=80/80  F: corr=0.99999874 slope=1.00149451 mae=1.322972e-06 rmse=5.114326e-06 used=80/80
 delta=0.001
   dense_kernel n=100  E: corr=0.99988085 slope=1.01879166 mae=8.584670e-07 rmse=3.873462e-06 used=100/100  F: corr=0.99999795 slope=0.99714528 mae=1.601835e-05 rmse=8.704978e-05 used=100/100
   dense_bias n=100  E: corr=0.99997382 slope=1.00176581 mae=6.362297e-07 rmse=1.198403e-06 used=100/100  F: corr=0.99999957 slope=1.00019348 mae=6.086344e-06 rmse=1.651956e-05 used=100/100
   alpha2b n=80  E: corr=0.99986963 slope=0.99819029 mae=4.468428e-07 rmse=1.920472e-06 used=80/80  F: corr=0.99999894 slope=1.00451274 mae=5.915148e-05 rmse=2.762186e-04 used=80/80
-  alpha3b_beta n=100  E: corr=0.99997776 slope=0.99307545 mae=9.585132e-08 rmse=5.143034e-07 used=100/100  F: corr=0.38502856 slope=0.14074581 mae=8.329358e-03 rmse=1.745772e-02 used=100/100
-  alpha3b_gamma n=100  E: corr=0.99998239 slope=0.99926102 mae=1.469740e-07 rmse=4.246838e-07 used=100/100  F: corr=0.38829545 slope=0.15693808 mae=9.587221e-03 rmse=2.013161e-02 used=100/100
-  alpha3b_delta n=100  E: corr=0.99999824 slope=0.99639158 mae=1.438365e-08 rmse=8.546117e-08 used=100/100  F: corr=0.05758667 slope=0.00628167 mae=7.598710e-03 rmse=1.826049e-02 used=100/100
+  alpha3b_beta n=80  E: corr=0.99995546 slope=0.98594802 mae=5.272644e-07 rmse=2.143395e-06 used=80/80  F: corr=0.99999992 slope=1.00008467 mae=2.650462e-06 rmse=5.582525e-06 used=80/80
+  alpha3b_gamma n=80  E: corr=0.99996233 slope=0.99212458 mae=4.615127e-07 rmse=1.412564e-06 used=80/80  F: corr=0.99999987 slope=1.00040766 mae=3.329187e-06 rmse=9.540830e-06 used=80/80
+  alpha3b_delta n=80  E: corr=0.99999785 slope=0.99677052 mae=2.040476e-08 rmse=9.589264e-08 used=80/80  F: corr=0.99999999 slope=1.00014926 mae=1.321713e-07 rmse=5.107394e-07 used=80/80
 delta=0.0001
   dense_kernel n=100  E: corr=0.99999877 slope=1.00187477 mae=8.569805e-08 rmse=3.865273e-07 used=100/100  F: corr=0.99999998 slope=0.99971594 mae=1.597452e-06 rmse=8.665904e-06 used=100/100
   dense_bias n=100  E: corr=0.99999974 slope=1.00017627 mae=6.360648e-08 rmse=1.198025e-07 used=100/100  F: corr=1.00000000 slope=1.00001941 mae=6.086984e-07 rmse=1.652319e-06 used=100/100
   alpha2b n=80  E: corr=0.99999870 slope=0.99981808 mae=4.468609e-08 rmse=1.921177e-07 used=80/80  F: corr=0.99999999 slope=1.00045122 mae=5.914355e-06 rmse=2.761890e-05 used=80/80
-  alpha3b_beta n=100  E: corr=0.99999978 slope=0.99930741 mae=9.585623e-09 rmse=5.143834e-08 used=100/100  F: corr=0.38502449 slope=0.14071962 mae=8.328667e-03 rmse=1.745772e-02 used=100/100
-  alpha3b_gamma n=100  E: corr=0.99999982 slope=0.99992601 mae=1.469542e-08 rmse=4.246431e-08 used=100/100  F: corr=0.38829923 slope=0.15692523 mae=9.586136e-03 rmse=2.013162e-02 used=100/100
-  alpha3b_delta n=100  E: corr=0.99999998 slope=0.99963917 mae=1.438300e-09 rmse=8.545768e-09 used=100/100  F: corr=0.05756433 slope=0.00627819 mae=7.598659e-03 rmse=1.826053e-02 used=100/100
+  alpha3b_beta n=80  E: corr=0.99999957 slope=0.99859480 mae=5.272475e-08 rmse=2.143343e-07 used=80/80  F: corr=1.00000000 slope=1.00000847 mae=2.680677e-07 rmse=5.617051e-07 used=79/80
+  alpha3b_gamma n=80  E: corr=0.99999963 slope=0.99921249 mae=4.614703e-08 rmse=1.412417e-07 used=80/80  F: corr=1.00000000 slope=1.00004078 mae=3.369877e-07 rmse=9.600413e-07 used=79/80
+  alpha3b_delta n=80  E: corr=0.99999998 slope=0.99967706 mae=2.040381e-09 rmse=9.588870e-09 used=80/80  F: corr=1.00000000 slope=1.00001492 mae=1.321586e-08 rmse=5.106700e-08 used=80/80

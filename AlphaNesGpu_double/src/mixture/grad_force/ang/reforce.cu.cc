@@ -58,6 +58,7 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
 
 
     allgrad[threadIdx.x].w=0.0;
+    __syncthreads();
 
 
     double3 local_alpha= {0.0, 0.0, 0.0};
@@ -71,7 +72,7 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
     int nn=reminder%na;
     int absolute_par=par+tipos_shift;
     int sum;
-    int actgrad;
+    int actgrad=0;
     if (t<N_local*dimbat*na)
     {
         int na_particle=num_triplets[b*N_local+par];
@@ -127,7 +128,7 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
                double sim2=exp(alphas.x*radialdes_j+alphas.y*radialdes_k);
                double sum_sim=sim1+sim2;
 
-               delta=expbeta*(1.0f+alphas.z*angulardes)*sum_sim*0.5;
+               delta=expbeta*(1.0+alphas.z*angulardes)*sum_sim*0.5;
 
                double suppj=(alphas.x*sim2+alphas.y*sim1)*expbeta;
                double suppk=(alphas.x*sim1+alphas.y*sim2)*expbeta;
@@ -186,9 +187,10 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
 	     }
 
             }
+    }
+    // Must be reached by every thread in the block (no divergent barrier).
     __syncthreads();
-//Il thread zero deve essere usato fuori dagli if. Infatti se la prima tripletta
-//è tipo sum=1 e io sto calcolando req_sum=0 non entra nel loop e non fa la riduzione
+    // Thread 0 reduces outside the t/nn/sum filters (padding threads keep zeros).
     if (threadIdx.x==0){
        for (int dd=0;dd<BLOCK_DIM;dd++){
            local_alpha.x+=allgrad[dd].x;
@@ -196,12 +198,14 @@ __global__ void gradforce_tripl_kernel(const double*  prevgrad_T_d,const double*
            local_alpha.z+=allgrad[dd].z;
            local_net+=allgrad[dd].w;
            }
-       atomicAdd((double*)&(gradnet_3b_T_d[actgrad+req_alpha]),local_net);
+       // actgrad is set for thread 0 whenever t < prod (true for launched blocks).
+       if (t < N_local*dimbat*na){
+         atomicAdd((double*)&(gradnet_3b_T_d[actgrad+req_alpha]),local_net);
+       }
        atomicAdd((double*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].x),local_alpha.x);
        atomicAdd((double*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].y),local_alpha.y);
        atomicAdd((double*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].z),local_alpha.z);
       }
-     }
 }
 
 
