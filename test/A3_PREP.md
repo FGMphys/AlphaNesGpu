@@ -74,3 +74,15 @@ Gates after C (V100):
 | Grad-param dw=1e-3 | families ≈1 | families ≈1 |
 | Inference float↔double | Compatible | Compatible |
 | `time_story` 1-epoch | **80.1 ms** (×0.88 vs 91.5) | **145.5 ms** (×0.97 vs 149.7) |
+
+## D — prefetch + reduce_retracing (2026-07-23)
+
+- Host mmap buffer copies overlap GPU via `ThreadPoolExecutor(1)`.
+- `e`/`f` uploaded once per buffer; angular-buffer `.numpy()` check once per epoch.
+- `full_train_*` / `full_test_*` use `@tf.function(reduce_retracing=True)`.
+
+## E — fuse angular grad launches (2026-07-23)
+
+- `grad_finger/ang` and `grad_force/ang`: host nested `(alpha,sum)` launch loops → single 2D grid (`blockIdx.y` selects pair). Same block reduction as before (per-thread atomics regressed float badly).
+
+Gates after D+E (V100): float **76.4 ms/frame** (×0.84); double **142.8 ms/frame** (×0.95); grad-param α3b families ≈1.

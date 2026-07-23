@@ -34,11 +34,15 @@ __global__ void gradforce_tripl_kernel(const real*  prevgrad_T_d,const real*  ne
                                        const int* actual_type_p,
                                        const int *num_triplets,const real* smooth_a_T_l,
                                        const int* type_map_T_d,real* gradnet_3b_T_d,
-                                      real* grad_alpha3b_T,real* grad_emb3b_T_d,int req_alpha,int req_sum,int BLOCK_DIM)
+                                      real* grad_alpha3b_T,real* grad_emb3b_T_d,int nt_couple,int BLOCK_DIM)
 {
 
     int actual_type=actual_type_p[0];
     int N_local=tipos_T[actual_type];
+
+    /* Fused host (alpha,sum) loops: one launch, blockIdx.y selects the pair. */
+    const int req_alpha = blockIdx.y / nt_couple;
+    const int req_sum = blockIdx.y % nt_couple;
 
     int tipos_shift=0;
     for (int y=0;y<actual_type;y++){
@@ -217,21 +221,16 @@ void gradforce_tripl_Launcher(const real*  prevgrad_T_d,const real*  netderiv_T_
                                       const int* type_map_T_d,int prod,real* gradnet_3b_T_d,
                                       real* grad_alpha3b_T_d,real* grad_emb3b_T_d, cudaStream_t stream){
 
-    dim3 dimGrid(ceil(real(prod)/real(BLOCK_DIM)),1,1);
-    dim3 dimBlock(BLOCK_DIM,1,1);
     int nt_couple=nt*(nt+1)/2;
-    for (int req_alpha=0;req_alpha<num_finger;req_alpha++){
-	for (int req_sum=0;req_sum<nt_couple;req_sum++){
+    dim3 dimGrid(ceil(real(prod)/real(BLOCK_DIM)), num_finger * nt_couple, 1);
+    dim3 dimBlock(BLOCK_DIM,1,1);
     TF_CHECK_OK(::tensorflow::GpuLaunchKernel(gradforce_tripl_kernel,dimGrid,
                 dimBlock, BLOCK_DIM*sizeof(real4), stream,prevgrad_T_d,netderiv_T_d,desr_T_d,desa_T_d,
                 intderiv_r_T_d,intderiv_a_T_d,intmap_r_T_d,
                 intmap_a_T_d,nr,na,N,dimbat,num_finger,
                 type_emb3b_d,nt,tipos_T,actual_type,
                 num_triplets_d,smooth_a_T,type_map_T_d,
-                gradnet_3b_T_d,grad_alpha3b_T_d,grad_emb3b_T_d,req_alpha,req_sum,BLOCK_DIM));
-
-	}
-    }
+                gradnet_3b_T_d,grad_alpha3b_T_d,grad_emb3b_T_d,nt_couple,BLOCK_DIM));
 
 }
 

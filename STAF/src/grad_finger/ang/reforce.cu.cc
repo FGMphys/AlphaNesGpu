@@ -15,12 +15,15 @@ __global__ void alphagrad_ang_kernel(const real* radial_descriptor,const real* a
                  int N_local,const int* intmap3b,const real* alpha3b,
                  int nsmooth_a,real* next_alpha3b_grad,
                  const real* type_emb3b,const int* type_map,
-                 real* next_emb3b_grad,const int* num_triplets,int req_alpha,
-		 int req_sum)
+                 real* next_emb3b_grad,const int* num_triplets,int nt_couple)
 {
   const int2* intmap_a=(const int2*) intmap3b;
   const real3* alphas=(const real3*) alpha3b;
   const real* ds=(const real*)radial_descriptor;
+
+  /* Fused host (alpha,sum) loops: one launch, blockIdx.y selects the pair. */
+  const int req_alpha = blockIdx.y / nt_couple;
+  const int req_sum = blockIdx.y % nt_couple;
 
   __shared__ real3 grad_alpha_s[BLOCK_DIM];
   __shared__ real grad_ck_s[BLOCK_DIM];
@@ -116,17 +119,16 @@ void alphagrad_ang_Launcher(const real* radial_descriptor,const real* angular_de
 
 
 
-                 dim3 dimGrid(ceil(real(dimbat*N_local*na)/real(BLOCK_DIM)),1,1);
+                 dim3 dimGrid(ceil(real(dimbat*N_local*na)/real(BLOCK_DIM)),
+                              nsmooth_a * nt_couple, 1);
                  dim3 dimBlock(BLOCK_DIM,1,1);
-                 for (int req_alpha=0;req_alpha<nsmooth_a;req_alpha++){
-                     for (int req_sum=0;req_sum<nt_couple;req_sum++){
-                         TF_CHECK_OK(::tensorflow::GpuLaunchKernel(alphagrad_ang_kernel,                      dimGrid, dimBlock, 0, stream,radial_descriptor,angular_descriptor,               nr,na,prevgrad,dimbat,
+                 TF_CHECK_OK(::tensorflow::GpuLaunchKernel(alphagrad_ang_kernel, dimGrid, dimBlock, 0, stream,
+                                radial_descriptor,angular_descriptor,
+                                nr,na,prevgrad,dimbat,
                                 N_local,intmap3b,alpha3b,
                                 nsmooth_a,next_alpha3b_grad,
                                 type_emb3b,type_map,
-                                next_emb3b_grad,num_triplet,req_alpha,req_sum));
-		        }
-		 }
+                                next_emb3b_grad,num_triplet,nt_couple));
 }
 
 
