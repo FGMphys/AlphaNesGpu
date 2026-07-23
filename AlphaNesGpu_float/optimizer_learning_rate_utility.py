@@ -4,7 +4,6 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow.keras.optimizers.schedules as optsch
-import tensorflow.keras.experimental as tfexp
 import tensorflow.keras.optimizers as tfopt
 
 def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
@@ -53,7 +52,7 @@ def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
             print("STAF: ",name," t_mul set to ",t_mul,sep=' ',end='\n')
             print("STAF: ",name," m_mul set to",m_mul,sep=' ',end='\n')
             print("STAF: ",name," alpha set to",alpha,sep=' ',end='\n')
-        lr_built=tfexp.CosineDecayRestarts(initial_learning_rate,first_decay_steps,t_mul=t_mul,
+        lr_built=optsch.CosineDecayRestarts(initial_learning_rate,first_decay_steps,t_mul=t_mul,
                           m_mul=m_mul,alpha=alpha,name=None)
 
     else:

@@ -1,6 +1,7 @@
 import os
 import time
 import sys
+from pathlib import Path
 
 import logging
 import absl.logging
@@ -19,6 +20,10 @@ from numpy.random import seed
 from numpy import random
 from numpy.random import default_rng
 
+_REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from staf.dtype import set_precision, tf_dtype, zero  # noqa: E402
 
 from source_routine.descriptor_builder import descriptor_layer
 
@@ -141,15 +146,16 @@ def make_loss(full_param):
         model_loss=HUBER
         val_loss=MSE
         print("STAF: the loss function is huber loss and validation loss is MSE")
+    dt = tf_dtype()
     try:
-        pe=tf.constant(float(full_param['loss_energy_prefactor']),dtype='float64')
-        pf=tf.constant(float(full_param['loss_force_prefactor']),dtype='float64')
-        pb=tf.constant(1.,dtype='float64')
+        pe=tf.constant(float(full_param['loss_energy_prefactor']),dtype=dt)
+        pf=tf.constant(float(full_param['loss_force_prefactor']),dtype=dt)
+        pb=tf.constant(1.,dtype=dt)
         print("STAF: pe and pf set to custom values",pe.numpy(),pf.numpy(),sep=' ',end='\n')
     except:
-        pe=tf.constant(1.,dtype='float64')
-        pf=tf.constant(1.,dtype='float64')
-        pb=tf.constant(1.,dtype='float64')
+        pe=tf.constant(1.,dtype=dt)
+        pf=tf.constant(1.,dtype=dt)
+        pb=tf.constant(1.,dtype=dt)
         print("STAF: pe and pf set to default value 1 1",sep=' ',end='\n')
 
     return model_loss,val_loss,pe,pf,pb
@@ -177,6 +183,7 @@ def make_method(full_param,model):
 ##Read the input file
 with open(sys.argv[1]) as file:
     full_param = yaml.load(file, Loader=yaml.FullLoader)
+set_precision(full_param.get("precision"), code_root=Path(__file__).resolve().parent)
 base_pattern=full_param['dataset_folder']
 try:
     tipos=np.loadtxt(base_pattern+"/type.dat",dtype='int').reshape(-1,1)
@@ -271,8 +278,7 @@ if nhl>0:
 else:
    nD=0
 
-#Fix precision
-tf.keras.backend.set_floatx('float64')
+# Precision already set from YAML (or inferred from this tree name)
 
 ##Building the learning rate and then the optimizer
 try:
@@ -434,10 +440,10 @@ except:
    print("STAF: test will be ever ",freq_test," epochs")
 start_loc=time.time()
 for ep in range(restart_ep,ne):
-    losstot=tf.constant(0.,dtype='float64')
-    vallosstot=tf.constant(0.,dtype='float64')
-    vallosstote=tf.constant(0.,dtype='float64')
-    vallosstotf=tf.constant(0.,dtype='float64')
+    losstot=zero()
+    vallosstot=zero()
+    vallosstote=zero()
+    vallosstotf=zero()
     for numbuf,el in enumerate(idx_str_tr):
         loss_buffer=0.
         start=time.time()

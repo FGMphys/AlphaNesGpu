@@ -449,7 +449,10 @@ def _build_model(precision: str, n_frames: int, tf):
 
     dtype_str = "float32" if precision == "float" else "float64"
     np_dtype = np.float32 if precision == "float" else np.float64
-    tf.keras.backend.set_floatx(dtype_str)
+    sys.path.insert(0, str(REPO))
+    from staf.dtype import set_precision
+    set_precision(precision)
+    assert tf.keras.backend.floatx() == dtype_str
 
     from gradient_utility.mixture import register_force_3bAFs_grad  # noqa: F401
     from gradient_utility.mixture import register_force_2bAFs_grad  # noqa: F401

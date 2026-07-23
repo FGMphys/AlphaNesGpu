@@ -1,14 +1,20 @@
+import sys
+from pathlib import Path
+
 import numpy as np
 from numpy.random import seed
 from numpy import random
 from numpy.random import default_rng
 
-
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from staf.dtype import np_dtype  # noqa: E402
 
 def filtered_matrix(map_to_build):
     nrow=len(map_to_build)
     ncol=sum(map_to_build)
-    matrix=np.zeros((nrow,ncol),dtype='float32')
+    matrix=np.zeros((nrow,ncol),dtype=np_dtype())
     prev=0
     for k in range(nrow):
         matrix[k,prev:prev+map_to_build[k]]=1.
@@ -53,55 +59,55 @@ def init_AFs_param(restart,full_param,nt,seed_par):
         [nalpha_r_arr,nalpha_a_arr,initial_type_emb]=gen_map_type_AFs(full_param)
         
         ###Initialize radial AFS parameters
-        init_alpha2b=[(np.random.rand((nalpha_r_arr[k,1]*nt))*2*limit-limit).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
+        init_alpha2b=[(np.random.rand((nalpha_r_arr[k,1]*nt))*2*limit-limit).reshape((nt,nalpha_r_arr[k,1])).astype(np_dtype()) for k in range(nt)]
         ###Initialize angular AFS parameters
         init_alpha3b=[]
         for k in range(nt):
-            vec=np.zeros((nalpha_a_arr[k,1]*nt_couple,3),dtype='float32')
-            vec[:,:2]=(np.random.rand((nalpha_a_arr[k,1]*nt_couple*2))*2*limit3b-limit3b).reshape((nalpha_a_arr[k,1]*nt_couple,2)).astype('float32')
-            vec[:,2]=(np.random.rand((nalpha_a_arr[k,1]*nt_couple))*-10).reshape(nalpha_a_arr[k,1]*nt_couple).astype('float32')
+            vec=np.zeros((nalpha_a_arr[k,1]*nt_couple,3),dtype=np_dtype())
+            vec[:,:2]=(np.random.rand((nalpha_a_arr[k,1]*nt_couple*2))*2*limit3b-limit3b).reshape((nalpha_a_arr[k,1]*nt_couple,2)).astype(np_dtype())
+            vec[:,2]=(np.random.rand((nalpha_a_arr[k,1]*nt_couple))*-10).reshape(nalpha_a_arr[k,1]*nt_couple).astype(np_dtype())
             init_alpha3b.append(vec.reshape((nt_couple,nalpha_a_arr[k,1]*3)))
         #Initialised Z for each AFS
-        init_mu=[(np.random.rand(nalpha_r_arr[k,1]+nalpha_a_arr[k,1])*2*limit-limit).astype('float32')
+        init_mu=[(np.random.rand(nalpha_r_arr[k,1]+nalpha_a_arr[k,1])*2*limit-limit).astype(np_dtype())
                 for k in range(nt)]
         ###Initialize Ck parameters (only for mixtures)
         '''
         if nt>1:
            initial_type_emb=gen_map_type_AFs(full_param) #[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
         else:
-           initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
-           initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float32') for k in range(nt)]
+           initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype(np_dtype()) for k in range(nt)]
+           initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype(np_dtype()) for k in range(nt)]
            initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
         '''
     ##Initialise only afs by reading them from file. State of optimizer is started from scratch.
     elif restart=='only_afs' or restart=='all_params':
          afs_param=full_param['afs_param_folder']
-         init_mu=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_mu.dat',dtype='float32') for k in range(nt)]
-         init_alpha2b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_2body.dat',dtype='float32').reshape((nt,-1)) for k in range(nt)]
-         init_alpha3b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_3body.dat',dtype='float32').reshape((nt_couple,-1)) for k in range(nt)]
+         init_mu=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_mu.dat',dtype=np_dtype()) for k in range(nt)]
+         init_alpha2b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_2body.dat',dtype=np_dtype()).reshape((nt,-1)) for k in range(nt)]
+         init_alpha3b=[np.loadtxt(afs_param+'/type'+str(k)+'_alpha_3body.dat',dtype=np_dtype()).reshape((nt_couple,-1)) for k in range(nt)]
          nalpha_r_arr=np.array([[k,init_alpha2b[k].shape[1]] for k in range(nt)])
          nalpha_a_arr=np.array([[k,int(init_alpha3b[k].shape[1]/3)] for k in range(nt)])
          if nt>1:
-             initial_type_emb_2b=[np.loadtxt(afs_param+'/type'+str(k)+'_type_emb_2b.dat',dtype='float32') for k in range(nt)]
-             initial_type_emb_3b=[np.loadtxt(afs_param+'/type'+str(k)+'_type_emb_3b.dat',dtype='float32') for k in range(nt)]
+             initial_type_emb_2b=[np.loadtxt(afs_param+'/type'+str(k)+'_type_emb_2b.dat',dtype=np_dtype()) for k in range(nt)]
+             initial_type_emb_3b=[np.loadtxt(afs_param+'/type'+str(k)+'_type_emb_3b.dat',dtype=np_dtype()) for k in range(nt)]
              initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
          else:
-           initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
-           initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float32') for k in range(nt)]
+           initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype(np_dtype()) for k in range(nt)]
+           initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype(np_dtype()) for k in range(nt)]
            initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
     else:
-        init_alpha2b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_2body.dat',dtype='float32').reshape((nt,-1)) for k in range(nt)]
-        init_alpha3b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_3body.dat',dtype='float32').reshape((nt_couple,-1)) for k in range(nt)]
+        init_alpha2b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_2body.dat',dtype=np_dtype()).reshape((nt,-1)) for k in range(nt)]
+        init_alpha3b=[np.loadtxt(restart+'/type'+str(k)+'_alpha_3body.dat',dtype=np_dtype()).reshape((nt_couple,-1)) for k in range(nt)]
         nalpha_r_arr=np.array([[k,init_alpha2b[k].shape[1]] for k in range(nt)])
         nalpha_a_arr=np.array([[k,int(init_alpha3b[k].shape[1]/3)] for k in range(nt)])
-        init_mu=[np.loadtxt(restart+'/type'+str(k)+'_alpha_mu.dat',dtype='float32') for k in range(nt)]
+        init_mu=[np.loadtxt(restart+'/type'+str(k)+'_alpha_mu.dat',dtype=np_dtype()) for k in range(nt)]
         if nt>1:
-            initial_type_emb_2b=[np.loadtxt(restart+'/type'+str(k)+'_type_emb_2b.dat',dtype='float32') for k in range(nt)]
-            initial_type_emb_3b=[np.loadtxt(restart+'/type'+str(k)+'_type_emb_3b.dat',dtype='float32') for k in range(nt)]
+            initial_type_emb_2b=[np.loadtxt(restart+'/type'+str(k)+'_type_emb_2b.dat',dtype=np_dtype()) for k in range(nt)]
+            initial_type_emb_3b=[np.loadtxt(restart+'/type'+str(k)+'_type_emb_3b.dat',dtype=np_dtype()) for k in range(nt)]
             initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
         else:
-           initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype('float32') for k in range(nt)]
-           initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype('float32') for k in range(nt)]
+           initial_type_emb_2b=[(np.ones(nt*nalpha_r_arr[k,1])).reshape((nt,nalpha_r_arr[k,1])).astype(np_dtype()) for k in range(nt)]
+           initial_type_emb_3b=[(np.ones(nt_couple*nalpha_a_arr[k,1])).reshape((nt_couple,nalpha_a_arr[k,1])).astype(np_dtype()) for k in range(nt)]
            initial_type_emb=[[initial_type_emb_2b[k],initial_type_emb_3b[k]] for k in range(nt)]
     print("STAF: Two-Body Atomic fingerprints are ",end='\n')
     print("STAF: atom type   number\n")

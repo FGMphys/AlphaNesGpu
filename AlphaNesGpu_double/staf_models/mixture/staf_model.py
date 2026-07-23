@@ -1,8 +1,16 @@
+import sys
+from pathlib import Path
+
 import tensorflow as tf
 import numpy as np
 from tensorflow.keras import Input
 from tensorflow.keras.layers import Dense
 import pickle
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from staf.dtype import zero  # noqa: E402
 
 
 class staf_full(tf.Module):
@@ -88,7 +96,7 @@ class staf_full(tf.Module):
         loss_bound=tf.add_n(loss_bound_2b)+tf.add_n(loss_bound_3b)
 
         loss_energy=self.lossfunction(self.totenergy,etrue)
-        loss_force=tf.constant(0.,dtype='float64')
+        loss_force=zero()
         loss=pe*loss_energy+pb*loss_bound
         grad_w=[tf.gradients(loss,net.trainable_variables) for net  in  self.nets]
         grad_2b=[tf.gradients(loss,physlay.alpha2b) for physlay in self.physics_layer]
@@ -152,7 +160,7 @@ class staf_full(tf.Module):
 
 
         loss_energy=self.val_loss(self.totenergy,etrue)
-        loss_force=tf.constant(0.,dtype='float64')
+        loss_force=zero()
         loss=loss_energy+loss_force
 
         return loss, loss_force,loss_energy

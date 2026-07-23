@@ -108,7 +108,11 @@ def main():
         model_dir = INFER / "model_double"
 
     sys.path.insert(0, str(code_root))
+    sys.path.insert(0, str(REPO))
     import tensorflow as tf
+    from staf.dtype import set_precision
+
+    set_precision(args.precision)
     from staf_models.mixture.staf_model_inference_full import (
         staf_full_inference,
     )

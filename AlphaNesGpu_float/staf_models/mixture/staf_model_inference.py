@@ -1,7 +1,18 @@
+import sys
+from pathlib import Path
+
 import tensorflow as tf
 import numpy as np
 from tensorflow.keras import Input
 from tensorflow.keras.layers import Dense
+
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+from staf.dtype import np_dtype, set_precision  # noqa: E402
+
+# Match keras floatx to this code tree (float vs double CUDA ops).
+set_precision(code_root=Path(__file__).resolve().parents[2])
 
 from source_routine.mixture.physics_layer_mod import physics_layer
 from source_routine.mixture.physics_layer_mod import lognorm_layer
@@ -37,7 +48,7 @@ class staf_full_inference(tf.Module):
           self.rc_ang=float(self.cutoff_info[1,0])
           self.ang_buff=int(self.cutoff_info[1,1])
           self.rs=self.cutoff_info[2,0]
-          self.boxinit=np.array([12.,0.,0.,12.,0.,12.],dtype='float32')
+          self.boxinit=np.array([12.,0.,0.,12.,0.,12.],dtype=np_dtype())
           self.N=len(self.type_map)
           if self.ntipos==1:
              self.nt_couple=1
@@ -54,17 +65,17 @@ class staf_full_inference(tf.Module):
 
           self.descriptor_layer=descriptor_layer(self.rc,self.rad_buff,self.rc_ang,self.ang_buff,self.N,self.boxinit,self.rs,self.max_batch)
 
-          init_alpha2b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_2body.dat',dtype='float32').reshape((self.ntipos,-1)) for k in range(self.ntipos)]
-          init_alpha3b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_3body.dat',dtype='float32').reshape((self.nt_couple,-1)) for k in range(self.ntipos)]
+          init_alpha2b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_2body.dat',dtype=np_dtype()).reshape((self.ntipos,-1)) for k in range(self.ntipos)]
+          init_alpha3b=[np.loadtxt(modelname+'/type'+str(k)+'_alpha_3body.dat',dtype=np_dtype()).reshape((self.nt_couple,-1)) for k in range(self.ntipos)]
           if self.ntipos==1:
                num_finger_rad=init_alpha2b[0].shape[1]
                num_finger_ang=init_alpha3b[0].shape[1]
-               initial_type_emb2b=np.ones(num_finger_rad,dtype='float32')
-               initial_type_emb3b=np.ones(num_finger_ang,dtype='float32')
+               initial_type_emb2b=np.ones(num_finger_rad,dtype=np_dtype())
+               initial_type_emb3b=np.ones(num_finger_ang,dtype=np_dtype())
                initial_type_emb=[initial_type_emb2b,initial_type_emb3b]
           else:
-               initial_type_emb2b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_2b.dat',dtype='float32') for k in range(self.ntipos)]
-               initial_type_emb3b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_3b.dat',dtype='float32') for k in range(self.ntipos)]
+               initial_type_emb2b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_2b.dat',dtype=np_dtype()) for k in range(self.ntipos)]
+               initial_type_emb3b=[np.loadtxt(modelname+'/type'+str(k)+'_type_emb_3b.dat',dtype=np_dtype()) for k in range(self.ntipos)]
                initial_type_emb=[[initial_type_emb2b[k],initial_type_emb3b[k]] for k in range(self.ntipos)]
           self.physics_layer=[physics_layer(init_alpha2b[k],init_alpha3b[k],
                        initial_type_emb[k]) for k in range(self.ntipos)]

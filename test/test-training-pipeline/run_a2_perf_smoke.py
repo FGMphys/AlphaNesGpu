@@ -45,7 +45,12 @@ def main():
 
     dtype = "float32" if args.precision == "float" else "float64"
     np_dtype = np.float32 if args.precision == "float" else np.float64
-    tf.keras.backend.set_floatx(dtype)
+    sys.path = [str(REPO)] + [x for x in sys.path if x != str(REPO)]
+    from staf.dtype import set_precision
+
+    set_precision(args.precision)
+    # keep local aliases for arrays
+    assert tf.keras.backend.floatx() == dtype
 
     from gradient_utility.mixture import register_force_3bAFs_grad  # noqa: F401
     from gradient_utility.mixture import register_force_2bAFs_grad  # noqa: F401

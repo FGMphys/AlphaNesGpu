@@ -4,22 +4,19 @@ import numpy as np
 
 import tensorflow as tf
 import tensorflow.keras.optimizers.schedules as optsch
-import tensorflow.keras.experimental as tfexp
 import tensorflow.keras.optimizers as tfopt
-
-tf.keras.backend.set_floatx('float64')
 
 def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
     if param[0]=='expdec':
        tf=ne*buffer_stream_tr
        try:
-           initial_learning_rate=np.float64(float(param[1]))
+           initial_learning_rate=float(param[1])
        except:
-           initial_learning_rate=np.float64(0.001)
+           initial_learning_rate=0.001
        try:
-           final_learning_rate=np.float64(float(param[2]))
+           final_learning_rate=float(param[2])
        except:
-           final_learning_rate=np.float64(10**(-7))
+           final_learning_rate=10**(-7)
        if num_call==0:
            print("STAF: ",name," learning rate decay is set to exponential decay.",sep=' ',end='\n')
            print("STAF: ",name," initial learning rate set to",initial_learning_rate,sep=' ',end='\n')
@@ -29,25 +26,25 @@ def build_learning_rate(param,ne,nb,buffer_stream_tr,name,num_call):
 
     elif param[0]=='cosann':
         try:
-            initial_learning_rate=np.float64(float(param[1]))
+            initial_learning_rate=float(param[1])
         except:
-            initial_learning_rate=np.float64(0.01)
+            initial_learning_rate=0.01
         try:
             first_decay_steps=int(float(param[2])*nb*buffer_stream_tr)
         except:
             first_decay_steps=int(2*nb*buffer_stream_tr)
         try:
-            t_mul=np.float64(float(param[3]))
+            t_mul=float(param[3])
         except:
-            t_mul=np.float64(2.0)
+            t_mul=2.0
         try:
-            m_mul=np.float64(float(param[4]))
+            m_mul=float(param[4])
         except:
-            m_mul=np.float64(1.0)
+            m_mul=1.0
         try:
-            alpha=np.float64(float(param[5]))
+            alpha=float(param[5])
         except:
-            alpha=np.float64(0.0)
+            alpha=0.0
         if num_call==0:
             print("STAF: ",name," learning rate decay is set to cosine annealing.",sep=' ',end='\n')
             print("STAF: ",name," initial learning rate set to",initial_learning_rate,sep=' ',end='\n')

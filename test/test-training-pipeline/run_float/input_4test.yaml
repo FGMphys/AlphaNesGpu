@@ -1,5 +1,8 @@
 #yaml input file
 
+# float32 | float64 (aliases: float|double). If omitted, inferred from code tree name.
+precision: float
+
 #Dataset Path
 dataset_folder: dataset
 
