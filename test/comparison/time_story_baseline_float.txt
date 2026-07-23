@@ -1,0 +1,38 @@
+# Float32 baseline timing on Tesla V100-PCIE-16GB
+# System: MB-pol water, 768 atoms (256 O + 512 H), Rc = Rc_ang = 4.5 A
+# Mean neighbors within Rc ~ 38.2
+# batch_size=4, displ_freq=10; each line times 10 batches (40 frames)
+# Steady-state stats exclude compile/validation spikes (>8 s)
+
+Epoch  0  step  10 . Time to elaborate  10  batch of  4  frames is 19.709614515304565
+Epoch  0  step  20 . Time to elaborate  10  batch of  4  frames is 3.482541084289551
+Epoch  0  step  30 . Time to elaborate  10  batch of  4  frames is 3.5203773975372314
+Epoch  0  step  40 . Time to elaborate  10  batch of  4  frames is 3.4448580741882324
+Epoch  0  step  50 . Time to elaborate  10  batch of  4  frames is 3.5522589683532715
+Epoch  0  step  60 . Time to elaborate  10  batch of  4  frames is 3.608247756958008
+Epoch  0  step  70 . Time to elaborate  10  batch of  4  frames is 3.4578046798706055
+Epoch  0  step  80 . Time to elaborate  10  batch of  4  frames is 3.463258743286133
+Epoch  0  step  90 . Time to elaborate  10  batch of  4  frames is 3.7644479274749756
+Epoch  0  step  100 . Time to elaborate  10  batch of  4  frames is 3.7809576988220215
+Epoch  0  step  110 . Time to elaborate  10  batch of  4  frames is 3.8570308685302734
+Epoch  0  step  120 . Time to elaborate  10  batch of  4  frames is 3.637103319168091
+Epoch  1  step  130 . Time to elaborate  10  batch of  4  frames is 11.321974039077759
+Epoch  1  step  140 . Time to elaborate  10  batch of  4  frames is 3.5272514820098877
+Epoch  1  step  150 . Time to elaborate  10  batch of  4  frames is 3.5305216312408447
+Epoch  1  step  160 . Time to elaborate  10  batch of  4  frames is 3.560220718383789
+Epoch  1  step  170 . Time to elaborate  10  batch of  4  frames is 3.506335496902466
+Epoch  1  step  180 . Time to elaborate  10  batch of  4  frames is 3.5082156658172607
+Epoch  1  step  190 . Time to elaborate  10  batch of  4  frames is 3.4935929775238037
+Epoch  1  step  200 . Time to elaborate  10  batch of  4  frames is 3.637681245803833
+Epoch  1  step  210 . Time to elaborate  10  batch of  4  frames is 3.761974573135376
+Epoch  1  step  220 . Time to elaborate  10  batch of  4  frames is 3.8707985877990723
+Epoch  1  step  230 . Time to elaborate  10  batch of  4  frames is 3.7028825283050537
+Epoch  1  step  240 . Time to elaborate  10  batch of  4  frames is 3.6377058029174805
+Epoch  1  step  250 . Time to elaborate  10  batch of  4  frames is 3.854663372039795
+Epoch  2  step  260 . Time to elaborate  10  batch of  4  frames is 9.850950717926025
+Epoch  2  step  270 . Time to elaborate  10  batch of  4  frames is 3.9312589168548584
+Epoch  2  step  280 . Time to elaborate  10  batch of  4  frames is 3.6953511238098145
+Epoch  2  step  290 . Time to elaborate  10  batch of  4  frames is 3.8511898517608643
+Epoch  2  step  300 . Time to elaborate  10  batch of  4  frames is 3.751020908355713
+Epoch  2  step  310 . Time to elaborate  10  batch of  4  frames is 3.855900287628174
+Epoch  2  step  320 . Time to elaborate  10  batch of  4  frames is 3.845590114593506

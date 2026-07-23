@@ -1,0 +1,28 @@
+# STAF performance baseline (reference for future optimizations)
+
+Hardware: Tesla V100-PCIE-16GB (driver 470.256.02), CUDA toolkit 11.8, TensorFlow 2.14
+Workload: test/run_{float,double} on dataset_MBPOL_278_223_248_full
+System: 768 atoms (256 O + 512 H), orthorhombic water box L≈19.5–19.7 Å
+Cutoffs: Rc = Rc_Angular = 4.5 Å, Rs = 2.25 Å
+Mean neighbors within Rc: 38.2 ± 0.8 (40-frame sample, MIC PBC)
+Buffers: Radial_Buffer = Max_Angular_Neigh = 60
+Training setup: batch_size = 4, buffer_stream_dim_tr = 4, energy+force, Seed = 60
+Timing source: time_story.dat (displ_freq = 10 → each sample covers 10 batches / 40 frames)
+Steady-state: exclude reports > 8 s (first-step compile / end-of-epoch validation)
+
+## float32 (AlphaNesGpu_float)
+- Steady report: 3.658 ± 0.151 s / 40 frames
+- Per batch (4 frames): 0.366 s
+- Per frame: 91.5 ms (10.93 frames/s)
+- Estimated training time / epoch (~120 steps): 44 s
+
+## float64 (AlphaNesGpu_double)
+- Steady report: 5.988 ± 0.049 s / 40 frames
+- Per batch (4 frames): 0.599 s
+- Per frame: 149.7 ms (6.68 frames/s)
+- Estimated training time / epoch (~120 steps): 72 s
+
+## Ratio
+- float64 / float32 wall time ≈ 1.64x on this workload
+
+Raw timing logs: time_story_baseline_float.txt, time_story_baseline_double.txt
