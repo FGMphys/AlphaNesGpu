@@ -2,6 +2,7 @@ import os
 import time
 import sys
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 import logging
 import absl.logging
@@ -448,28 +449,62 @@ try:
 except:
    freq_test=1
    print("STAF: test will be ever ",freq_test," epochs")
+
+_dt = tf_dtype()
+_np_dtype = np.float64 if _dt == tf.float64 else np.float32
+
+def _load_buffer_host(pos_map, box_map, e_map, f_map, el):
+    """Copy mmap slices on a host thread so GPU can train the previous buffer."""
+    return (np.asarray(pos_map[el], dtype=_np_dtype),
+            np.asarray(box_map[el], dtype=_np_dtype),
+            np.asarray(e_map[el], dtype=_np_dtype),
+            np.asarray(f_map[el], dtype=_np_dtype))
+
+print("STAF: reduce_retracing on train/test + host buffer prefetch")
 start_loc=time.time()
+_prefetch_pool = ThreadPoolExecutor(max_workers=1)
 for ep in range(restart_ep,ne):
     losstot=zero()
     vallosstot=zero()
     vallosstote=zero()
     vallosstotf=zero()
-    for numbuf,el in enumerate(idx_str_tr):
+    nbuf_tr = idx_str_tr.shape[0]
+    fut = _prefetch_pool.submit(
+        _load_buffer_host, pos_map_tr, box_map_tr, e_map_tr, f_map_tr, idx_str_tr[0]
+    ) if nbuf_tr else None
+    for numbuf in range(nbuf_tr):
         loss_buffer=0.
         start=time.time()
+        pos_np, box_np, e_np, f_np = fut.result()
+        if numbuf + 1 < nbuf_tr:
+            fut = _prefetch_pool.submit(
+                _load_buffer_host, pos_map_tr, box_map_tr, e_map_tr, f_map_tr,
+                idx_str_tr[numbuf + 1]
+            )
+        pos_t = tf.convert_to_tensor(pos_np, dtype=_dt)
+        box_t = tf.convert_to_tensor(box_np, dtype=_dt)
+        e_t = tf.convert_to_tensor(e_np, dtype=_dt)
+        f_t = tf.convert_to_tensor(f_np, dtype=_dt)
         [raddescr,angdescr,des3bsupp,
         intmap2b,intmap3b,intder2b,
-        intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(tf.constant(pos_map_tr[el]),tf.constant(box_map_tr[el]))
-        # One host sync per buffer (safety), not per train step.
-        max_ang=int(tf.reduce_max(numtriplet).numpy())
-        max_buff=int(max_ang*(max_ang-1)/2)
-        if (max_buff>ang_buff):
-            print("STAF: found angular neighbours beyond the buffer (%d vs %d)"%(max_buff,ang_buff))
-            sys.exit()
+        intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(pos_t, box_t)
+        # Host sync only once per epoch (first buffer) — avoids D2H every buffer.
+        if numbuf == 0:
+            max_ang=int(tf.reduce_max(numtriplet).numpy())
+            max_buff=int(max_ang*(max_ang-1)/2)
+            if (max_buff>ang_buff):
+                print("STAF: found angular neighbours beyond the buffer (%d vs %d)"%(max_buff,ang_buff))
+                sys.exit()
         nb=int(buffer_stream_tr/bs)
         for k in range(nb):
             start3=time.time()
-            [loss,losse,loss_bound,lossf]=trainmeth(raddescr[k*bs:(k+1)*bs],angdescr[k*bs:(k+1)*bs],des3bsupp[k*bs:(k+1)*bs],intmap2b[k*bs:(k+1)*bs],intder2b[k*bs:(k+1)*bs],intmap3b[k*bs:(k+1)*bs],intder3b[k*bs:(k+1)*bs],intder3bsupp[k*bs:(k+1)*bs],numtriplet[k*bs:(k+1)*bs],e_map_tr[el][k*bs:(k+1)*bs],f_map_tr[el][k*bs:(k+1)*bs],pe,pf,pb)
+            [loss,losse,loss_bound,lossf]=trainmeth(
+                raddescr[k*bs:(k+1)*bs], angdescr[k*bs:(k+1)*bs],
+                des3bsupp[k*bs:(k+1)*bs], intmap2b[k*bs:(k+1)*bs],
+                intder2b[k*bs:(k+1)*bs], intmap3b[k*bs:(k+1)*bs],
+                intder3b[k*bs:(k+1)*bs], intder3bsupp[k*bs:(k+1)*bs],
+                numtriplet[k*bs:(k+1)*bs], e_t[k*bs:(k+1)*bs], f_t[k*bs:(k+1)*bs],
+                pe, pf, pb)
             lrnow=model.get_lrnet()
             lrnow2=model.get_lrphys()
             accumul=accumul+1
@@ -490,16 +525,36 @@ for ep in range(restart_ep,ne):
     lcurve_notmean.flush()
     lr_file.flush()
     if (ep%freq_test==0):
-       for numbuf,el in enumerate(idx_str_ts):
+       nbuf_ts = idx_str_ts.shape[0]
+       fut_ts = _prefetch_pool.submit(
+           _load_buffer_host, pos_map_ts, box_map_ts, e_map_ts, f_map_ts, idx_str_ts[0]
+       ) if nbuf_ts else None
+       for numbuf in range(nbuf_ts):
            vallosstot_buff=0.
            vallosstote_buff=0.
            vallosstotf_buff=0.
+           pos_np, box_np, e_np, f_np = fut_ts.result()
+           if numbuf + 1 < nbuf_ts:
+               fut_ts = _prefetch_pool.submit(
+                   _load_buffer_host, pos_map_ts, box_map_ts, e_map_ts, f_map_ts,
+                   idx_str_ts[numbuf + 1]
+               )
+           pos_t = tf.convert_to_tensor(pos_np, dtype=_dt)
+           box_t = tf.convert_to_tensor(box_np, dtype=_dt)
+           e_t = tf.convert_to_tensor(e_np, dtype=_dt)
+           f_t = tf.convert_to_tensor(f_np, dtype=_dt)
            [raddescr,angdescr,des3bsupp,
            intmap2b,intmap3b,intder2b,
-           intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(pos_map_ts[el],box_map_ts[el])
+           intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(pos_t, box_t)
            nb=int(buffer_stream_ts/bs_test)
            for k in range(nb):
-               [val_loss,val_lossf,val_losse]=testmeth(raddescr[k*bs_test:(k+1)*bs_test],angdescr[k*bs_test:(k+1)*bs_test],des3bsupp[k*bs_test:(k+1)*bs_test],intmap2b[k*bs_test:(k+1)*bs_test],intder2b[k*bs_test:(k+1)*bs_test],intmap3b[k*bs_test:(k+1)*bs_test],intder3b[k*bs_test:(k+1)*bs_test],intder3bsupp[k*bs_test:(k+1)*bs_test],numtriplet[k*bs_test:(k+1)*bs_test],e_map_ts[el][k*bs_test:(k+1)*bs_test],f_map_ts[el][k*bs_test:(k+1)*bs_test])
+               [val_loss,val_lossf,val_losse]=testmeth(
+                   raddescr[k*bs_test:(k+1)*bs_test], angdescr[k*bs_test:(k+1)*bs_test],
+                   des3bsupp[k*bs_test:(k+1)*bs_test], intmap2b[k*bs_test:(k+1)*bs_test],
+                   intder2b[k*bs_test:(k+1)*bs_test], intmap3b[k*bs_test:(k+1)*bs_test],
+                   intder3b[k*bs_test:(k+1)*bs_test], intder3bsupp[k*bs_test:(k+1)*bs_test],
+                   numtriplet[k*bs_test:(k+1)*bs_test],
+                   e_t[k*bs_test:(k+1)*bs_test], f_t[k*bs_test:(k+1)*bs_test])
                vallosstot_buff+=val_loss
                vallosstote_buff+=val_losse
                vallosstotf_buff+=val_lossf

@@ -66,7 +66,7 @@ class staf_full(tf.Module):
         self.global_step=0
 
 
-    @tf.function()
+    @tf.function(reduce_retracing=True)
     def full_train_e(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,
                      intder3bsupp,numtriplet,etrue,ftrue,pe,pf,pb):
 
@@ -132,7 +132,7 @@ class staf_full(tf.Module):
         ######## FINE MODIFICA 19.04: SOLVE BUG ONLY FIRST HIDDEN ###########
         return loss_force+loss_energy,loss_force,loss_energy
 
-    @tf.function()
+    @tf.function(reduce_retracing=True)
     def full_test_e(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,intder3bsupp,
                     numtriplet,etrue,ftrue):
 
@@ -164,7 +164,7 @@ class staf_full(tf.Module):
         loss=loss_energy+loss_force
 
         return loss, loss_force,loss_energy
-    @tf.function()
+    @tf.function(reduce_retracing=True)
     def full_train_e_f(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,
                      intder3bsupp,numtriplet,etrue,ftrue,pe,pf,pb):
 
@@ -257,7 +257,7 @@ class staf_full(tf.Module):
 
         return loss,loss_energy,loss_bound,loss_force
 
-    @tf.function()
+    @tf.function(reduce_retracing=True)
     def full_test_e_f(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,intder3bsupp,
                      numtriplet,etrue,ftrue):
 
