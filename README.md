@@ -14,6 +14,12 @@ bash install_path.sh all          # builds ops_float + ops_double from src/
 python staf_train.py input_staf.yaml   # precision: float|double
 ```
 
+**Linea B (LAMMPS, in progress):** default MD path is **ONNX + ONNX Runtime** for the Dense MLP; custom CUDA stays in `libstaf`. See [`test/B_ARCHITECTURE.md`](test/B_ARCHITECTURE.md), [`libstaf/`](libstaf/), [`lammps/USER-STAF/`](lammps/USER-STAF/). Export:
+
+```bash
+python STAF/save_models/export_mlp_onnx.py -imodel model_log0 -modelname model_onnx
+```
+
 Experimental variants remain under `DEV/` (not part of the A2 full-atom unify).
 
 See `STAF/README.md`, `test/ACCEPTANCE.md`, and `test/A2_PROGRESS.md`.

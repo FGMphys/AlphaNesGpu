@@ -33,3 +33,15 @@ Layout:
 | `staf_paths.py` | Resolves active ops root from precision |
 
 Experimental CG / RDF forks remain under `../DEV/` (out of A2 scope).
+
+## MD export (Linea B, ONNX)
+
+Dense MLP for LAMMPS/`libstaf` (ORT), no custom ops in the graph:
+
+```bash
+python save_models/export_mlp_onnx.py -imodel model_log0 -modelname model_onnx
+# requires: pip install tf2onnx
+```
+
+See `../test/B_ARCHITECTURE.md`. Legacy SavedModel: `save_models/save_model.py`.
+

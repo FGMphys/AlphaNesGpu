@@ -1,0 +1,8 @@
+STAF MLP grad export (inference-ORT friendly)
+source: /home/francegm/AlphaNesGpu/test/test-training-pipeline/run_float/model_log0
+precision: float32
+ntypes: 2
+onnx input:  af [batch,n_atoms,n_AF]
+onnx output: energy [] = 0.5*sum(atomic)
+onnx output: dE_daf [batch,n_atoms,n_AF] = d(sum atomic)/daf
+TanhGrad rewritten to Mul/Sub; no training-only ops
