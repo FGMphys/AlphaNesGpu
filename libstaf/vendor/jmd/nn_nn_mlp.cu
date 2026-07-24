@@ -61,6 +61,7 @@ extern "C" {
 #include "src_nn/fingerprint/ang/reforce.h"
 #include "src_nn/force/rad/reforce.h"
 #include "src_nn/force/ang/reforce.h"
+#include "src_nn/staf_force_pbc.h"
 
 /* ===================================================================== */
 /*  Utility macros                                                        */
@@ -75,6 +76,7 @@ extern "C" {
 
 /* Descriptor geometry */
 static int    N;
+static int    N_all;
 static int    Radial_Buffer;
 static int    Angular_Buffer;
 static double Cutoff;
@@ -140,6 +142,19 @@ static double *Virial_Diagonal_d;
 /* Repulsion parameters */
 static double Rs, coeffA, coeffB, coeffC, Pow_alpha, Pow_beta;
 
+/* Domain decomposition / external neighbor list */
+static int    g_ext_neigh = 0;
+static int   *howmany_h = NULL;
+static int   *with_h = NULL;
+static int    ext_maxneigh = 0;
+static int    cap_ext_centers = 0; /* host howmany_h/with_h capacity */
+static int    cap_n_all = 0;
+static int    cap_n_centers = 0;   /* device howmany_d/with_d capacity */
+static int   *tipos_snapshot = NULL;
+
+/* MLP eval staging (also reset when owned Tipos change on resize). */
+static int     s_buf_total = 0;
+
 /* ===================================================================== */
 /*  StafMlp handle set externally via staf_jmd_set_mlp()                 */
 /* ===================================================================== */
@@ -150,8 +165,159 @@ extern "C" void staf_jmd_set_mlp(void *mlp)
     g_staf_mlp = (StafMlp *)mlp;
 }
 
+extern "C" void staf_jmd_set_skip_pbc(int skip)
+{
+    staf_descriptor_set_skip_pbc(skip);
+    staf_force_set_skip_pbc(skip);
+}
+
+extern "C" void staf_jmd_set_external_neigh(const int *howmany_host,
+                                            const int *with_host,
+                                            int n_centers, int maxneigh)
+{
+    if (!howmany_host || !with_host || n_centers <= 0 || maxneigh <= 0)
+        return;
+    g_ext_neigh = 1;
+    if (!howmany_h || !with_h || n_centers > cap_ext_centers) {
+        free(howmany_h);
+        free(with_h);
+        howmany_h = (int *)malloc((size_t)n_centers * sizeof(int));
+        with_h = (int *)malloc((size_t)n_centers * (size_t)Radial_Buffer *
+                               sizeof(int));
+        if (!howmany_h || !with_h) {
+            fprintf(stderr, "staf_jmd_set_external_neigh: malloc failed\n");
+            g_ext_neigh = 0;
+            return;
+        }
+        cap_ext_centers = n_centers;
+    }
+    ext_maxneigh = maxneigh;
+    for (int i = 0; i < n_centers; ++i) {
+        int nn = howmany_host[i];
+        if (nn < 0) nn = 0;
+        if (nn > Radial_Buffer) nn = Radial_Buffer;
+        if (nn > maxneigh) nn = maxneigh;
+        howmany_h[i] = nn;
+        for (int k = 0; k < Radial_Buffer; ++k) {
+            with_h[i * Radial_Buffer + k] =
+                (k < nn) ? with_host[i * maxneigh + k] : 0;
+        }
+    }
+}
+
+extern "C" void staf_jmd_clear_external_neigh(void)
+{
+    g_ext_neigh = 0;
+}
+
+static void rebuild_owned_buffers(void)
+{
+    /* Prior irregular GPU blocks are intentionally leaked on resize (B2). */
+    Intmap2b_d  = createIrregularMatrix2D_CUDA_int(NumTypes, Tipos, (Radial_Buffer + 1));
+    Intmap3b_d  = createIrregularMatrix2D_CUDA_int(NumTypes, Tipos, (Angular_Buffer * 2));
+    Des2b_d     = createIrregularMatrix2D_CUDA(NumTypes, Tipos, Radial_Buffer);
+    Des3b_d     = createIrregularMatrix2D_CUDA(NumTypes, Tipos, Angular_Buffer);
+    Des3bsupp_d = createIrregularMatrix2D_CUDA(NumTypes, Tipos, Radial_Buffer);
+    Der2b_d     = createIrregularMatrix2D_CUDA(NumTypes, Tipos, (Radial_Buffer * 3));
+    Der3bsupp_d = createIrregularMatrix2D_CUDA(NumTypes, Tipos, (Radial_Buffer * 3));
+    Der3b_d     = createIrregularMatrix2D_CUDA(NumTypes, Tipos, (Angular_Buffer * 2 * 3));
+    Numtriplet_d = createIrregularMatrix2D_CUDA_int(NumTypes, Tipos, 1);
+
+    int *dimAFSall = (int *)calloc(NumTypes, sizeof(int));
+    dimAFSall_tot  = 0;
+    for (int type = 0; type < NumTypes; type++)
+        dimAFSall[type] = (Alpha_num[type] + Alpha_a_num[type]) * Tipos[type];
+    for (int type = 0; type < NumTypes; type++)
+        dimAFSall_tot += dimAFSall[type];
+    AFs_all_d = createIrregularMatrix2D_CUDA(NumTypes, dimAFSall, 1);
+    free(dimAFSall);
+
+    int *dimGrad = (int *)calloc(NumTypes, sizeof(int));
+    for (int k = 0; k < NumTypes; k++)
+        dimGrad[k] = (Alpha_num[k] + Alpha_a_num[k]) * Tipos[k];
+    Gradients   = IrregularMatrix2Ddouble(NumTypes, dimGrad, 1.);
+    Gradients_d = createIrregularMatrix2D_CUDA(NumTypes, dimGrad, 1.);
+    free(dimGrad);
+    s_buf_total = 0;
+}
+
+extern "C" int staf_jmd_resize(int n_centers, int n_all,
+                               const int *tipos_owned,
+                               const int *type_map_all)
+{
+    if (n_centers < 0 || n_all < n_centers || !tipos_owned || !type_map_all)
+        return -1;
+
+    int tipos_changed = 0;
+    if (!tipos_snapshot) {
+        tipos_snapshot = (int *)calloc(NumTypes, sizeof(int));
+        memcpy(tipos_snapshot, Tipos, (size_t)NumTypes * sizeof(int));
+    }
+    for (int t = 0; t < NumTypes; t++) {
+        if (tipos_owned[t] != tipos_snapshot[t]) {
+            tipos_changed = 1;
+            break;
+        }
+    }
+
+    N = n_centers;
+    N_all = n_all;
+
+    if (tipos_changed) {
+        memcpy(Tipos, tipos_owned, (size_t)NumTypes * sizeof(int));
+        memcpy(tipos_snapshot, tipos_owned, (size_t)NumTypes * sizeof(int));
+        cudaMemcpy(Tipos_d, Tipos, (size_t)NumTypes * sizeof(int),
+                   cudaMemcpyHostToDevice);
+        rebuild_owned_buffers();
+    }
+
+    Type_map = (int *)realloc(Type_map, (size_t)n_all * sizeof(int));
+    memcpy(Type_map, type_map_all, (size_t)n_all * sizeof(int));
+    if (Type_map_d)
+        cudaFree(Type_map_d);
+    cudaMalloc((void **)&Type_map_d, (size_t)n_all * sizeof(int));
+    cudaMemcpy(Type_map_d, Type_map, (size_t)n_all * sizeof(int),
+               cudaMemcpyHostToDevice);
+
+    if (n_all > cap_n_all) {
+        if (pos_d)
+            cudaFree(pos_d);
+        if (Force_d)
+            cudaFree(Force_d);
+        cudaMalloc((void **)&pos_d, (size_t)n_all * 3 * sizeof(double));
+        cudaMalloc((void **)&Force_d, (size_t)n_all * 3 * sizeof(double));
+        cap_n_all = n_all;
+    }
+
+    if (n_centers > cap_n_centers) {
+        if (howmany_d)
+            cudaFree(howmany_d);
+        if (with_d)
+            cudaFree(with_d);
+        if (with_dist2_d)
+            cudaFree(with_dist2_d);
+        cudaMalloc((void **)&howmany_d, (size_t)n_centers * sizeof(int));
+        cudaMalloc((void **)&with_d,
+                   (size_t)n_centers * (size_t)Radial_Buffer * sizeof(int));
+        cudaMalloc((void **)&with_dist2_d,
+                   (size_t)n_centers * (size_t)Radial_Buffer * sizeof(double));
+        cap_n_centers = n_centers;
+    }
+
+    return 0;
+}
+
+extern "C" int staf_jmd_num_types(void)
+{
+    return NumTypes;
+}
+
+extern "C" int staf_jmd_radial_buffer(void)
+{
+    return Radial_Buffer;
+}
+
 /* ===================================================================== */
-/*  Repulsion construction (unchanged)                                    */
 /* ===================================================================== */
 
 static void save_cutoff(double rc)
@@ -228,6 +394,10 @@ void Constructor_Descriptors(FILE *config_file)
     read_tipos(Tipos, NumTypes, Typefile);
     cudaMemcpy(Tipos_d, Tipos, NumTypes * sizeof(int), cudaMemcpyHostToDevice);
 
+    N_all = N;
+    cap_n_all = N;
+    cap_n_centers = N;
+
     Type_map = (int *)calloc(N, sizeof(int));
     cudaMalloc((void **)&Type_map_d, N * sizeof(int));
     make_typemap(Type_map, N, NNmodelRoot);
@@ -265,12 +435,12 @@ void make_typemap(int *type_map, int num_of_particles, char *root_path)
     int code = 0, par = 0;
     for (int k = 0; k < NumTypes; k++) {
         for (int y = 0; y < Tipos[k]; y++) {
-            type_map[par] = code;
+            if (par < num_of_particles)
+                type_map[par] = code;
             par++;
         }
         code++;
     }
-    assert(N == par);
     (void)root_path;
 }
 
@@ -368,6 +538,14 @@ extern "C" void initializenn_(FILE *config_file, int number_of_particles)
 {
     N = number_of_particles;
     Constructor_Descriptors(config_file);
+    /* 1-rank bootstrap: when N matches type.dat sum, Tipos already correct. */
+    int sum_tipos = 0;
+    for (int t = 0; t < NumTypes; t++)
+        sum_tipos += Tipos[t];
+    if (sum_tipos == N) {
+        tipos_snapshot = (int *)calloc(NumTypes, sizeof(int));
+        memcpy(tipos_snapshot, Tipos, (size_t)NumTypes * sizeof(int));
+    }
     printf("Initializenn: Descriptors correctly constructed and loaded!\n");
     Constructor_AFS();
     printf("Initializenn: AFs correctly constructed and loaded!\n");
@@ -381,10 +559,13 @@ extern "C" void initializenn_(FILE *config_file, int number_of_particles)
 void Compute_Descriptors(double *box_d_arg, double *pos_d_arg,
                           int *howmany_d_arg, int *with_d_arg)
 {
-    set_tensor_to_zero_int(Numtriplet_d[0], N * sizeof(int));
+    set_tensor_to_zero_int(Numtriplet_d[0], N); /* elements, not bytes */
+    set_tensor_to_zero_double(Des2b_d[0], N * Radial_Buffer);
+    set_tensor_to_zero_double(Des3b_d[0], N * Angular_Buffer);
+    set_tensor_to_zero_double(Des3bsupp_d[0], N * Radial_Buffer);
 
     fill_radial_launcher(Cutoff, Radial_Buffer, Cutoff_Angular, Angular_Buffer, N,
-                         pos_d_arg, box_d_arg,
+                         N_all, pos_d_arg, box_d_arg,
                          howmany_d_arg, with_d_arg,
                          Des2b_d[0], Intmap2b_d[0], Der2b_d[0],
                          Des3bsupp_d[0], Der3bsupp_d[0], 1, Numtriplet_d[0],
@@ -392,8 +573,7 @@ void Compute_Descriptors(double *box_d_arg, double *pos_d_arg,
                          Pow_alpha, Pow_beta);
 
     fill_angular_launcher(Cutoff, Radial_Buffer, Cutoff_Angular,
-                          Angular_Buffer, N,
-                          pos_d_arg, box_d_arg,
+                          Angular_Buffer, N, N_all, pos_d_arg, box_d_arg,
                           howmany_d_arg, with_d_arg,
                           Des3b_d[0], Intmap3b_d[0],
                           Des3bsupp_d[0], Der3b_d[0],
@@ -445,7 +625,6 @@ static double *s_af_buf = NULL;  /* packed AFs  (host, double) */
 static double *s_gr_buf = NULL;  /* packed grads (host, double) */
 static float  *s_af_f32 = NULL;  /* float staging when mlp is float32 */
 static float  *s_gr_f32 = NULL;
-static int     s_buf_total = 0;  /* total elements allocated */
 
 static void ensure_eval_buffers()
 {
@@ -514,21 +693,28 @@ void Compute_NNEnergyandGradient_all(double *energy)
             int n_des = N * Radial_Buffer;
             double *des_h = (double *)malloc((size_t)n_des * sizeof(double));
             int *how_h = (int *)malloc((size_t)N * sizeof(int));
+            int *with_dump = (int *)malloc((size_t)n_des * sizeof(int));
             cudaMemcpy(des_h, Des2b_d[0], (size_t)n_des * sizeof(double),
                        cudaMemcpyDeviceToHost);
             cudaMemcpy(how_h, howmany_d, (size_t)N * sizeof(int),
                        cudaMemcpyDeviceToHost);
+            cudaMemcpy(with_dump, with_d, (size_t)n_des * sizeof(int),
+                       cudaMemcpyDeviceToHost);
             FILE *df = fopen(ime_path, "wb");
             if (df) {
                 fwrite(&N, sizeof(int), 1, df);
+                fwrite(&N_all, sizeof(int), 1, df);
                 fwrite(&Radial_Buffer, sizeof(int), 1, df);
+                fwrite(&g_ext_neigh, sizeof(int), 1, df);
                 fwrite(how_h, sizeof(int), (size_t)N, df);
+                fwrite(with_dump, sizeof(int), (size_t)n_des, df);
                 fwrite(des_h, sizeof(double), (size_t)n_des, df);
                 fclose(df);
                 fprintf(stderr, "nn_nn_mlp: dumped IME/Des2b to %s\n", ime_path);
             }
             free(des_h);
             free(how_h);
+            free(with_dump);
         }
     }
 
@@ -602,7 +788,7 @@ void Compute_Force_2b(int type)
     int prod = Tipos[type] * Radial_Buffer;
     computeforce_doublets_Launcher(Gradients_d[type], Des2b_d[type],
                                    Der2b_d[type], Intmap2b_d[type],
-                                   Radial_Buffer, N, 1,
+                                   Radial_Buffer, N_all, 1,
                                    Alpha_num[type], Alpha_a_num[type],
                                    Alpha_d[type], Coeff_2b_d[type], NumTypes,
                                    Tipos_d, type, Force_d, Type_map_d, prod,
@@ -616,7 +802,7 @@ void Compute_Force_3b(int type)
                                 Des3bsupp_d[type], Des3b_d[type],
                                 Der3bsupp_d[type], Der3b_d[type],
                                 Intmap2b_d[type], Intmap3b_d[type],
-                                Radial_Buffer, Angular_Buffer, N, 1,
+                                Radial_Buffer, Angular_Buffer, N_all, 1,
                                 Alpha_a_num[type], Alpha_num[type],
                                 Coeff_3b_d[type], NumTypes, Tipos_d,
                                 type, Force_d, Numtriplet_d[type],
@@ -626,13 +812,14 @@ void Compute_Force_3b(int type)
 
 void Compute_Forces_all(vector *force, double *virial, vector *virial_diag)
 {
-    set_tensor_to_zero_double(Force_d, 3 * N);
+    set_tensor_to_zero_double(Force_d, 3 * N_all);
     set_tensor_to_zero_double(Virial_Diagonal_d, 3);
     for (int type = 0; type < NumTypes; type++) {
         Compute_Force_2b(type);
         Compute_Force_3b(type);
     }
-    cudaMemcpy(force,       Force_d,           N * 3 * sizeof(double), cudaMemcpyDeviceToHost);
+    cudaMemcpy(force, Force_d, (size_t)N_all * 3 * sizeof(double),
+               cudaMemcpyDeviceToHost);
     cudaMemcpy(virial_diag, Virial_Diagonal_d, 3 * sizeof(double),     cudaMemcpyDeviceToHost);
     *virial = virial_diag->x + virial_diag->y + virial_diag->z;
 }
@@ -653,23 +840,46 @@ extern "C" void calculateforces(vector *pos, double *box,
                                  double *energy, vector *force,
                                  double *virial, vector *virialxyz)
 {
-    cudaMemcpy(pos_d, pos, N * 3 * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(box_d, box, 6 * sizeof(double),     cudaMemcpyHostToDevice);
+    cudaMemcpy(pos_d, pos, (size_t)N_all * 3 * sizeof(double),
+               cudaMemcpyHostToDevice);
+    cudaMemcpy(box_d, box, 6 * sizeof(double), cudaMemcpyHostToDevice);
 
-    MAX_PARTICLE_CELLS = Radial_Buffer;
-    int c_nx, c_ny, c_nz;
-    celleCompute(N, box, pos_d, Cutoff,
-                 &Cells, &Cells_howmany, &c_nx, &c_ny, &c_nz,
-                 MAX_PARTICLE_CELLS);
-    imeCompute(N, box_d, pos_d, Cutoff,
-               Cells, Cells_howmany, c_nx, c_ny, c_nz,
-               with_d, howmany_d, with_dist2_d,
-               MAX_PARTICLE_CELLS, Radial_Buffer);
+    if (g_ext_neigh) {
+        cudaMemcpy(howmany_d, howmany_h, (size_t)N * sizeof(int),
+                   cudaMemcpyHostToDevice);
+        cudaMemcpy(with_d, with_h,
+                   (size_t)N * (size_t)Radial_Buffer * sizeof(int),
+                   cudaMemcpyHostToDevice);
+        staf_jmd_set_skip_pbc(1);
+    } else {
+        if (N_all != N) {
+            fprintf(stderr,
+                    "nn_nn_mlp: N_all (%d) != N (%d) without external neigh\n",
+                    N_all, N);
+            exit(1);
+        }
+        staf_jmd_set_skip_pbc(0);
+        MAX_PARTICLE_CELLS = Radial_Buffer;
+        int c_nx, c_ny, c_nz;
+        celleCompute(N, box, pos_d, Cutoff,
+                     &Cells, &Cells_howmany, &c_nx, &c_ny, &c_nz,
+                     MAX_PARTICLE_CELLS);
+        imeCompute(N, box_d, pos_d, Cutoff,
+                   Cells, Cells_howmany, c_nx, c_ny, c_nz,
+                   with_d, howmany_d, with_dist2_d,
+                   MAX_PARTICLE_CELLS, Radial_Buffer);
 
-    /* Copy IME to host */
-    cudaMemcpy(Ime->howmany, howmany_d,    N * sizeof(int),                       cudaMemcpyDeviceToHost);
-    cudaMemcpy(Ime->rij2[0], with_dist2_d, N * Radial_Buffer * sizeof(double),   cudaMemcpyDeviceToHost);
-    cudaMemcpy(Ime->with[0], with_d,       N * Radial_Buffer * sizeof(int),       cudaMemcpyDeviceToHost);
+        if (Ime) {
+            cudaMemcpy(Ime->howmany, howmany_d, (size_t)N * sizeof(int),
+                       cudaMemcpyDeviceToHost);
+            cudaMemcpy(Ime->rij2[0], with_dist2_d,
+                       (size_t)N * Radial_Buffer * sizeof(double),
+                       cudaMemcpyDeviceToHost);
+            cudaMemcpy(Ime->with[0], with_d,
+                       (size_t)N * Radial_Buffer * sizeof(int),
+                       cudaMemcpyDeviceToHost);
+        }
+    }
 
     Compute_Descriptors(box_d, pos_d, howmany_d, with_d);
     Compute_AFs_all();
@@ -686,24 +896,49 @@ extern "C" void calculate_energies(vector *pos, double *box,
                                     double *energy, vector *force,
                                     double *virial, vector *virialxyz)
 {
-    (void)force; (void)virial; (void)virialxyz;
+    (void)force;
+    (void)virial;
+    (void)virialxyz;
 
-    cudaMemcpy(pos_d, pos, N * 3 * sizeof(double), cudaMemcpyHostToDevice);
-    cudaMemcpy(box_d, box, 6 * sizeof(double),     cudaMemcpyHostToDevice);
+    cudaMemcpy(pos_d, pos, (size_t)N_all * 3 * sizeof(double),
+               cudaMemcpyHostToDevice);
+    cudaMemcpy(box_d, box, 6 * sizeof(double), cudaMemcpyHostToDevice);
 
-    MAX_PARTICLE_CELLS = Radial_Buffer;
-    int c_nx, c_ny, c_nz;
-    celleCompute(N, box, pos_d, Cutoff,
-                 &Cells, &Cells_howmany, &c_nx, &c_ny, &c_nz,
-                 MAX_PARTICLE_CELLS);
-    imeCompute(N, box_d, pos_d, Cutoff,
-               Cells, Cells_howmany, c_nx, c_ny, c_nz,
-               with_d, howmany_d, with_dist2_d,
-               MAX_PARTICLE_CELLS, Radial_Buffer);
+    if (g_ext_neigh) {
+        cudaMemcpy(howmany_d, howmany_h, (size_t)N * sizeof(int),
+                   cudaMemcpyHostToDevice);
+        cudaMemcpy(with_d, with_h,
+                   (size_t)N * (size_t)Radial_Buffer * sizeof(int),
+                   cudaMemcpyHostToDevice);
+        staf_jmd_set_skip_pbc(1);
+    } else {
+        if (N_all != N) {
+            fprintf(stderr,
+                    "nn_nn_mlp: N_all != N without external neigh (energies)\n");
+            exit(1);
+        }
+        staf_jmd_set_skip_pbc(0);
+        MAX_PARTICLE_CELLS = Radial_Buffer;
+        int c_nx, c_ny, c_nz;
+        celleCompute(N, box, pos_d, Cutoff,
+                     &Cells, &Cells_howmany, &c_nx, &c_ny, &c_nz,
+                     MAX_PARTICLE_CELLS);
+        imeCompute(N, box_d, pos_d, Cutoff,
+                   Cells, Cells_howmany, c_nx, c_ny, c_nz,
+                   with_d, howmany_d, with_dist2_d,
+                   MAX_PARTICLE_CELLS, Radial_Buffer);
 
-    cudaMemcpy(Ime->howmany, howmany_d,    N * sizeof(int),              cudaMemcpyDeviceToHost);
-    cudaMemcpy(Ime->rij2[0], with_dist2_d, N * Radial_Buffer * sizeof(double), cudaMemcpyDeviceToHost);
-    cudaMemcpy(Ime->with[0], with_d,       N * Radial_Buffer * sizeof(int),    cudaMemcpyDeviceToHost);
+        if (Ime) {
+            cudaMemcpy(Ime->howmany, howmany_d, (size_t)N * sizeof(int),
+                       cudaMemcpyDeviceToHost);
+            cudaMemcpy(Ime->rij2[0], with_dist2_d,
+                       (size_t)N * Radial_Buffer * sizeof(double),
+                       cudaMemcpyDeviceToHost);
+            cudaMemcpy(Ime->with[0], with_d,
+                       (size_t)N * Radial_Buffer * sizeof(int),
+                       cudaMemcpyDeviceToHost);
+        }
+    }
 
     Compute_Descriptors(box_d, pos_d, howmany_d, with_d);
     Compute_AFs_all();

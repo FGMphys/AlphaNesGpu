@@ -156,3 +156,12 @@ Smoke model: `test/test-lammps-smoke/model_onnx_grad_float/`.
 Helper: [`scripts/staf_gpu_env.sh`](../scripts/staf_gpu_env.sh) — honors `CUDA_HOME` / `CUDNN_LIB` / `ORT_ROOT`, else probes common paths and exports `LD_LIBRARY_PATH` + `CUDACXX`.
 
 Do **not** install CUDA 12 on this host until the NVIDIA driver is upgraded (≥525/570 depending on toolkit).
+
+## B2 MPI DD status (2026-07-24)
+
+- `pair_staf` injects LAMMPS **full + ghost** neighbor list into `libstaf` (indices only; distances from positions). JMD `celle`/`ime` skipped on this path; PBC `rint` off when ghosts carry images.
+- Neighbors are filtered to STAF cutoff (not skin) and sorted by distance before inject (JMD ime convention).
+- Ghost force contributions merge via pair **`reverse_comm`** (`comm_reverse=3`).
+- Multi-rank allowed; `comm_modify cutoff` must be ≥ `max(rcut_r, rcut_a)` (1× cutoff DD).
+- GPU pin: `staf_cuda_set_device` uses `local_rank % deviceCount` (shared GPU ok for smoke).
+- Parity harness: `test/test-lammps-dd-parity/run_dd_parity.sh` — **PASS** np=1/2/4 on water smoke (`PE≈−99.53378`, max|ΔE|~1e-5, max|ΔF|~1e-5).

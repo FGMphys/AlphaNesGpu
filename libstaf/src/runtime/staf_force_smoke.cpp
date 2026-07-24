@@ -94,8 +94,8 @@ int main(int argc, char** argv) {
 
   std::vector<double> f(natoms * 3, 0.0), vir(6, 0.0);
   double e = 0.0;
-  int rc = staf_compute(m, natoms, 0, x.data(), box6, type.data(), &e, f.data(),
-                        vir.data());
+  int rc = staf_compute(m, natoms, 0, x.data(), box6, type.data(), NULL, NULL,
+                        0, &e, f.data(), vir.data());
   printf("staf_compute rc=%d  E=%.8f\n", rc, e);
   double fmax = 0.0;
   for (double v : f) fmax = std::fmax(fmax, std::fabs(v));

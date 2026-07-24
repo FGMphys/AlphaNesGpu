@@ -1,17 +1,20 @@
 /* -*- c++ -*- ----------------------------------------------------------
-   FixSTAF scaffold — pin CUDA device from MPI local rank (optional)
+   FixSTAF — pin CUDA device from MPI local rank (or explicit id)
 ------------------------------------------------------------------------- */
 
 #include "fix_staf.h"
 
 #include "comm.h"
 #include "error.h"
+#include "utils.h"
+
+#include "staf.h"
 
 using namespace LAMMPS_NS;
 
 FixSTAF::FixSTAF(LAMMPS *lmp, int narg, char **arg) : Fix(lmp, narg, arg)
 {
-  if (narg < 3) error->all(FLERR, "Illegal fix staf command");
+  if (narg < 4) error->all(FLERR, "Illegal fix staf command");
   device_id = utils::inumeric(FLERR, arg[3], false, lmp);
 }
 
@@ -22,7 +25,8 @@ int FixSTAF::setmask()
 
 void FixSTAF::init()
 {
-  /* TODO: cudaSetDevice(device_id) or map from comm->me % ngpus */
+  if (staf_cuda_set_device(device_id) != 0)
+    error->all(FLERR, "fix staf: staf_cuda_set_device failed");
   if (comm->me == 0)
-    error->warning(FLERR, "fix staf: scaffold only (no CUDA pin yet)");
+    utils::logmesg(lmp, "Fix staf: pinned CUDA device {}\n", device_id);
 }

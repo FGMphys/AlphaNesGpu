@@ -40,11 +40,8 @@ LIB = \
 		$(JMD_SRC)/log.o \
 		$(JMD_SRC)/vector.o \
 		$(JMD_SRC)/interaction_map.o \
-		$(JMD_SRC)/src_nn/descriptor_builder/reforce.o \
 		$(JMD_SRC)/src_nn/fingerprint/rad/reforce.o \
 		$(JMD_SRC)/src_nn/fingerprint/ang/reforce.o \
-		$(JMD_SRC)/src_nn/force/rad/reforce.o \
-		$(JMD_SRC)/src_nn/force/ang/reforce.o \
 		-Wl,--end-group \
 		-lonnxruntime \
 		-lcudart -lcuda -lgsl -lgslcblas -lpthread -ldl -lm

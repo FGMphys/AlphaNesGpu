@@ -70,6 +70,20 @@ extern "C" {
  */
 void staf_jmd_set_mlp(void *mlp);  /* StafMlp* cast to void* for C callers */
 
+/* Domain decomposition (MPI): external neigh already in JMD-packed order. */
+void staf_jmd_set_skip_pbc(int skip);
+void staf_jmd_set_external_neigh(const int *howmany_host, const int *with_host,
+                                 int n_centers, int maxneigh);
+void staf_jmd_clear_external_neigh(void);
+/* n_centers = nlocal owned; n_all = nlocal + nghost.
+   tipos_owned[NumTypes] per-type owned counts;
+   type_map_all[n_all] species index for each packed slot.
+   Returns 0 on success. May realloc GPU buffers when sizes change. */
+int staf_jmd_resize(int n_centers, int n_all, const int *tipos_owned,
+                    const int *type_map_all);
+int staf_jmd_num_types(void);
+int staf_jmd_radial_buffer(void);
+
 void initializenn_(FILE *config_file, int number_of_particles);
 
 void calculateforces(vector *pos, double *box,

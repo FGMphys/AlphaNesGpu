@@ -42,7 +42,13 @@ endif()
 if(STAF_WITH_JMD)
   enable_language(CUDA)
   set(CMAKE_CUDA_STANDARD 14)
-  add_library(staf_jmd_nn STATIC vendor/jmd/nn_nn_mlp.cu)
+  add_library(staf_jmd_nn STATIC
+    vendor/jmd/nn_nn_mlp.cu
+    vendor/jmd/src_nn/descriptor_builder/reforce.cu
+    vendor/jmd/src_nn/staf_force_pbc.cu
+    vendor/jmd/src_nn/force/rad/reforce.cu
+    vendor/jmd/src_nn/force/ang/reforce.cu
+  )
   target_include_directories(staf_jmd_nn PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/jmd
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -67,11 +73,8 @@ if(STAF_WITH_JMD)
     ${JMD_SRC}/log.o
     ${JMD_SRC}/vector.o
     ${JMD_SRC}/interaction_map.o
-    ${JMD_SRC}/src_nn/descriptor_builder/reforce.o
     ${JMD_SRC}/src_nn/fingerprint/rad/reforce.o
     ${JMD_SRC}/src_nn/fingerprint/ang/reforce.o
-    ${JMD_SRC}/src_nn/force/rad/reforce.o
-    ${JMD_SRC}/src_nn/force/ang/reforce.o
   )
   foreach(o ${JMD_OBJS})
     if(NOT EXISTS ${o})
@@ -82,6 +85,7 @@ if(STAF_WITH_JMD)
   target_include_directories(staf PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/vendor/jmd
     ${JMD_SRC}
+    ${CUDA_HOME}/include
   )
   target_link_libraries(staf PUBLIC staf_jmd_nn ${JMD_OBJS}
     cudart cuda

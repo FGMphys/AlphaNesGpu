@@ -1,5 +1,5 @@
 /* -*- c++ -*- ----------------------------------------------------------
-   USER-STAF scaffold — pair_style staf
+   USER-STAF — pair_style staf
    Runtime: libstaf (ORT MLP + CUDA AF/force). See test/B_ARCHITECTURE.md
 ------------------------------------------------------------------------- */
 
@@ -29,13 +29,22 @@ class PairSTAF : public Pair {
   void init_style() override;
   double init_one(int, int) override;
 
+  int pack_reverse_comm(int, int, double *) override;
+  void unpack_reverse_comm(int, int *, double *) override;
+
  protected:
   char *model_dir;
   double cut_radial, cut_angular;
   StafModel *staf;
   int staf_precision; /* 0 float, 1 double */
+  int device_id;
+
+  /* Scratch for reverse_comm of ghost forces before summing into atom->f. */
+  double *f_ghost; /* [nmax*3], only ghosts used */
+  int f_ghost_max;
 
   void allocate();
+  int resolve_device_id() const;
 };
 
 }  // namespace LAMMPS_NS
