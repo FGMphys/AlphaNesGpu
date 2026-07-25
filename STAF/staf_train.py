@@ -152,21 +152,6 @@ def wrap_train_method(trainmeth, strategy):
 
     return _call
 
-def scale_lr_param_for_horovod(lr_param_split, hvd_mod):
-    """Scale initial LR by hvd.size() (global-batch convention)."""
-    if hvd_mod is None or hvd_mod.size() <= 1:
-        return lr_param_split
-    out = list(lr_param_split)
-    try:
-        out[1] = str(float(out[1]) * float(hvd_mod.size()))
-        print(
-            "STAF: horovod scaled initial LR by size=%d → %s"
-            % (hvd_mod.size(), out[1])
-        )
-    except (IndexError, ValueError):
-        pass
-    return out
-
 def shard_idx_str(idx_str, hvd_mod, name):
     """Frame-buffer sharding across MPI ranks (train path)."""
     if hvd_mod is None or hvd_mod.size() <= 1:
@@ -465,15 +450,19 @@ restart=restart_par
 ## (under MirroredStrategy.scope when distribute=mirrored)
 with dist_scope():
     if restart_par=='no' or restart_par=='only_afs':
-        lr_net_param=scale_lr_param_for_horovod(
-            full_param['lr_dense_net'].split(), hvd_mod)
+        # Horovod: keep YAML learning rates (no × hvd.size() linear scale).
+        if hvd_mod is not None:
+            print(
+                "STAF: horovod keeps YAML learning rates "
+                "(no × hvd.size() scale)"
+            )
+        lr_net_param=full_param['lr_dense_net'].split()
         lr_net=build_learning_rate(lr_net_param,ne,nb,idx_str_tr.shape[0],'net',0)
 
         opt_net_param=full_param['optimizer_net'].split()
         opt_net=build_optimizer(opt_net_param,lr_net,0)
 
-        lr_phys_param=scale_lr_param_for_horovod(
-            full_param['lr_phys_net'].split(), hvd_mod)
+        lr_phys_param=full_param['lr_phys_net'].split()
         lr_phys=build_learning_rate(lr_phys_param,ne,nb,idx_str_tr.shape[0],'phys',0)
         opt_phys_param=full_param['optimizer_phys'].split()
         opt_phys=build_optimizer(opt_phys_param,lr_phys,0)

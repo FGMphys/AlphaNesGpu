@@ -143,7 +143,7 @@ mpirun -np 1 python ../../../STAF/staf_train.py input_horovod_smoke.yaml
 
 Wiring in `STAF/staf_train.py`:
 - GPU init deferred until after YAML; `hvd.init()` + pin `gpus[local_rank]`
-- `hvd.DistributedOptimizer` on net/phys opts; initial LR × `hvd.size()`
+- `hvd.DistributedOptimizer` on net/phys opts; YAML learning rates kept as-is (no × `hvd.size()`)
 - train buffer shard `idx_str_tr[rank::size]`; test/save/logs on rank 0 only
 - `hvd.broadcast_variables` after first train step (or restart warm-up)
 

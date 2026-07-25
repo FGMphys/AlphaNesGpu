@@ -10,7 +10,7 @@ precision: float
 #   none     — single device (default if omitted)
 #   mirrored — tf.distribute.MirroredStrategy on one node (1+ GPUs)
 #   horovod  — MPI ranks × 1 GPU (same- or multi-node); launch with mpirun
-#              Initial LR is scaled × hvd.size(); train buffers are sharded.
+#              YAML learning rates are not auto-scaled; train buffers are sharded.
 # Optional devices: logical GPU indices for mirrored only (ignored for horovod).
 distribute: none
 # devices: [0, 1]
