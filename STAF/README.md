@@ -1,6 +1,6 @@
-# STAF (unified)
+# STAF-AI Potential (unified)
 
-Single official tree for the Soft Two-body Angular Fingerprint potential.
+Official code tree for **STAF-AI Potential — Self Trained Atomic Fingerprint AI Potential**.
 
 ```bash
 # compile ops from STAF/src → ops_{float,double}/src

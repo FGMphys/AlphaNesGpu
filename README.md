@@ -1,6 +1,6 @@
-# STAF
+# STAF-AI Potential
 
-**STAF** — Soft Two-body Angular Fingerprint deep neural network potential for water and biomolecular systems.
+**STAF-AI Potential — Self Trained Atomic Fingerprint AI Potential**
 
 ![STAF neural potential](assets/staf_hero.png)
 
@@ -108,7 +108,8 @@ Raw numbers and Slurm details: `test/test-training-pipeline/comparison/leonardo_
 If you use this code, please cite:
 
 ```
-Francesco Guidarelli Mattioli, Federico Dogo, Franz Saija, and Marco Fabrizio,
-"A Soft Two-body Angular Fingerprint approach for the development of neural network potentials for water and biomolecular systems",
-J. Chem. Phys. 158, 104101 (2023). https://doi.org/10.1063/5.0139245
+Guidarelli Mattioli, F., Sciortino, F., & Russo, J. (2023).
+A neural network potential with self-trained atomic fingerprints: A test with the mW water potential.
+The Journal of Chemical Physics, 158(10), 104101.
+https://doi.org/10.1063/5.0139245
 ```
