@@ -50,15 +50,19 @@ except:
 tf.config.threading.set_intra_op_parallelism_threads(numthreads)
 print("STAF: tensorflow intra threads set to work with %d threads"%tf.config.threading.get_intra_op_parallelism_threads())
 
-def _configure_gpu_memory_growth(gpus):
+def _configure_gpu_memory_growth(gpus, list_logical=True):
+    """Set memory growth. Avoid list_logical_devices before set_visible_devices
+    (that call initializes the GPU runtime and blocks visibility changes)."""
     if not gpus:
         print("STAF: no GPU detected")
         return
     try:
         for gpu in gpus:
             tf.config.experimental.set_memory_growth(gpu, True)
-        logical_gpus = tf.config.list_logical_devices('GPU')
-        print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+        print(len(gpus), "Physical GPU(s) (memory growth set)")
+        if list_logical:
+            logical_gpus = tf.config.list_logical_devices('GPU')
+            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
     except RuntimeError as e:
         # Memory growth must be set before GPUs have been initialized
         print(e)
@@ -86,14 +90,25 @@ def init_distribute(full_param):
             )
         hvd.init()
         gpus = tf.config.list_physical_devices('GPU')
-        _configure_gpu_memory_growth(gpus)
+        # Do NOT list_logical_devices before pinning — that initializes CUDA.
+        _configure_gpu_memory_growth(gpus, list_logical=False)
         if gpus:
-            if hvd.local_rank() >= len(gpus):
+            # Slurm may already expose a single GPU via CUDA_VISIBLE_DEVICES.
+            if len(gpus) == 1:
+                target = gpus[0]
+            elif hvd.local_rank() >= len(gpus):
                 sys.exit(
                     "STAF: horovod local_rank=%d but only %d GPU(s) visible"
                     % (hvd.local_rank(), len(gpus))
                 )
-            tf.config.set_visible_devices(gpus[hvd.local_rank()], 'GPU')
+            else:
+                target = gpus[hvd.local_rank()]
+            tf.config.set_visible_devices(target, 'GPU')
+            logical_gpus = tf.config.list_logical_devices('GPU')
+            print(
+                "STAF: horovod pinned GPU; physical=%d logical=%d"
+                % (len(gpus), len(logical_gpus))
+            )
         print(
             "STAF: distribute=horovod size=%d rank=%d local_rank=%d"
             % (hvd.size(), hvd.rank(), hvd.local_rank())
