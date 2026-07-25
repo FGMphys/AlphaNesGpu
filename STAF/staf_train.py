@@ -167,21 +167,6 @@ def wrap_train_method(trainmeth, strategy):
 
     return _call
 
-def scale_lr_param_for_horovod(lr_param_split, hvd_mod):
-    """Scale initial LR by hvd.size() (global-batch convention)."""
-    if hvd_mod is None or hvd_mod.size() <= 1:
-        return lr_param_split
-    out = list(lr_param_split)
-    try:
-        out[1] = str(float(out[1]) * float(hvd_mod.size()))
-        print(
-            "STAF: horovod scaled initial LR by size=%d → %s"
-            % (hvd_mod.size(), out[1])
-        )
-    except (IndexError, ValueError):
-        pass
-    return out
-
 def shard_idx_str(idx_str, hvd_mod, name):
     """Frame-buffer sharding across MPI ranks (train path)."""
     if hvd_mod is None or hvd_mod.size() <= 1:
@@ -480,15 +465,19 @@ restart=restart_par
 ## (under MirroredStrategy.scope when distribute=mirrored)
 with dist_scope():
     if restart_par=='no' or restart_par=='only_afs':
-        lr_net_param=scale_lr_param_for_horovod(
-            full_param['lr_dense_net'].split(), hvd_mod)
+        # Horovod: keep YAML learning rates (no × hvd.size() linear scale).
+        if hvd_mod is not None:
+            print(
+                "STAF: horovod keeps YAML learning rates "
+                "(no × hvd.size() scale)"
+            )
+        lr_net_param=full_param['lr_dense_net'].split()
         lr_net=build_learning_rate(lr_net_param,ne,nb,idx_str_tr.shape[0],'net',0)
 
         opt_net_param=full_param['optimizer_net'].split()
         opt_net=build_optimizer(opt_net_param,lr_net,0)
 
-        lr_phys_param=scale_lr_param_for_horovod(
-            full_param['lr_phys_net'].split(), hvd_mod)
+        lr_phys_param=full_param['lr_phys_net'].split()
         lr_phys=build_learning_rate(lr_phys_param,ne,nb,idx_str_tr.shape[0],'phys',0)
         opt_phys_param=full_param['optimizer_phys'].split()
         opt_phys=build_optimizer(opt_phys_param,lr_phys,0)
@@ -577,15 +566,7 @@ if is_chief:
        print("@    s4 legend \"lr_phys\"", file=fileOU)
        print("@    s5 legend \"epoch\"", file=fileOU)
        out_time=open("time_story.dat",'w')
-       print("# STAF timing log", file=out_time)
-       print("# BATCH lines: wall time for displ_freq train steps (chief only).", file=out_time)
-       print("#   Horovod: steps are synced (allreduce); global_frames = local_frames * n_ranks.", file=out_time)
-       print("#   Mirrored/none: global_frames = local_frames (bs is the batch passed to train).", file=out_time)
-       print("# EPOCH lines: wall train / test seconds for the full epoch on chief.", file=out_time)
-       print("#Columns_BATCH: kind epoch step displ_freq batch_size n_parallel "
-             "wall_s local_frames global_frames global_frames_per_s ms_per_global_frame",
-             file=out_time)
-       print("#Columns_EPOCH: kind epoch train_s test_s", file=out_time)
+       print("#Time per epoch training  #Time per epoch test\n",file=out_time)
        lr_file=open("lr_step.dat",'w')
        print("# STAF learning-rate schedule (net)", file=lr_file)
        print("# Columns: lr_net", file=lr_file)
@@ -670,14 +651,6 @@ def _load_buffer_host(pos_map, box_map, e_map, f_map, el):
             np.asarray(f_map[el], dtype=_np_dtype))
 
 print("STAF: reduce_retracing on train/test + host buffer prefetch")
-# Parallel width for throughput accounting (Horovod ranks or Mirrored replicas).
-if hvd_mod is not None:
-    _n_parallel = int(hvd_mod.size())
-elif strategy is not None:
-    _n_parallel = int(strategy.num_replicas_in_sync)
-else:
-    _n_parallel = 1
-print("STAF: timing n_parallel=%d (distribute=%s)" % (_n_parallel, distribute_mode))
 start_loc=time.time()
 _prefetch_pool = ThreadPoolExecutor(max_workers=1)
 for ep in range(restart_ep,ne):
@@ -685,7 +658,6 @@ for ep in range(restart_ep,ne):
     vallosstot=zero()
     vallosstote=zero()
     vallosstotf=zero()
-    start_ep_tr=time.time()
     nbuf_tr = idx_str_tr.shape[0]
     fut = _prefetch_pool.submit(
         _load_buffer_host, pos_map_tr, box_map_tr, e_map_tr, f_map_tr, idx_str_tr[0]
@@ -739,43 +711,17 @@ for ep in range(restart_ep,ne):
             if is_chief and accumul % displ_freq == 0:
                 lcurve_notmean.flush()
                 lr_file.flush()
-                wall = time.time() - start_loc
-                local_frames = displ_freq * bs
-                # Horovod shards data: each rank's local step runs in parallel → × n_ranks.
-                # Mirrored currently feeds the same tensor to every replica (no split).
-                if hvd_mod is not None:
-                    global_frames = local_frames * _n_parallel
-                else:
-                    global_frames = local_frames
-                fps = (global_frames / wall) if wall > 0 else 0.0
-                ms_pf = (1000.0 * wall / global_frames) if global_frames > 0 else 0.0
-                msg = (
-                    "Epoch %d step %d . Time to elaborate %d batch of %d frames is %.6f"
-                    " | n_parallel=%d local_frames=%d global_frames=%d"
-                    " global_frames_per_s=%.2f ms_per_global_frame=%.3f"
-                    % (ep, accumul, displ_freq, bs, wall,
-                       _n_parallel, local_frames, global_frames, fps, ms_pf)
-                )
-                print(msg)
-                print(
-                    "BATCH", ep, accumul, displ_freq, bs, _n_parallel,
-                    "%.6f" % wall, local_frames, global_frames,
-                    "%.4f" % fps, "%.4f" % ms_pf,
-                    file=out_time,
-                )
+                print("Epoch ",ep," step ",accumul,". Time to elaborate ",displ_freq," batch of ",bs," frames is",(time.time()-start_loc))
+                print("Epoch ",ep," step ",accumul,". Time to elaborate ",displ_freq," batch of ",bs," frames is",(time.time()-start_loc),file=out_time)
                 start_loc=time.time()
         losstot+=loss_buffer
     losstot*=1/(k+1)/(numbuf+1)
     stop_tr=time.time()
-    train_ep_s = stop_tr - start_ep_tr
     if is_chief:
         lcurve_notmean.flush()
         lr_file.flush()
     # Test + checkpoint: rank 0 only under Horovod (avoids racing model_log*).
-    start_ep_ts=time.time()
-    did_test = False
     if is_chief and (ep%freq_test==0):
-       did_test = True
        nbuf_ts = idx_str_ts.shape[0]
        fut_ts = _prefetch_pool.submit(
            _load_buffer_host, pos_map_ts, box_map_ts, e_map_ts, f_map_ts, idx_str_ts[0]
@@ -839,15 +785,3 @@ for ep in range(restart_ep,ne):
        print("We are at epoch ",ep)
        fileOU.flush()
        out_time.flush()
-    test_ep_s = (time.time() - start_ep_ts) if did_test else 0.0
-    if is_chief:
-        print(
-            "EPOCH %d train_s=%.3f test_s=%.3f n_parallel=%d"
-            % (ep, train_ep_s, test_ep_s, _n_parallel)
-        )
-        print(
-            "EPOCH", ep, "%.6f" % train_ep_s, "%.6f" % test_ep_s,
-            file=out_time,
-        )
-        out_time.flush()
-        start_loc = time.time()
