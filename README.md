@@ -14,6 +14,12 @@ bash install_path.sh all          # builds ops_float + ops_double from src/
 python staf_train.py input_staf.yaml   # precision: float|double
 ```
 
+**Linea B (LAMMPS, in progress):** default MD path is **ONNX + ONNX Runtime** for the Dense MLP; custom CUDA stays in `libstaf`. See [`test/B_ARCHITECTURE.md`](test/B_ARCHITECTURE.md), [`libstaf/`](libstaf/), [`lammps/USER-STAF/`](lammps/USER-STAF/). Export:
+
+```bash
+python STAF/save_models/export_mlp_onnx.py -imodel model_log0 -modelname model_onnx
+```
+
 Experimental variants remain under `DEV/` (not part of the A2 full-atom unify).
 
 See `STAF/README.md`, `test/ACCEPTANCE.md`, and `test/A2_PROGRESS.md`.
@@ -40,39 +46,76 @@ float64 / float32 wall-time ratio on this workload: **≈ 1.64×**.
 
 Raw logs: `test/test-training-pipeline/comparison/performance_baseline.txt`.
 
-## Multi-GPU (Horovod) — none vs 1×4 vs 2×4
+## Leonardo multi-GPU benchmarks (Horovod)
 
-Leonardo A100, float32, `batch_size=8`, full MB-pol. Throughput scales ~linearly with ranks; after removing `LR × hvd.size()`, Horovod loss/RMSE track the single-GPU baseline.
+Measured on **CINECA Leonardo** (`boost_usr_prod`, QoS `boost_qos_lprod`, account `AIFAC_F02_652`). Full MB-pol float dataset, `batch_size = 8`, `buffer_stream_dim_tr = 8`, energy+force, neighbor buffers 60.
 
-| Run | GPUs | Train s/epoch | Global frames/s | Notes |
-| --- | ---: | ---: | ---: | --- |
-| none | 1 | **147.7** | **16.3** | 20 ep |
-| Horovod 1×4 | 4 | **36.9** (~4.0×) | **68** | 100 ep (LR × 4 still OK) |
-| Horovod 2×4 | 8 | **18.5** (~8.0×) | **129** | 200 ep, no LR × N |
+- Timing / first campaign: `jobs/bench_20260724` (2026-07-24/25)
+- Loss fix re-run (no `LR × hvd.size()`): `jobs/bench_post-LR-not-scaling-fix` (2026-07-25)
 
-![Scaling timing](assets/scaling_none_1x4_2x4_timing.png)
+### HPC configuration
 
-![Scaling loss / RMSE](assets/scaling_none_1x4_2x4_loss_rmse.png)
+| Item | Value |
+| --- | --- |
+| GPU | **NVIDIA A100-SXM-64GB** (sm_80), 4 GPUs / node |
+| Software | Python 3.10, TensorFlow **2.14**, Horovod **0.28.1** (NCCL allreduce) |
+| Modules | `gcc/12.2.0`, `cuda/12.2`, `cudnn/8.9.7`, `nccl/2.22.3`, `openmpi/4.1.6` |
+| Ops | `STAF/ops_float` built for **sm_80** |
+| Launch | 1 Python rank / GPU via `srun`; 8 CPUs / task; `--cpu-bind=none` |
+| Dataset | `mbpol_full_float` (`subsampling: no`), \(R_c = R_c^\mathrm{ang} = 4.5\) Å, \(R_s = 2.25\) Å |
 
-![Scaling loss / RMSE early epochs](assets/scaling_none_1x4_2x4_loss_rmse_ep20.png)
+| Run | Job | Nodes | GPUs | Epochs | Notes |
+| --- | --- | ---: | ---: | ---: | --- |
+| `distribute: none` | 50159734 | 1 | 1 | 20 | baseline |
+| Horovod **1×4** | 50159735 | 1 | 4 | 100 | first campaign |
+| Horovod **2×4** (LR × 8, stalled) | 50159736 | 2 | 8 | 200 | first campaign |
+| Horovod **2×4** (no LR × N) | 50222273 | 2 | 8 | 200 | post-fix, batch 8 |
+| Horovod **2×4** (no LR × N) | 50222274 | 2 | 8 | 200 | post-fix, batch 4 |
 
-### LR × N bug (2×4 was stuck)
+### Steady-state timing (none vs 1×4 vs 2×4)
 
-With `LR × hvd.size()` on **2×4** (×8), training stalled (`Loss_Tot` ≈ 0.23, \(RMSE_F\) flat ≈ 0.72). Without that scale, loss decreases normally.
+Throughput from `time_story.dat` full `BATCH` windows (first compile window excluded). Epoch times: mean train wall for epochs ≥ 1. For Horovod, `global_frames = displ_freq × batch_size × n_ranks`.
 
-| Run | Setup | Result |
-| --- | --- | --- |
-| before | 2×4, batch 8, LR × 8 | Loss_Tot stuck ≈ 0.23; \(RMSE_F\) flat ≈ 0.72 eV/Å |
-| after | 2×4, batch 8, no LR × N | Loss_Tot → ≈ 0.0047; \(RMSE_F\) → ≈ 0.097 eV/Å (200 ep) |
-| after | 2×4, batch 4, no LR × N | Loss_Tot → ≈ 0.0049; \(RMSE_F\) → ≈ 0.099 eV/Å (200 ep) |
+| Run | Global frames / s | ms / global frame | Train / epoch | Speedup | Parallel eff. |
+| --- | --- | --- | --- | --- | --- |
+| none 1×A100 | **16.25 ± 0.05** | 61.5 | **147.7 ± 0.1 s** | 1.00× | 100% |
+| Horovod 1×4 | **64.93 ± 0.18** | 15.4 | **36.9 ± 0.4 s** | **4.00×** | **99.9%** |
+| Horovod 2×4 | **131.97 ± 3.91** | 7.6 | **18.5 ± 0.3 s** | **8.12×** | **101.5%** |
+
+![Leonardo throughput and epoch time](assets/leonardo_multigpu_throughput.png)
+
+![Leonardo strong scaling](assets/leonardo_multigpu_scaling.png)
+
+![Leonardo epoch train time (first 20 epochs)](assets/leonardo_multigpu_epoch_time.png)
+
+![Scaling timing overlay](assets/scaling_none_1x4_2x4_timing.png)
+
+### Loss / RMSE (after removing LR × N)
+
+In the first 2×4 campaign, auto-scaling LR by `hvd.size()` (×8) stalled force training (`Loss_Tot` ≈ 0.23, \(RMSE_F\) ≈ 0.72). That policy is **removed**: Horovod keeps the YAML learning rates. Re-run 2×4 then matches none / 1×4.
+
+| Run | Late val. RMSE_E / RMSE_F | Late Loss_Tot | Status |
+| --- | --- | --- | --- |
+| none 1×A100 (val ep 10) | 8.3×10⁻⁴ / **0.104** | ≈ 0.0054 | OK |
+| Horovod 1×4 (val ep 90) | 1.0×10⁻³ / **0.102** | ≈ 0.0052 | OK |
+| Horovod 2×4 before (LR × 8, ep 190) | 7.3×10⁻³ / **0.719** | ≈ 0.231 | stalled |
+| Horovod 2×4 after (no LR × N, b8, ep 190) | 1.0×10⁻³ / **0.097** | ≈ 0.0047 | OK |
+| Horovod 2×4 after (no LR × N, b4, ep 190) | 9.3×10⁻⁴ / **0.099** | ≈ 0.0049 | OK |
 
 ![HVD loss bug vs fix](assets/hvd_loss_unstuck_vs_bug.png)
 
 ![HVD batch Loss_Tot bug vs fix](assets/hvd_loss_batch_bug_vs_fix.png)
 
+![Scaling loss / RMSE](assets/scaling_none_1x4_2x4_loss_rmse.png)
+
+![Scaling loss / RMSE early epochs](assets/scaling_none_1x4_2x4_loss_rmse_ep20.png)
+
 ![HVD validation RMSE after fix](assets/hvd_validation_rmse.png)
 
-Data: `jobs/bench_20260724/{none_b8_20ep,hvd_1x4_b8_100ep,hvd_2x4_b8_200ep}` and `jobs/bench_post-LR-not-scaling-fix/hvd_2x4_{b8,b4}_200ep`.
+First-campaign overlays (include stalled 2×4): `assets/leonardo_multigpu_loss.png`, `assets/leonardo_multigpu_rmse.png`, `assets/leonardo_multigpu_loss_rmse_overlay.png`.
+
+Raw numbers: `test/test-training-pipeline/comparison/leonardo_multigpu_baseline.txt`.  
+Leonardo workdir for runs (not the git source of truth): `/leonardo_work/AIFAC_F02_652/STAF-test/jobs/`.
 
 ## Citation
 

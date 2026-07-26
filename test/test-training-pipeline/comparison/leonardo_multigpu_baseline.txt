@@ -1,0 +1,69 @@
+# STAF multi-GPU training baseline — Leonardo (CINECA)
+# Campaign: jobs/bench_20260724 (2026-07-24 / 2026-07-25)
+# Workdir: /leonardo_work/AIFAC_F02_652/STAF-test
+
+## HPC configuration (common)
+
+Site:          Leonardo (CINECA), partition boost_usr_prod, QoS boost_qos_lprod
+Account:       AIFAC_F02_652
+GPU:           NVIDIA A100-SXM-64GB (compute capability 8.0), 4 GPUs / node
+CPU binding:   8 CPUs / task (--cpus-per-task=8), --cpu-bind=none
+Software:      Python 3.10, TensorFlow 2.14, Horovod 0.28.1 (NCCL)
+Modules:       gcc/12.2.0, cuda/12.2, cudnn/8.9.7, nccl/2.22.3, openmpi/4.1.6, cmake/3.27.9
+Ops:           STAF/ops_float compiled for sm_80
+Env script:    env_staf.sh
+
+## Workload (common)
+
+Dataset:       mbpol_full_float (full MB-pol STAF set, subsampling: no)
+System:        768 atoms (256 O + 512 H), orthorhombic water
+Cutoffs:       Rc = Rc_Angular = 4.5 Å, Rs = 2.25 Å
+Buffers:       Radial_Buffer = Max_Angular_Neigh = 60
+Precision:     float32
+Batch:         batch_size = 8, buffer_stream_dim_tr = 8, displ_freq = 10
+Loss:          energy+force, huber
+afsparam:      production/afsparam_2
+Seed:          0
+
+## Runs
+
+| Run              | Job ID   | Nodes | Tasks/GPUs | Epochs | Host (chief)              | Job wall |
+|------------------|----------|-------|------------|--------|---------------------------|----------|
+| none_b8_20ep     | 50159734 | 1     | 1          | 20     | lrdn2975.leonardo.local   | 50.1 min |
+| hvd_1x4_b8_100ep | 50159735 | 1     | 4          | 100    | lrdn1473.leonardo.local   | 62.7 min |
+| hvd_2x4_b8_200ep | 50159736 | 2     | 8 (4×2)    | 200    | 2× boost nodes            | 63.6 min |
+
+SLURM: srun launches one Python rank per GPU; Horovod + NCCL allreduce.
+
+## Steady-state timing
+
+Metric source: time_story.dat BATCH lines with wall in (3.5, 8) s (full displ_freq
+windows); first BATCH (XLA/compile) excluded. Epoch train_s: mean over epochs ≥ 1.
+
+Horovod accounting: global_frames = local_frames * n_ranks
+  (local_frames = displ_freq * batch_size = 10 * 8 = 80)
+
+| Run              | n_parallel | Global frames/s | ms / global frame | Train s / epoch | Speedup (fps) | Parallel eff. |
+|------------------|------------|-----------------|-------------------|-----------------|---------------|---------------|
+| none 1×A100      | 1          | 16.25 ± 0.05    | 61.53             | 147.68 ± 0.09   | 1.00×         | 100%          |
+| Horovod 1×4      | 4          | 64.93 ± 0.18    | 15.40             | 36.93 ± 0.42    | 4.00×         | 99.9%         |
+| Horovod 2×4      | 8          | 131.97 ± 3.91   | 7.58              | 18.53 ± 0.31    | 8.12×         | 101.5%        |
+
+## Loss / RMSE parity
+
+Source: lcurve_notmean (batch) and lcurve.out (validation every 10 epochs).
+
+| Run              | Final epoch-mean Loss_E | Final epoch-mean Loss_F | Late RMSE_E | Late RMSE_F |
+|------------------|-------------------------|-------------------------|-------------|-------------|
+| none (val ep10)  | 3.1e-7                  | 0.00534                 | 8.3e-4      | 0.104       |
+| Horovod 1×4 ep90 | 5.0e-7                  | 0.00522                 | 1.0e-3      | 0.102       |
+| Horovod 2×4 ep190| 2.6e-5                  | 0.237 (stalled)         | 7.3e-3      | 0.719 (stalled) |
+
+none ≈ Horovod 1×4 on force plateau. Horovod 2×4 force training stalled
+(LR×8 global-batch scaling); use for timing only until re-run.
+
+Notes:
+- Epoch-time speedups vs none: 1×4 ≈ 4.00×, 2×4 ≈ 7.97× (data-parallel sharding).
+- Short trailing BATCH windows at epoch boundaries are excluded from fps averages.
+- Raw dirs: jobs/bench_20260724/{none_b8_20ep,hvd_1x4_b8_100ep,hvd_2x4_b8_200ep}/
+- Plots: assets/leonardo_multigpu_{throughput,scaling,epoch_time,loss,rmse,loss_rmse_overlay}.png

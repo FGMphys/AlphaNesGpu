@@ -1,0 +1,7 @@
+STAF MLP export
+source: /home/francegm/AlphaNesGpu/test/test-training-pipeline/run_double/model_log0
+precision: float64
+ntypes: 2
+onnx input: logdes [batch,n_atoms,n_AF]  (after lognorm)
+onnx output: atomic_e [batch,n_atoms]
+libstaf: lognorm + ORT/native Dense + analytical dE/daf

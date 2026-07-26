@@ -44,6 +44,9 @@ test/test-regression/**/cutoff_curve.dat
 STAF/ops_float/
 STAF/ops_double/
 
+# libstaf local builds
+libstaf/build/
+
 # Never track bytecode under experimental forks
 DEV/**/__pycache__/
 DEV/**/*.pyc
@@ -51,3 +54,14 @@ DEV/**/*.pyc
 # Leonardo data bundle (regenerate with test/pack_leonardo_bundle.sh)
 STAF_leonardo_test_bundle/
 STAF_leonardo_test_bundle.tar.gz
+
+# Vendored ONNX Runtime binary drops (download locally; see scripts/staf_gpu_env.sh)
+third_party/
+
+# Scratch / generated at repo root or under tests
+/cutoff_curve.dat
+test/**/work/
+test/**/*.log
+test/test-lammps-smoke/log.lammps
+test/test-lammps-smoke/ort_grad_spike/
+

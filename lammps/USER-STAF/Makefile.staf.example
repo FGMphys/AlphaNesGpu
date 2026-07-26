@@ -1,0 +1,79 @@
+# Example makefile fragment for LAMMPS + USER-STAF (no MBX).
+# Copy to $LAMMPS/src/MAKE/MINE/Makefile.staf and adjust paths.
+
+SHELL = /bin/sh
+
+STAF_ROOT  ?= /home/francegm/AlphaNesGpu
+LIBSTAF    ?= $(STAF_ROOT)/libstaf/build
+ORT_ROOT   ?= $(STAF_ROOT)/third_party/onnxruntime
+JMD_SRC    ?= /home/francegm/neuralmdGPU/full_atom/src
+CUDA_HOME  ?= /home/francegm/programmi/cuda
+TF_UNUSED  =
+
+CC =        mpic++
+CCFLAGS =   -g -O3 -std=c++14 \
+            -I$(STAF_ROOT)/libstaf/include \
+            -I$(STAF_ROOT)/libstaf/vendor/jmd \
+            -I$(JMD_SRC)
+SHFLAGS =   -fPIC
+DEPFLAGS =  -M
+
+LINK =      mpic++
+LINKFLAGS = -g -O3
+LIB =       -L$(LIBSTAF) -lstaf \
+            -L$(CUDA_HOME)/lib64 -lcudart -lcuda -lcublas \
+            -lgsl -lgslcblas -lpthread -ldl
+SIZE =      size
+
+ARCHIVE =   ar
+ARFLAGS =   -rc
+SHLIBFLAGS = -shared
+
+LMP_INC =   -DLAMMPS_GZIP -DLAMMPS_MEMALIGN=64
+MPI_INC =   -DMPICH_SKIP_MPICXX -DOMPI_SKIP_MPICXX=1
+MPI_PATH =
+MPI_LIB =
+FFT_INC =
+FFT_PATH =
+FFT_LIB =
+JPG_INC =
+JPG_PATH =
+JPG_LIB =
+
+include Makefile.package.settings
+include Makefile.package
+
+EXTRA_INC = $(LMP_INC) $(PKG_INC) $(MPI_INC) $(FFT_INC) $(JPG_INC) $(PKG_SYSINC)
+EXTRA_PATH = $(PKG_PATH) $(MPI_PATH) $(FFT_PATH) $(JPG_PATH) $(PKG_SYSPATH)
+EXTRA_LIB = $(PKG_LIB) $(MPI_LIB) $(FFT_LIB) $(JPG_LIB) $(PKG_SYSLIB) $(LIB)
+EXTRA_CPP_DEPENDS = $(PKG_CPP_DEPENDS)
+EXTRA_LINK_DEPENDS = $(PKG_LINK_DEPENDS)
+
+vpath %.cpp ..
+vpath %.h ..
+
+$(EXE): main.o $(LMPLIB) $(EXTRA_LINK_DEPENDS)
+	$(LINK) $(LINKFLAGS) main.o $(EXTRA_PATH) $(LMPLINK) $(EXTRA_LIB) -o $@
+	$(SIZE) $@
+
+lib: $(LMPLIB)
+
+$(LMPLIB): $(OBJ)
+	$(ARCHIVE) $(ARFLAGS) $(LMPLIB) $(OBJ)
+
+lib_shared: $(OBJ)
+	$(CC) $(CCFLAGS) $(SHFLAGS) $(SHLIBFLAGS) $(EXTRA_PATH) -o $(SHAREDLIB) $(OBJ) $(EXTRA_LIB) $(LIB)
+
+SIZEOBJ = size
+
+%.o:%.cpp
+	$(CC) $(EXTRA_INC) $(CCFLAGS) -c $<
+
+%.d:%.cpp
+	$(CC) $(EXTRA_INC) $(DEPFLAGS) $< > $@
+
+.PHONY: clean
+clean:
+	rm -f *.o *.d ../lmp_staf
+
+sinclude *.d

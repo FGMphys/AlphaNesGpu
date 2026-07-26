@@ -1,6 +1,6 @@
-# STAF (unified)
+# STAF-AI Potential (unified)
 
-Single official tree for the Soft Two-body Angular Fingerprint potential.
+Official code tree for **STAF-AI Potential — Self Trained Atomic Fingerprint AI Potential**.
 
 ```bash
 # compile ops from STAF/src → ops_{float,double}/src
@@ -33,3 +33,15 @@ Layout:
 | `staf_paths.py` | Resolves active ops root from precision |
 
 Experimental CG / RDF forks remain under `../DEV/` (out of A2 scope).
+
+## MD export (Linea B, ONNX)
+
+Dense MLP for LAMMPS/`libstaf` (ORT), no custom ops in the graph:
+
+```bash
+python save_models/export_mlp_onnx.py -imodel model_log0 -modelname model_onnx
+# requires: pip install tf2onnx
+```
+
+See `../test/B_ARCHITECTURE.md`. Legacy SavedModel: `save_models/save_model.py`.
+
