@@ -48,7 +48,10 @@ Raw logs: `test/test-training-pipeline/comparison/performance_baseline.txt`.
 
 ## Leonardo multi-GPU benchmarks (Horovod)
 
-Measured on **CINECA Leonardo** (`boost_usr_prod`, QoS `boost_qos_lprod`, account `AIFAC_F02_652`), campaign `jobs/bench_20260724` (2026-07-24/25). Full MB-pol float dataset, `batch_size = 8`, `buffer_stream_dim_tr = 8`, energy+force, neighbor buffers 60.
+Measured on **CINECA Leonardo** (`boost_usr_prod`, QoS `boost_qos_lprod`, account `AIFAC_F02_652`). Full MB-pol float dataset, `batch_size = 8`, `buffer_stream_dim_tr = 8`, energy+force, neighbor buffers 60.
+
+- Timing / first campaign: `jobs/bench_20260724` (2026-07-24/25)
+- Loss fix re-run (no `LR × hvd.size()`): `jobs/bench_post-LR-not-scaling-fix` (2026-07-25)
 
 ### HPC configuration
 
@@ -61,15 +64,17 @@ Measured on **CINECA Leonardo** (`boost_usr_prod`, QoS `boost_qos_lprod`, accoun
 | Launch | 1 Python rank / GPU via `srun`; 8 CPUs / task; `--cpu-bind=none` |
 | Dataset | `mbpol_full_float` (`subsampling: no`), \(R_c = R_c^\mathrm{ang} = 4.5\) Å, \(R_s = 2.25\) Å |
 
-| Run | Job | Nodes | GPUs | Epochs | Chief host | Job wall |
-| --- | --- | --- | --- | --- | --- | --- |
-| `distribute: none` | 50159734 | 1 | 1 | 20 | `lrdn2975` | 50.1 min |
-| Horovod **1×4** | 50159735 | 1 | 4 | 100 | `lrdn1473` | 62.7 min |
-| Horovod **2×4** | 50159736 | 2 | 8 | 200 | 2× boost nodes | 63.6 min |
+| Run | Job | Nodes | GPUs | Epochs | Notes |
+| --- | --- | ---: | ---: | ---: | --- |
+| `distribute: none` | 50159734 | 1 | 1 | 20 | baseline |
+| Horovod **1×4** | 50159735 | 1 | 4 | 100 | first campaign |
+| Horovod **2×4** (LR × 8, stalled) | 50159736 | 2 | 8 | 200 | first campaign |
+| Horovod **2×4** (no LR × N) | 50222273 | 2 | 8 | 200 | post-fix, batch 8 |
+| Horovod **2×4** (no LR × N) | 50222274 | 2 | 8 | 200 | post-fix, batch 4 |
 
-### Steady-state results
+### Steady-state timing (none vs 1×4 vs 2×4)
 
-Throughput from `time_story.dat` full `BATCH` windows (wall 3.5–8 s; first compile window excluded). Epoch times: mean train wall for epochs ≥ 1. For Horovod, `global_frames = displ_freq × batch_size × n_ranks`.
+Throughput from `time_story.dat` full `BATCH` windows (first compile window excluded). Epoch times: mean train wall for epochs ≥ 1. For Horovod, `global_frames = displ_freq × batch_size × n_ranks`.
 
 | Run | Global frames / s | ms / global frame | Train / epoch | Speedup | Parallel eff. |
 | --- | --- | --- | --- | --- | --- |
@@ -83,25 +88,34 @@ Throughput from `time_story.dat` full `BATCH` windows (wall 3.5–8 s; first com
 
 ![Leonardo epoch train time (first 20 epochs)](assets/leonardo_multigpu_epoch_time.png)
 
-### Loss / RMSE parity (same physics?)
+![Scaling timing overlay](assets/scaling_none_1x4_2x4_timing.png)
 
-Overlay of `lcurve_notmean` (epoch-mean batch `Loss_E` / `Loss_F`) and test-set `RMSE_E` / `RMSE_F` from `lcurve.out` (`freq_test = 10`). Units: energy eV/atom, forces eV/Å.
+### Loss / RMSE (after removing LR × N)
 
-| Run | Final epoch-mean Loss_E / Loss_F | Late val. RMSE_E / RMSE_F |
-| --- | --- | --- |
-| none 1×A100 (ep 19 / val ep 10) | 3.1×10⁻⁷ / **0.00534** | 8.3×10⁻⁴ / **0.104** |
-| Horovod 1×4 (ep 99 / val ep 90) | 5.0×10⁻⁷ / **0.00522** | 1.0×10⁻³ / **0.102** |
-| Horovod 2×4 (ep 199 / val ep 190) | 2.6×10⁻⁵ / **0.237** (stalled) | 7.3×10⁻³ / **0.719** (stalled) |
+In the first 2×4 campaign, auto-scaling LR by `hvd.size()` (×8) stalled force training (`Loss_Tot` ≈ 0.23, \(RMSE_F\) ≈ 0.72). That policy is **removed**: Horovod keeps the YAML learning rates. Re-run 2×4 then matches none / 1×4.
 
-**none** and **Horovod 1×4** reach the same force plateau (batch `Loss_F` ≈ 5.3×10⁻³, `RMSE_F` ≈ 0.103 eV/Å). **Horovod 2×4** kept throughput scaling but **did not train forces** in this campaign (then LR was auto-scaled ×`hvd.size()` → 0.008; force loss flat). That ×N LR policy has been **removed** — Horovod now keeps the YAML learning rates. Re-run 2×4 recommended with unchanged YAML LR (optionally `batch_size: 4` for global batch 32).
+| Run | Late val. RMSE_E / RMSE_F | Late Loss_Tot | Status |
+| --- | --- | --- | --- |
+| none 1×A100 (val ep 10) | 8.3×10⁻⁴ / **0.104** | ≈ 0.0054 | OK |
+| Horovod 1×4 (val ep 90) | 1.0×10⁻³ / **0.102** | ≈ 0.0052 | OK |
+| Horovod 2×4 before (LR × 8, ep 190) | 7.3×10⁻³ / **0.719** | ≈ 0.231 | stalled |
+| Horovod 2×4 after (no LR × N, b8, ep 190) | 1.0×10⁻³ / **0.097** | ≈ 0.0047 | OK |
+| Horovod 2×4 after (no LR × N, b4, ep 190) | 9.3×10⁻⁴ / **0.099** | ≈ 0.0049 | OK |
 
-![Leonardo batch losses](assets/leonardo_multigpu_loss.png)
+![HVD loss bug vs fix](assets/hvd_loss_unstuck_vs_bug.png)
 
-![Leonardo validation RMSE](assets/leonardo_multigpu_rmse.png)
+![HVD batch Loss_Tot bug vs fix](assets/hvd_loss_batch_bug_vs_fix.png)
 
-![Leonardo loss/RMSE overlay (first 20 epochs)](assets/leonardo_multigpu_loss_rmse_overlay.png)
+![Scaling loss / RMSE](assets/scaling_none_1x4_2x4_loss_rmse.png)
 
-Raw numbers and Slurm details: `test/test-training-pipeline/comparison/leonardo_multigpu_baseline.txt`. Source runs under `/leonardo_work/AIFAC_F02_652/STAF-test/jobs/bench_20260724/`.
+![Scaling loss / RMSE early epochs](assets/scaling_none_1x4_2x4_loss_rmse_ep20.png)
+
+![HVD validation RMSE after fix](assets/hvd_validation_rmse.png)
+
+First-campaign overlays (include stalled 2×4): `assets/leonardo_multigpu_loss.png`, `assets/leonardo_multigpu_rmse.png`, `assets/leonardo_multigpu_loss_rmse_overlay.png`.
+
+Raw numbers: `test/test-training-pipeline/comparison/leonardo_multigpu_baseline.txt`.  
+Leonardo workdir for runs (not the git source of truth): `/leonardo_work/AIFAC_F02_652/STAF-test/jobs/`.
 
 ## Citation
 
