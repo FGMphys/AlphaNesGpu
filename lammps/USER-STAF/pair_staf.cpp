@@ -35,6 +35,11 @@ PairSTAF::PairSTAF(LAMMPS *lmp) : Pair(lmp)
   manybody_flag = 1;
   /* Ghost forces from many-body chain rule → reverse_comm into owned atoms. */
   comm_reverse = 3;
+  /* libstaf returns pair virial (diag); do NOT use virial_fdotr_compute —
+     ghost force pieces live in f_ghost until reverse_comm, so FDOTR would
+     miss them / double-count.  Without this flag, newton-on NPT never sets
+     vflag_global and pressure is kinetic-only (~wrong by thousands of atm). */
+  no_virial_fdotr_compute = 1;
 
   model_dir = nullptr;
   staf = nullptr;
