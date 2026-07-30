@@ -60,6 +60,8 @@ third_party/
 
 # Scratch / generated at repo root or under tests
 /cutoff_curve.dat
+# Ignore entire test tree for untracked clutter (tracked files stay tracked)
+test/
 test/**/work/
 test/**/*.log
 test/test-lammps-smoke/log.lammps
