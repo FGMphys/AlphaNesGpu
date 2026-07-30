@@ -43,6 +43,7 @@ Pos = np.loadtxt(pos_path, dtype="float32").reshape((1, -1, 3))
 Box = np.loadtxt(box_path, dtype="float32").reshape((1, 6))
 
 output = Model.full_test(Pos, Box)
-output2 = Model.full_test(Pos, Box)
 print("energy[0]", float(np.asarray(output[0]).reshape(-1)[0]))
 print("force shape", np.asarray(output[1]).shape)
+w = np.asarray(output[2]).reshape(-1)
+print("virial_diag", w[0], w[1], w[2])

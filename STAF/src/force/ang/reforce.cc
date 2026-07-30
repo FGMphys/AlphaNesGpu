@@ -147,3 +147,92 @@ class ComputeForceTriplOp : public OpKernel {
 }
 };
 REGISTER_KERNEL_BUILDER(Name("ComputeForceTripl").Device(DEVICE_GPU), ComputeForceTriplOp);
+
+void computeforce_tripl_virial_Launcher(
+                        const real*  netderiv_T_d, const real* desr_T_d, const real* desa_T_d,
+                        const real* intderiv_r_T_d, const real* intderiv_a_T_d,
+                        const int* intmap_r_T_d,const int* intmap_a_T_d,
+                         int nr, int na, int N, int dimbat,int num_finger,const real* type_emb3b_d,int nt,const int* tipos_T,const int* actual_type,real* forces3b_T_d,const int *num_triplets_d,const real* smooth_a_T,const int* type_map_T_d,int prod,
+                         real* virial_diagonal_d,const real* pos_d,const real* box_d,
+                         cudaStream_t stream);
+
+REGISTER_OP("ComputeForceTriplVirial")
+    .Input("netderiv: " STAF_TF_DTYPE)
+    .Input("radial_descriptor: " STAF_TF_DTYPE)
+    .Input("angular_descriptor: " STAF_TF_DTYPE)
+    .Input("descriptor_derivative_rad: " STAF_TF_DTYPE)
+    .Input("descriptor_derivative_ang: " STAF_TF_DTYPE)
+    .Input("interaction_map_rad: int32")
+    .Input("interaction_map_ang: int32")
+    .Input("alpha3b_parameters: " STAF_TF_DTYPE)
+    .Input("type_emb3b_parameters: " STAF_TF_DTYPE)
+    .Input("type_map: int32")
+    .Input("tipos: int32")
+    .Input("actual_type: int32")
+    .Input("num_triplets: int32")
+    .Input("pos: " STAF_TF_DTYPE)
+    .Input("box: " STAF_TF_DTYPE)
+    .Output("force: " STAF_TF_DTYPE)
+    .Output("virial_diag: " STAF_TF_DTYPE);
+
+class ComputeForceTriplVirialOp : public OpKernel {
+ public:
+  explicit ComputeForceTriplVirialOp(OpKernelConstruction* context) : OpKernel(context) {}
+  void Compute(OpKernelContext* context) override {
+    const cudaStream_t stream = context->eigen_device<Eigen::GpuDevice>().stream();
+
+    const Tensor& netderiv_T = context->input(0);
+    const Tensor& desr_T = context->input(1);
+    const Tensor& desa_T = context->input(2);
+    const Tensor& intderiv_r_T = context->input(3);
+    const Tensor& intderiv_a_T = context->input(4);
+    const Tensor& intmap_r_T = context->input(5);
+    const Tensor& intmap_a_T = context->input(6);
+    const Tensor& smooth_a_T = context->input(7);
+    const Tensor& type_emb3b_T = context->input(8);
+    const Tensor& type_map_T = context->input(9);
+    const Tensor& tipos_T = context->input(10);
+    const Tensor& actual_type_T = context->input(11);
+    const Tensor& num_triplets_T=context->input(12);
+    const Tensor& pos_T = context->input(13);
+    const Tensor& box_T = context->input(14);
+
+    int dimbat = netderiv_T.shape().dim_size(0);
+    int nr = desr_T.shape().dim_size(2);
+    int na = desa_T.shape().dim_size(2);
+    int N = type_map_T.shape().dim_size(0);
+    int nt = tipos_T.shape().dim_size(0);
+    const int* actual_type=actual_type_T.flat<int>().data();
+    int num_finger=int(smooth_a_T.shape().dim_size(1)/3);
+
+    Tensor* forces3b_T = NULL;
+    TensorShape force_shape;
+    force_shape.AddDim(dimbat);
+    force_shape.AddDim(N*3);
+    OP_REQUIRES_OK(context, context->allocate_output(0, force_shape, &forces3b_T));
+
+    Tensor* virial_T = NULL;
+    TensorShape virial_shape;
+    virial_shape.AddDim(dimbat);
+    virial_shape.AddDim(3);
+    OP_REQUIRES_OK(context, context->allocate_output(1, virial_shape, &virial_T));
+
+    set_tensor_to_zero_real(forces3b_T->flat<real>().data(), dimbat*3*N, stream);
+    set_tensor_to_zero_real(virial_T->flat<real>().data(), dimbat*3, stream);
+
+    int prod=netderiv_T.shape().dim_size(0)*netderiv_T.shape().dim_size(1)*desa_T.shape().dim_size(2);
+    computeforce_tripl_virial_Launcher(
+        netderiv_T.flat<real>().data(), desr_T.flat<real>().data(), desa_T.flat<real>().data(),
+        intderiv_r_T.flat<real>().data(), intderiv_a_T.flat<real>().data(),
+        intmap_r_T.flat<int>().data(), intmap_a_T.flat<int>().data(),
+        nr, na, N, dimbat, num_finger, type_emb3b_T.flat<real>().data(), nt,
+        tipos_T.flat<int>().data(), actual_type,
+        forces3b_T->flat<real>().data(), num_triplets_T.flat<int>().data(),
+        smooth_a_T.flat<real>().data(), type_map_T.flat<int>().data(), prod,
+        virial_T->flat<real>().data(), pos_T.flat<real>().data(), box_T.flat<real>().data(),
+        stream);
+  }
+};
+REGISTER_KERNEL_BUILDER(Name("ComputeForceTriplVirial").Device(DEVICE_GPU),
+                        ComputeForceTriplVirialOp);
+

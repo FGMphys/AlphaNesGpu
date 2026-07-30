@@ -104,6 +104,8 @@ if(STAF_BUILD_SMOKE)
   if(STAF_WITH_JMD)
     add_executable(staf_force_smoke src/runtime/staf_force_smoke.cpp)
     target_link_libraries(staf_force_smoke PRIVATE staf)
+    add_executable(staf_virial_batch src/runtime/staf_virial_batch.cpp)
+    target_link_libraries(staf_virial_batch PRIVATE staf)
   endif()
 endif()
 

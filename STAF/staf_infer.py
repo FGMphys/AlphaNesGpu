@@ -66,11 +66,13 @@ def main(argv: list[str] | None = None) -> int:
     box = np.asarray(box, dtype=dtype).reshape(1, -1)
 
     model = staf_full_inference(str(Path(args.model).resolve()))
-    energy, force = model.full_test(pos, box)[:2]
+    energy, force, virial = model.full_test(pos, box)
     e = float(np.asarray(energy).reshape(-1)[0])
     f = np.asarray(force)
+    w = np.asarray(virial).reshape(-1)
     print(f"STAF: energy={e:.10f}")
     print(f"STAF: force shape={f.shape} |F|_rms={float(np.sqrt(np.mean(f * f))):.6e}")
+    print(f"STAF: virial_diag (eV) Wxx={w[0]:.6f} Wyy={w[1]:.6f} Wzz={w[2]:.6f}")
 
     if args.json_out is not None:
         payload = {
@@ -79,6 +81,7 @@ def main(argv: list[str] | None = None) -> int:
             "energy": e,
             "force_rms": float(np.sqrt(np.mean(f * f))),
             "n_atoms": int(f.size // 3),
+            "virial_diag": [float(x) for x in w[:3]],
         }
         args.json_out.write_text(json.dumps(payload, indent=2) + "\n")
         print(f"STAF: wrote {args.json_out}")

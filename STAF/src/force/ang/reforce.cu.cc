@@ -4,6 +4,8 @@
 #include "tensorflow/core/util/gpu_kernel_helper.h"
 #include "tensorflow/core/util/gpu_launch_config.h"
 #include "staf_real.h"
+#define STAF_FORCE_PBC_DEFINE
+#include "staf_force_pbc.cuh"
 #include <mutex>
 #include <unordered_map>
 #include <cuda_runtime.h>
@@ -260,6 +262,239 @@ void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream){
      dim3 dimBlock(300,1,1);
      // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, stream,tensor,dimten));
+}
+
+/* ---- Virial-aware angular force (jmd-compatible) ---- */
+
+__global__ void computeforce_tripl_virial_kernel(
+                        const real*  netderiv_T, const real* desr_T, const real* desa_T,
+                        const real* intderiv_r_T, const real* intderiv_a_T_l,
+                        const int* intmap_r_T,const int* intmap_a_T_l,
+                        int nr, const int na, int N, int dimbat , int num_finger,const real* type_emb3b,int nt,
+                        const int* tipos_T,
+                        const int* actual_type_p,real* forces3b_T_l,const int *num_triplets,const real* smooth_a_T_l,const int* type_map_T_d,
+                        real* virial_diagonal_d,const real* pos_d,const real* box_d,int BLOCK_DIM)
+{
+    int actual_type=actual_type_p[0];
+    int N_local=tipos_T[actual_type];
+
+    int tipos_shift=0;
+    for (int y=0;y<actual_type;y++){
+        tipos_shift=tipos_shift+tipos_T[y];
+    }
+    const real2* intderiv_a_T=(const real2 *)intderiv_a_T_l;
+    const int2* intmap_a_T=(const int2 *) intmap_a_T_l;
+    real3* forces3b_T=(real3 *)forces3b_T_l;
+    const real3* smooth_a_T=(const real3 *)smooth_a_T_l;
+    const real3* pos_d_l=(const real3*)pos_d;
+
+    int t=blockIdx.x*blockDim.x+threadIdx.x;
+
+    extern __shared__ unsigned char sharedMemory_ang[];
+    real3 *forza_i = (real3 *)sharedMemory_ang;
+    real3 *virial_diagonal_i = (real3 *)(sharedMemory_ang + sizeof(real3) * BLOCK_DIM);
+
+    forza_i[threadIdx.x].x=real(0.);
+    forza_i[threadIdx.x].y=real(0.);
+    forza_i[threadIdx.x].z=real(0.);
+    virial_diagonal_i[threadIdx.x].x=real(0.);
+    virial_diagonal_i[threadIdx.x].y=real(0.);
+    virial_diagonal_i[threadIdx.x].z=real(0.);
+
+    real3 local_force = {real(0.), real(0.), real(0.)};
+    real3 local_virial = {real(0.), real(0.), real(0.)};
+    real3 distij = {real(0.), real(0.), real(0.)};
+    real3 rij = {real(0.), real(0.), real(0.)};
+    real3 distik = {real(0.), real(0.), real(0.)};
+    real3 rik = {real(0.), real(0.), real(0.)};
+
+    int b=t/(na*N_local);
+    int reminder=t%(na*N_local);
+    int par=reminder/na;
+    int nn=reminder%na;
+    int absolute_par=par+tipos_shift;
+    if (t<N_local*dimbat*na)
+    {
+        int na_particle=num_triplets[b*N_local+par];
+        int nn_particle=(na_particle*(na_particle-1))/2;
+        if (nn<nn_particle)
+        {
+            real3 other_forcej = {real(0.), real(0.), real(0.)};
+            real3 other_forcek = {real(0.), real(0.), real(0.)};
+
+            int na_dim=na_particle;
+
+            int j=0;
+            int prev_row=0;
+            int next_row=na_dim-j-1;
+            while (nn>=next_row)
+            {
+                j+=1;
+                prev_row=next_row;
+                next_row+=na_dim-j-1;
+            }
+            int k=nn-prev_row+1+j;
+
+            real delta=real(0.);
+            real Bp_j=real(0.);
+            real Bp_k=real(0.);
+
+            int actual=b*N_local*nr+par*nr;
+            int actual_ang=b*N_local*na+par*na;
+            int actgrad=b*N_local*num_finger+par*num_finger;
+
+            int2 neigh=intmap_a_T[b*(N_local*na)+na*par+nn];
+
+            int j_type=type_map_T_d[neigh.x];
+            int k_type=type_map_T_d[neigh.y];
+            int sum=j_type+k_type;
+
+            real angulardes=desa_T[actual_ang+nn];
+            real radialdes_j=desr_T[actual+j];
+            real radialdes_k=desr_T[actual+k];
+
+            const real3& pos_i = pos_d_l[b*N + absolute_par];
+            const real3& pos_j = pos_d_l[b*N + neigh.x];
+            const real3& pos_k = pos_d_l[b*N + neigh.y];
+            const real* box_b = box_d + b*6;
+
+            rij.x=pos_i.x-pos_j.x;
+            rij.y=pos_i.y-pos_j.y;
+            rij.z=pos_i.z-pos_j.z;
+            if (!staf_force_skip_pbc) {
+                rij.x-=rint(rij.x);
+                rij.y-=rint(rij.y);
+                rij.z-=rint(rij.z);
+            }
+            distij.x=box_b[0]*rij.x+box_b[1]*rij.y+box_b[2]*rij.z;
+            distij.y=box_b[3]*rij.y+box_b[4]*rij.z;
+            distij.z=box_b[5]*rij.z;
+
+            rik.x=pos_i.x-pos_k.x;
+            rik.y=pos_i.y-pos_k.y;
+            rik.z=pos_i.z-pos_k.z;
+            if (!staf_force_skip_pbc) {
+                rik.x-=rint(rik.x);
+                rik.y-=rint(rik.y);
+                rik.z-=rint(rik.z);
+            }
+            distik.x=box_b[0]*rik.x+box_b[1]*rik.y+box_b[2]*rik.z;
+            distik.y=box_b[3]*rik.y+box_b[4]*rik.z;
+            distik.z=box_b[5]*rik.z;
+
+            for (int a1=0; a1<num_finger; a1++)
+            {
+                real3 alphas=smooth_a_T[sum*num_finger+a1];
+                real chtjk_par=type_emb3b[sum*num_finger+a1];
+
+                real net_der=real(0.5)*netderiv_T[actgrad+a1]*chtjk_par;
+
+                real expbeta=staf_exp(alphas.z*angulardes);
+
+                real sim1=staf_exp(alphas.y*radialdes_j+alphas.x*radialdes_k);
+                real sim2=staf_exp(alphas.x*radialdes_j+alphas.y*radialdes_k);
+
+                delta=expbeta*(1.+alphas.z*angulardes)*(sim1+sim2)*real(0.5);
+
+                real suppj=(alphas.x*sim2+alphas.y*sim1)*expbeta*real(0.5);
+                real suppk=(alphas.x*sim1+alphas.y*sim2)*expbeta*real(0.5);
+                Bp_j=suppj*angulardes;
+                Bp_k=suppk*angulardes;
+
+                real2 intder = intderiv_a_T[b*(N_local*na)*3+par*na*3+0*na+nn];
+                real intder_r_j=intderiv_r_T[b*N_local*3*nr+nr*3*par+0*nr+j];
+                real intder_r_k=intderiv_r_T[b*N_local*3*nr+nr*3*par+0*nr+k];
+
+                real fxij=net_der*(delta*intder.x+Bp_j*intder_r_j);
+                real fxik=net_der*(delta*intder.y+Bp_k*intder_r_k);
+
+                forza_i[threadIdx.x].x-=(fxij+fxik);
+                virial_diagonal_i[threadIdx.x].x-=fxij*distij.x;
+                virial_diagonal_i[threadIdx.x].x-=fxik*distik.x;
+                other_forcej.x+=fxij;
+                other_forcek.x+=fxik;
+
+                intder = intderiv_a_T[b*(N_local*na)*3+par*na*3+1*na+nn];
+                intder_r_j=intderiv_r_T[b*N_local*3*nr+nr*3*par+1*nr+j];
+                intder_r_k=intderiv_r_T[b*N_local*3*nr+nr*3*par+1*nr+k];
+
+                fxij=net_der*(delta*intder.x+Bp_j*intder_r_j);
+                fxik=net_der*(delta*intder.y+Bp_k*intder_r_k);
+
+                forza_i[threadIdx.x].y-=(fxij+fxik);
+                virial_diagonal_i[threadIdx.x].y-=fxij*distij.y;
+                virial_diagonal_i[threadIdx.x].y-=fxik*distik.y;
+                other_forcej.y+=fxij;
+                other_forcek.y+=fxik;
+
+                intder = intderiv_a_T[b*(N_local*na)*3+par*na*3+2*na+nn];
+                intder_r_j=intderiv_r_T[b*N_local*3*nr+nr*3*par+2*nr+j];
+                intder_r_k=intderiv_r_T[b*N_local*3*nr+nr*3*par+2*nr+k];
+
+                fxij=net_der*(delta*intder.x+Bp_j*intder_r_j);
+                fxik=net_der*(delta*intder.y+Bp_k*intder_r_k);
+
+                forza_i[threadIdx.x].z-=(fxij+fxik);
+                virial_diagonal_i[threadIdx.x].z-=fxij*distij.z;
+                virial_diagonal_i[threadIdx.x].z-=fxik*distik.z;
+                other_forcej.z+=fxij;
+                other_forcek.z+=fxik;
+            }
+
+            atomicAdd((real*)&(forces3b_T[b*N+neigh.x].x),other_forcej.x);
+            atomicAdd((real*)&(forces3b_T[b*N+neigh.x].y),other_forcej.y);
+            atomicAdd((real*)&(forces3b_T[b*N+neigh.x].z),other_forcej.z);
+
+            atomicAdd((real*)&(forces3b_T[b*N+neigh.y].x),other_forcek.x);
+            atomicAdd((real*)&(forces3b_T[b*N+neigh.y].y),other_forcek.y);
+            atomicAdd((real*)&(forces3b_T[b*N+neigh.y].z),other_forcek.z);
+        }
+    }
+
+    __syncthreads();
+
+    if (threadIdx.x==0)
+    {
+        for (int i=0;i<BLOCK_DIM;i++)
+        {
+            local_force.x+=forza_i[i].x;
+            local_force.y+=forza_i[i].y;
+            local_force.z+=forza_i[i].z;
+            local_virial.x+=virial_diagonal_i[i].x;
+            local_virial.y+=virial_diagonal_i[i].y;
+            local_virial.z+=virial_diagonal_i[i].z;
+        }
+
+        atomicAdd((real*)&(forces3b_T[b*N+absolute_par].x),local_force.x);
+        atomicAdd((real*)&(forces3b_T[b*N+absolute_par].y),local_force.y);
+        atomicAdd((real*)&(forces3b_T[b*N+absolute_par].z),local_force.z);
+
+        atomicAdd((real*)&(virial_diagonal_d[b*3+0]),local_virial.x);
+        atomicAdd((real*)&(virial_diagonal_d[b*3+1]),local_virial.y);
+        atomicAdd((real*)&(virial_diagonal_d[b*3+2]),local_virial.z);
+    }
+}
+
+void computeforce_tripl_virial_Launcher(
+                        const real*  netderiv_T_d, const real* desr_T_d, const real* desa_T_d,
+                        const real* intderiv_r_T_d, const real* intderiv_a_T_d,
+                        const int* intmap_r_T_d,const int* intmap_a_T_d,
+                         int nr, int na, int N, int dimbat,int num_finger,const real* type_emb3b_d,int nt,const int* tipos_T,const int* actual_type,real* forces3b_T_d,const int *num_triplets_d,const real* smooth_a_T,const int* type_map_T_d,int prod,
+                         real* virial_diagonal_d,const real* pos_d,const real* box_d,
+                         cudaStream_t stream){
+
+    const int BLOCK_DIM = current_block_dim();
+    dim3 dimGrid(ceil(real(prod)/real(BLOCK_DIM)),1,1);
+    dim3 dimBlock(BLOCK_DIM,1,1);
+    TF_CHECK_OK(::tensorflow::GpuLaunchKernel(
+        computeforce_tripl_virial_kernel, dimGrid, dimBlock, 2*BLOCK_DIM*sizeof(real3), stream,
+        netderiv_T_d,desr_T_d,desa_T_d,
+        intderiv_r_T_d,intderiv_a_T_d,intmap_r_T_d,
+        intmap_a_T_d,nr,na,N,dimbat,
+        num_finger,
+        type_emb3b_d,nt,tipos_T,
+        actual_type,forces3b_T_d,num_triplets_d,smooth_a_T,type_map_T_d,
+        virial_diagonal_d,pos_d,box_d,BLOCK_DIM));
 }
 
 #endif

@@ -17,8 +17,8 @@ set_ops_root("double" if tf.keras.backend.floatx() == "float64" else "float")
 from source_routine.physics_layer_mod import physics_layer
 from source_routine.physics_layer_mod import lognorm_layer
 from source_routine.descriptor_builder import descriptor_layer
-from source_routine.force_layer_mod import force_debug_layer
-print("STAF: Inference (full)")
+from source_routine.force_layer_mod import force_virial_layer
+print("STAF: Inference (full) + virial")
 
 def make_typemap(tipos):
     num=0
@@ -83,10 +83,11 @@ class staf_full_inference(tf.Module):
 
           self.nets=[tf.saved_model.load(modelname+'/model_type'+str(k))
                           for k in range(self.ntipos)]
-          self.force_layer=force_debug_layer(self.rad_buff,self.ang_buff)
+          self.force_layer=force_virial_layer(self.rad_buff,self.ang_buff)
 
 #      @tf.function()
       def full_test(self,pos,box):
+          """Return (energy [B], force [B,N*3], virial_diag [B,3])."""
 
           [x1,x2,x3bsupp,
         int2b,int3b,intder2b,
@@ -118,8 +119,8 @@ class staf_full_inference(tf.Module):
           self.grad_listed=[tf.split(self.outmodel[k][1],[self.physics_layer[k].nalpha_r,
                                       self.physics_layer[k].nalpha_a],axis=-1) for k in range(nt)]
 
-          
-          self.force_list=[self.force_layer(self.grad_listed[k][0],self.x2b[k],
+          force_vir = [self.force_layer(
+                                 self.grad_listed[k][0],self.x2b[k],
                                  self.intder2b[k],self.int2b[k],
                                  self.physics_layer[k].alpha2b,
                                  self.grad_listed[k][1],self.x3b[k],self.x3bsupp[k],
@@ -128,11 +129,8 @@ class staf_full_inference(tf.Module):
                                  self.physics_layer[k].alpha3b,
                                  self.physics_layer[k].type_emb_2b,
                                  self.physics_layer[k].type_emb_3b,
-                                 self.type_map,self.tipos,k) for k in range(nt)]
+                                 self.type_map,self.tipos,k, pos, box) for k in range(nt)]
 
-          self.force=tf.math.add_n(self.force_list[:][0])
-          
-          info="self.totenergy,self.force_list,self.grad_listed,self.fingerprint,self.x2b,self.x3b,self.x3bsupp,self.int2b,self.int3b,self.intder2b,self.intder3b,self.intder3bsupp"
-          return self.totenergy,self.force_list,self.grad_listed,self.fingerprint,self.x2b,self.x3b,self.x3bsupp,self.int2b,self.int3b,self.intder2b,self.intder3b,self.intder3bsupp,info
-
-# Temporary aliases (remove after callers migrate)
+          self.force = tf.math.add_n([fv[0] for fv in force_vir])
+          self.virial_diag = tf.math.add_n([fv[1] for fv in force_vir])
+          return self.totenergy, self.force, self.virial_diag
