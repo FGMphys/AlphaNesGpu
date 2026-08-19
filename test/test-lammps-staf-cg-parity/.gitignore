@@ -1,0 +1,4 @@
+results/
+*.dump
+log.lammps
+log.lammps.*

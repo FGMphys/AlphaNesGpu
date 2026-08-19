@@ -108,6 +108,30 @@ python run_grad_param_regression.py --precision double --n-per-family 20
 
 Checklist: [`DEV/STAF_CG_SPRINTS.md`](../DEV/STAF_CG_SPRINTS.md).
 
+## STAF-CG LAMMPS gate (Sprint 6)
+
+`pair_style staf/cg` must match Python STAF-CG on the 24-bead USCGSITE frame 0
+(float32 ONNX under `test/test-cg-inference/model_onnx_double/`). Configurational
+pressure is pair virial only (`run 0`, zero velocities; no kinetic).
+
+```bash
+source scripts/staf_gpu_env.sh
+export LMP_CG=${LMP_CG:-/home/francegm/programmi/lammps-23Jun2022/src/lmp_staf_cg}
+# 1-rank smoke
+bash test/test-lammps-staf-cg-parity/run_smoke.sh
+# required E / F / P_config vs Python
+python test/test-lammps-staf-cg-parity/run_compare.py
+# DD 1 vs 2 vs 4 (skip np>1 if CUDA ctx fails on 1 GPU)
+bash test/test-lammps-staf-cg-parity/run_dd_parity.sh
+```
+
+Pass: `max|ΔE| < 1e-3`, `max|ΔF| < 1e-3` (per component), and
+`|ΔP|/max(|P|,1) < 0.05` **or** `max|ΔW_diag| < 1e-2` (`p_gate` in
+`summary.json`). DD vs np=1 uses 1e-4 like full-atom `test-lammps-dd-parity`.
+
+Build: `bash lammps/USER-STAF-CG/Install.sh $LAMMPS_SRC && make staf_cg`
+→ `lmp_staf_cg`. Do not overwrite `lmp_staf`.
+
 
 ## A1 residual
 

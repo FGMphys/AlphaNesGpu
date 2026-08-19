@@ -64,34 +64,40 @@ Plan: Cursor `staf-cg_linea_c`. Living science plan: [`docs/PIANO_ALPHANES.md`](
 
 ## Sprint 4 — Horovod + virial
 
-- [ ] `distribute: none | horovod` as [`STAF/staf_train.py`](../STAF/staf_train.py) (no LR × N)
-- [ ] Smoke `mpirun -np 1`; 2 ranks if hardware allows
-- [ ] `type_of_training: energy+force+virial` + kernels adapted to intra/inert/sticky
-- [ ] FD virial on a mini-frame (`pass: true`); origami npy may still lack `virial.npy`
+- [x] `distribute: none | horovod` as [`STAF/staf_train.py`](../STAF/staf_train.py) (no LR × N)
+- [x] Smoke `mpirun -np 1`; 2 ranks if hardware allows
+- [x] `type_of_training: energy+force+virial` + kernels adapted to intra/inert/sticky
+- [x] FD virial on a mini-frame (`pass: true`); origami npy may still lack `virial.npy`
 
 **Done when:** Horovod 1-rank OK; virial compiles; FD virial passes.
+
+**Closed 2026-08-19:** Horovod in `staf_cg_train.py` (no LR×N). `mpirun -np 1` smoke: RMSE_f=38.35259. 1×V100 so np=2 skipped. Virial ops (intra/inert/sticky) in `ops_{float,double}`. Strain FD on MODEL1896: corr(W_ana, W_num)=0.99999948 with `W=-(E⁺−E⁻)/(2ε)`. Inference: `full_test_virial()`; `full_test` still `(E,F)`.
 
 ---
 
 ## Sprint 5 — `libstaf_cg` + ONNX
 
-- [ ] `libstaf_cg/` (ORT MLP, CUDA from STAF-CG, dual-cutoff / color maps)
-- [ ] `STAF-CG/save_models/export_mlp_grad_onnx.py` + ASCII AF + `map_intra` / color
-- [ ] Eval E,F on MODEL1896-export vs Python STAF-CG (1 frame, 1 rank, no LAMMPS)
+- [x] `libstaf_cg/` (ORT MLP, CUDA from STAF-CG, dual-cutoff / color maps)
+- [x] `STAF-CG/save_models/export_mlp_grad_onnx.py` + ASCII AF + `map_intra` / color
+- [x] Eval E,F on 1-epoch keras export vs Python STAF-CG (1 frame, 1 rank, no LAMMPS)
 
 **Done when:** libstaf_cg matches Python on one frame.
+
+**Closed 2026-08-19:** `cmake --build libstaf_cg/build` links `staf_force_smoke`. Float32 ONNX from `test/test-cg-pipeline/work/staf_cg_freeze_ep10` → `test/test-cg-inference/model_onnx_double/` (MODEL1896 is SavedModel-only; same export is reusable in Sprint 6). Frame 0 (24 beads, box 280): Python float32 vs libstaf_cg float32 `max|ΔE|≈9.5e-7`, `max|ΔF|≈8.3e-8` (`test/test-cg-libstaf/summary.txt` pass true). WCA/LJ not linked (STAF-only). No `DEV/AlphaNesGpu_double_CG_dv_RC` edits; CUDA trees stay separate.
 
 ---
 
 ## Sprint 6 — LAMMPS `pair_style staf/cg`
 
-- [ ] `lammps/USER-STAF-CG/`: `PairStyle(staf/cg, PairSTAFCG)`
-- [ ] Smoke 1-rank dimer 24 beads
-- [ ] **Parity required:** same frame (USCGSITE / MODEL1896 export) → LAMMPS vs Python STAF-CG: **energy, forces, configurational pressure** (pair virial only, no kinetic). Fail the sprint if E or F or P disagree. Harness: `test/test-lammps-staf-cg-parity/`
-- [ ] DD 1 vs 2 vs 4 ranks, same E/F/P trio
-- [ ] [`test/ACCEPTANCE.md`](../test/ACCEPTANCE.md) CG section; PIANO linea C/B4; `STAF-CG/README.md`
+- [x] `lammps/USER-STAF-CG/`: `PairStyle(staf/cg, PairSTAFCG)`
+- [x] Smoke 1-rank dimer 24 beads
+- [x] **Parity required:** same frame (USCGSITE / MODEL1896 export) → LAMMPS vs Python STAF-CG: **energy, forces, configurational pressure** (pair virial only, no kinetic). Fail the sprint if E or F or P disagree. Harness: `test/test-lammps-staf-cg-parity/`
+- [x] DD 1 vs 2 vs 4 ranks, same E/F/P trio
+- [x] [`test/ACCEPTANCE.md`](../test/ACCEPTANCE.md) CG section; PIANO linea C/B4; `STAF-CG/README.md`
 
 **Done when:** `staf/cg` runs; **E/F/P = Python**; DD parity; DEV remains archive.
+
+**Closed 2026-08-19:** binary `/home/francegm/programmi/lammps-23Jun2022/src/lmp_staf_cg` (`lmp_staf` unchanged). Frame 0 (24 beads, box 280, float32 ONNX): max|ΔE|≈7.0e-7, max|ΔF|≈8.3e-8, |ΔP|/max(|P|,1)≈1.4e-8 (`p_gate: rel_P`; also max|ΔW_diag|≈2.4e-7). DD np=1/2/4 bit-identical E/F/P on 1×V100 (ranks share GPU; dimer sits in one subdomain, empty ranks skip compute). Intra Rc=50 ⇒ `comm_modify cutoff 50`.
 
 ---
 

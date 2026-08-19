@@ -660,17 +660,13 @@ Suite:
 
 ### B4. Estensione CG (dopo MVP water, allineata a linea C)
 
-Solo quando inter/intra origami sono stabili:
-
-- `pair_style staf/cg` con mappe `map_intra`, `color_type_map`, dual cutoff.  
-- Attenzione DD: cutoff intra origami ~50 Å ⇒ ghost skin enorme / domini grandi — può richiedere box/strategy dedicata (o hybrid WCA+NN).  
-- WCA inter può restare `pair_style hybrid` LAMMPS.
+`pair_style staf/cg` **esiste** (Sprint 6): package [`lammps/USER-STAF-CG/`](../lammps/USER-STAF-CG/), runtime [`libstaf_cg/`](../libstaf_cg/), binary `lmp_staf_cg` (non sostituisce `lmp_staf`). Gate: `test/test-lammps-staf-cg-parity/` — stesso frame 24 bead, LAMMPS vs Python STAF-CG su energia, forze e pressione configurazionale (solo pair virial). Intra `Rc=50` Å ⇒ `comm_modify cutoff 50`. DD 1 vs 2 vs 4 rank (una V100, rank che condividono la GPU). WCA/LJ extras non sono nel pair; restano `hybrid` se servono. Scientific C4 (inter RMSE) è ancora dopo questo wiring.
 
 ---
 
 ## 4. Linea C — CG AlphaNes per Origami (intra OK-ish, inter bloccato)
 
-**Port ufficiale:** [`STAF-CG/`](../STAF-CG/) (Sprint 1–3 closed 2026-08-19; checklist [`DEV/STAF_CG_SPRINTS.md`](../DEV/STAF_CG_SPRINTS.md)). `DEV/AlphaNesGpu_double_CG_dv_RC/` resta freeze. Gate: `bash test/test-cg-pipeline/run_sprint3.sh`.
+**Port ufficiale:** [`STAF-CG/`](../STAF-CG/) (Sprint 1–5 closed 2026-08-19; checklist [`DEV/STAF_CG_SPRINTS.md`](../DEV/STAF_CG_SPRINTS.md)). `DEV/AlphaNesGpu_double_CG_dv_RC/` resta freeze. Gate Python: `bash test/test-cg-pipeline/run_sprint3.sh`. **LAMMPS:** `pair_style staf/cg` (`lammps/USER-STAF-CG/`, `lmp_staf_cg`) — Sprint 6, parity E/F/P_config in `test/test-lammps-staf-cg-parity/`.
 
 ### C0. Diagnosi sintetica
 

@@ -55,6 +55,10 @@ STAF-CG/ops_double/
 
 # libstaf local builds
 libstaf/build/
+libstaf_cg/build/
+
+# STAF-CG ONNX export (local only)
+test/test-cg-inference/model_onnx_double/
 
 # Never track bytecode under experimental forks
 DEV/**/__pycache__/
@@ -68,6 +72,7 @@ STAF_leonardo_test_bundle.tar.gz
 third_party/
 
 # Scratch / generated at repo root or under tests
+/tmp/
 /cutoff_curve.dat
 # Ignore entire test tree for untracked clutter (tracked files stay tracked)
 test/

@@ -2,6 +2,14 @@
 # precision: float|double (Sprint 2)
 precision: double
 
+# Multi-GPU distribution (same repo; select mode here only).
+# Options: none | horovod
+#   none     — single device (default if omitted)
+#   horovod  — MPI ranks × 1 GPU (same- or multi-node); launch with mpirun
+#              YAML learning rates are not auto-scaled; train buffers are sharded.
+# MirroredStrategy was removed; use horovod for multi-GPU.
+distribute: none
+
 #Dataset Path
 dataset_folder: ../dataset_inter
 
@@ -60,7 +68,7 @@ optimizer_net: adam #Optimizer
 optimizer_phys: adam #Optimizer
 loss_method: huber #Loss function (Options: huber or MSE, validation is always MSE)
 
-type_of_training: energy+force #Options: energy or energy+force
+type_of_training: energy+force #Options: energy or energy+force or energy+force+virial
 
 ##Learning rate schedule
 #Options:

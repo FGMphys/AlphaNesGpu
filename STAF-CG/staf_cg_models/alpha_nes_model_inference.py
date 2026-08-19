@@ -7,6 +7,7 @@ from source_routine.physics_layer_mod import physics_layer
 from source_routine.physics_layer_mod import lognorm_layer
 from source_routine.descriptor_builder import descriptor_layer
 from source_routine.force_layer_mod import force_layer
+from source_routine.force_layer_mod import force_virial_layer
 from staf.dtype import np_dtype
 print("STAF-CG: Inference of CG model")
 
@@ -54,6 +55,7 @@ class alpha_nes_full_inference(tf.Module):
           self.nets=[tf.saved_model.load(modelname+'/model_type'+str(k))
                           for k in range(self.number_of_NN)]
           self.force_layer=force_layer(self.rad_buff,self.ang_buff)
+          self.force_virial_layer=force_virial_layer(self.rad_buff,self.ang_buff,with_grad=False)
 
 
 
@@ -109,3 +111,52 @@ class alpha_nes_full_inference(tf.Module):
 
 
           return self.totenergy,self.force
+
+      def full_test_virial(self,pos,box):
+          """Return (energy [B], force [B,N*3], virial [B,9] row-major)."""
+          if pos.shape[0] > self.max_batch:
+             raise ValueError(
+             f"Batch troppo grande: {pos.shape[0]} > {self.max_batch}"
+             )
+          [x1,x2,x3bsupp,
+        int2b,int3b,intder2b,
+        intder3b,intder3bsupp,numtriplet]=self.descriptor_layer(pos,box,self.map_intra)
+
+          self.x2b = x1
+          self.x3b = x2
+          self.x3bsupp = x3bsupp
+          self.int2b = int2b
+          self.int3b = int3b
+          self.intder2b = intder2b
+          self.intder3b = intder3b
+          self.intder3bsupp = intder3bsupp
+          self.numtriplet = numtriplet
+
+          number_of_NN=self.number_of_NN
+          self.fingerprint=[self.physics_layer[k](self.x2b,self.x3bsupp,
+          self.int2b,self.x3b,self.int3b,self.numtriplet,self.color_type_map,self.map_color_interaction,self.map_intra)
+                      for k in range(number_of_NN)]
+          self.outmodel=[self.nets[k].testmodel(fingers) for k,fingers in enumerate(self.fingerprint)]
+          self.energy=[self.outmodel[k][0] for k in range(self.number_of_NN)]
+
+          self.totene=tf.concat(self.energy,axis=1)
+          self.totenergy=tf.reduce_sum(self.totene,axis=(-1))
+
+          self.grad_listed=[tf.split(self.outmodel[k][1],[self.physics_layer[k].nalpha_r,
+                                      self.physics_layer[k].nalpha_a],axis=-1) for k in range(self.number_of_NN)]
+
+          force_vir=[self.force_virial_layer(self.grad_listed[k][0],self.x2b,
+                                   self.intder2b,self.int2b,
+                                   self.physics_layer[k].alpha2b,
+                                   self.grad_listed[k][1],self.x3b,self.x3bsupp,
+                                   self.intder3b,self.intder3bsupp,self.int3b,
+                                   self.numtriplet,
+                                   self.physics_layer[k].alpha3b,
+                                   self.physics_layer[k].type_emb_2b,
+                                   self.physics_layer[k].type_emb_3b,
+                                   self.color_type_map,self.map_color_interaction,
+                                   k,self.map_intra,pos,box) for k in range(self.number_of_NN)]
+
+          self.force=tf.math.add_n([fv[0] for fv in force_vir])
+          self.virial=tf.math.add_n([fv[1] for fv in force_vir])
+          return self.totenergy,self.force,self.virial

@@ -55,32 +55,144 @@ except:
 tf.config.threading.set_intra_op_parallelism_threads(numthreads)
 print("STAF-CG: tensorflow intra threads set to work with %d threads"%tf.config.threading.get_intra_op_parallelism_threads())
 
-gpus = tf.config.list_physical_devices('GPU')
-if gpus:
-  try:
-    # Currently, memory growth needs to be the same across GPUs
-    for gpu in gpus:
-      tf.config.experimental.set_memory_growth(gpu, True)
-    logical_gpus = tf.config.list_logical_devices('GPU')
-    print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
-  except RuntimeError as e:
-    # Memory growth must be set before GPUs have been initialized
-    print(e)
+def _configure_gpu_memory_growth(gpus, list_logical=True):
+    """Set memory growth. Avoid list_logical_devices before set_visible_devices
+    (that call initializes the GPU runtime and blocks visibility changes)."""
+    if not gpus:
+        print("STAF-CG: no GPU detected")
+        return
+    try:
+        for gpu in gpus:
+            tf.config.experimental.set_memory_growth(gpu, True)
+        print(len(gpus), "Physical GPU(s) (memory growth set)")
+        if list_logical:
+            logical_gpus = tf.config.list_logical_devices('GPU')
+            print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+    except RuntimeError as e:
+        # Memory growth must be set before GPUs have been initialized
+        print(e)
+
+def init_distribute(full_param):
+    """Return (mode, hvd_module|None).
+
+    Multi-GPU is Horovod only (``distribute: horovod``). MirroredStrategy was
+    removed — use ``mpirun -np N`` on one or more nodes instead.
+
+    GPU memory growth / visibility is configured here (after YAML) so Horovod
+    can pin each MPI rank to gpus[local_rank] before TF initializes devices.
+    """
+    mode = str(full_param.get('distribute', 'none')).strip().lower()
+    if mode in ('', 'none', 'null', 'single'):
+        _configure_gpu_memory_growth(tf.config.list_physical_devices('GPU'))
+        print("STAF-CG: distribute=none (single device)")
+        return 'none', None
+
+    if mode == 'mirrored':
+        sys.exit(
+            "STAF-CG: distribute=mirrored was removed.\n"
+            "  Use distribute: horovod with mpirun -np <N> "
+            "(same-node or multi-node)."
+        )
+
+    if mode != 'horovod':
+        sys.exit(
+            "STAF-CG: unknown distribute=%r (use none | horovod)" % mode
+        )
+
+    try:
+        import horovod.tensorflow as hvd
+    except ImportError:
+        sys.exit(
+            "STAF-CG: distribute=horovod requires the horovod package.\n"
+            "  Install (example): HOROVOD_WITH_TENSORFLOW=1 pip install horovod\n"
+            "  Launch: mpirun -np <N> python staf_cg_train.py <input.yaml>"
+        )
+    hvd.init()
+    gpus = tf.config.list_physical_devices('GPU')
+    # Do NOT list_logical_devices before pinning — that initializes CUDA.
+    _configure_gpu_memory_growth(gpus, list_logical=False)
+    if gpus:
+        # Slurm may already expose a single GPU via CUDA_VISIBLE_DEVICES.
+        if len(gpus) == 1:
+            target = gpus[0]
+        elif hvd.local_rank() >= len(gpus):
+            sys.exit(
+                "STAF-CG: horovod local_rank=%d but only %d GPU(s) visible"
+                % (hvd.local_rank(), len(gpus))
+            )
+        else:
+            target = gpus[hvd.local_rank()]
+        tf.config.set_visible_devices(target, 'GPU')
+        logical_gpus = tf.config.list_logical_devices('GPU')
+        print(
+            "STAF-CG: horovod pinned GPU; physical=%d logical=%d"
+            % (len(gpus), len(logical_gpus))
+        )
+    print(
+        "STAF-CG: distribute=horovod size=%d rank=%d local_rank=%d"
+        % (hvd.size(), hvd.rank(), hvd.local_rank())
+    )
+    return 'horovod', hvd
+
+def shard_idx_str(idx_str, hvd_mod, name):
+    """Frame-buffer sharding across MPI ranks (train path)."""
+    if hvd_mod is None or hvd_mod.size() <= 1:
+        return idx_str
+    shard = idx_str[hvd_mod.rank()::hvd_mod.size()]
+    if shard.shape[0] == 0:
+        sys.exit(
+            "STAF-CG: horovod shard empty for %s on rank %d (size=%d); "
+            "use fewer ranks or a larger dataset"
+            % (name, hvd_mod.rank(), hvd_mod.size())
+        )
+    print(
+        "STAF-CG: horovod sharded %s buffers %d → %d (rank %d/%d)"
+        % (name, idx_str.shape[0], shard.shape[0], hvd_mod.rank(), hvd_mod.size())
+    )
+    return shard
+
+def collect_broadcast_variables(model):
+    """Model + optimizer variables for hvd.broadcast_variables."""
+    vars_ = []
+    for net in model.nets:
+        vars_.extend(list(net.variables))
+    for phys in model.physics_layer:
+        vars_.extend([phys.alpha2b, phys.alpha3b, phys.type_emb_2b, phys.type_emb_3b])
+    for logn in model.lognorm_layer:
+        vars_.append(logn.mu)
+    try:
+        vars_.extend(list(model.opt_net.variables()))
+    except Exception:
+        pass
+    try:
+        vars_.extend(list(model.opt_phys.variables()))
+    except Exception:
+        pass
+    return vars_
 
 @tf.function()
 def MSE(ypred,y):
    loss_function=tf.reduce_mean(tf.square((ypred-y)))
    return loss_function
 
-def make_dataset_stream(base_pattern,mode):
+def make_dataset_stream(base_pattern,mode,need_virial=False):
     energy_on_disk=np.load(base_pattern+'/'+mode+'/'+'energy.npy',mmap_mode='r')
     force_on_disk=np.load(base_pattern+'/'+mode+'/'+'force.npy',mmap_mode='r')
 
     pos_on_disk=np.load(base_pattern+'/'+mode+'/'+'pos.npy',mmap_mode='r')
     box_on_disk=np.load(base_pattern+'/'+mode+'/'+'box.npy',mmap_mode='r')
+    if not need_virial:
+        return energy_on_disk,force_on_disk,pos_on_disk,box_on_disk
 
-
-    return energy_on_disk,force_on_disk,pos_on_disk,box_on_disk
+    vir_path = base_pattern+'/'+mode+'/'+'virial.npy'
+    if not os.path.isfile(vir_path):
+        sys.exit(
+            "STAF-CG: type_of_training=energy+force+virial requires virial.npy under "
+            "%s/%s/ (total eV, shape [nframe,9], no /N). Missing: %s"
+            % (base_pattern, mode, vir_path)
+        )
+    virial_on_disk=np.load(vir_path,mmap_mode='r')
+    return energy_on_disk,force_on_disk,pos_on_disk,box_on_disk,virial_on_disk
 
 def check_dimension(buffdim,dimension,mode):
     res=buffdim
@@ -88,7 +200,7 @@ def check_dimension(buffdim,dimension,mode):
        print("STAF-CG: buffdim in ",mode," mode is bigger than number of frames in the dataset. We set buffdim=datasetdim!")
        res=dimension
     return res
-def make_idx_str(dimension,buffdim,mode):
+def make_idx_str(dimension,buffdim,mode,save_shuffle=True):
     buffdim=check_dimension(buffdim,dimension,mode)
     truedim=dimension//buffdim*buffdim
     rejected=dimension%buffdim
@@ -97,7 +209,7 @@ def make_idx_str(dimension,buffdim,mode):
     vec=np.arange(0,dimension)
     np.random.shuffle(vec)
     vec=np.reshape(vec[:truedim],(dimension//buffdim,buffdim))
-    if mode=='test':
+    if mode=='test' and save_shuffle:
        np.savetxt("shuffle_dataset_vec",vec)
     return buffdim,vec
 
@@ -167,8 +279,14 @@ def make_loss(full_param):
         pf=tf.constant(1.,dtype=tf_dtype())
         pb=tf.constant(1.,dtype=tf_dtype())
         print("STAF-CG: pe and pf set to default value 1 1",sep=' ',end='\n')
+    try:
+        pv=tf.constant(float(full_param['loss_virial_prefactor']),dtype=tf_dtype())
+        print("STAF-CG: pv (virial prefactor) set to", float(pv.numpy()))
+    except Exception:
+        pv=tf.constant(1.,dtype=tf_dtype())
+        print("STAF-CG: pv (virial prefactor) default 1")
 
-    return model_loss,val_loss,pe,pf,pb
+    return model_loss,val_loss,pe,pf,pb,pv
 
 def make_method(full_param,model):
     try:
@@ -179,13 +297,20 @@ def make_method(full_param,model):
        trainmeth=model.full_train_e_f
        testmeth=model.full_test_e_f
        print("STAF-CG: training will be on both energies and forces")
+    elif train_meth=='energy+force+virial':
+       trainmeth=model.full_train_e_f_v
+       testmeth=model.full_test_e_f_v
+       print("STAF-CG: training will be on energy + force + full virial tensor (9)")
     elif train_meth=='energy':
          trainmeth=model.full_train_e
          testmeth=model.full_test_e
          print("STAF-CG: training will be on  energies only")
     else:
-        sys.exit("STAF-CG: Error in type_of_training key. Possible choices are energy+force or energy")
-    return trainmeth,testmeth
+        sys.exit(
+            "STAF-CG: Error in type_of_training key. Possible choices are "
+            "energy+force, energy+force+virial, or energy"
+        )
+    return trainmeth,testmeth,train_meth
 
 
 
@@ -195,6 +320,8 @@ with open(sys.argv[1]) as file:
     full_param = yaml.load(file, Loader=yaml.FullLoader)
 set_precision(full_param.get("precision"), default="float64")
 set_ops_root("double" if tf_dtype() == "float64" else "float")
+distribute_mode, hvd_mod = init_distribute(full_param)  # none | horovod
+is_chief = (hvd_mod is None) or (hvd_mod.rank() == 0)
 base_pattern=full_param['dataset_folder']
 """
 try:
@@ -225,12 +352,16 @@ from gradient_utility import register_force_3bAFs_grad
 from gradient_utility import register_force_2bAFs_grad
 from gradient_utility import register_3bAFs_grad
 from gradient_utility import register_2bAFs_grad
+if full_param.get('type_of_training', 'energy+force') == 'energy+force+virial':
+    from gradient_utility import register_force_2bAFs_virial_grad  # noqa: F401
+    from gradient_utility import register_force_3bAFs_virial_grad  # noqa: F401
 
 from staf_cg_models.alpha_nes_model import alpha_nes_full
 
 from source_routine.physics_layer_mod import physics_layer
 from source_routine.physics_layer_mod import lognorm_layer
 from source_routine.force_layer_mod import force_layer
+from source_routine.force_layer_mod import force_virial_layer
 
 
 
@@ -249,13 +380,26 @@ except:
     tf.random.set_seed(seed_par+1)
     os.environ['PYTHONHASHSEED']=str(seed_par)
     print("STAF-CG: seed fixed by default 12345\n")
+_train_type = full_param.get('type_of_training', 'energy+force')
+_need_virial = (_train_type == 'energy+force+virial')
 #Read dataset map on disk
-[e_map_tr,f_map_tr,pos_map_tr,box_map_tr]=make_dataset_stream(base_pattern,'training')
-[e_map_ts,f_map_ts,pos_map_ts,box_map_ts]=make_dataset_stream(base_pattern,'test')
+if _need_virial:
+    [e_map_tr,f_map_tr,pos_map_tr,box_map_tr,v_map_tr]=make_dataset_stream(
+        base_pattern,'training',need_virial=True)
+    [e_map_ts,f_map_ts,pos_map_ts,box_map_ts,v_map_ts]=make_dataset_stream(
+        base_pattern,'test',need_virial=True)
+    check_along_frames([e_map_tr,f_map_tr,pos_map_tr,box_map_tr,v_map_tr],0)
+    check_along_frames([e_map_ts,f_map_ts,pos_map_ts,box_map_ts,v_map_ts],0)
+    if v_map_tr.shape[-1] != 9 or v_map_ts.shape[-1] != 9:
+        sys.exit("STAF-CG: virial.npy last dim must be 9 (full tensor, total eV)")
+else:
+    [e_map_tr,f_map_tr,pos_map_tr,box_map_tr]=make_dataset_stream(base_pattern,'training')
+    [e_map_ts,f_map_ts,pos_map_ts,box_map_ts]=make_dataset_stream(base_pattern,'test')
+    v_map_tr = v_map_ts = None
+    ###Check dimension of dataset
+    check_along_frames([e_map_tr,f_map_tr,pos_map_tr,box_map_tr],0)
+    check_along_frames([e_map_ts,f_map_ts,pos_map_ts,box_map_ts],0)
 map_intra=np.loadtxt(full_param['map_intra_file'],dtype='int32')
-###Check dimension of dataset
-check_along_frames([e_map_tr,f_map_tr,pos_map_tr,box_map_tr],0)
-check_along_frames([e_map_ts,f_map_ts,pos_map_ts,box_map_ts],0)
 #Building a stream vector
 buffer_stream_tr=full_param['buffer_stream_dim_tr']
 buffer_stream_ts=full_param['buffer_stream_dim_ts']
@@ -267,8 +411,12 @@ if subsamp!='no':
 else:
    dimtr=pos_map_tr.shape[0]
    dimts=pos_map_ts.shape[0]
-[buffer_stream_tr,idx_str_tr]=make_idx_str(dimtr,buffer_stream_tr,'train')
-[buffer_stream_ts,idx_str_ts]=make_idx_str(dimts,buffer_stream_ts,'test')
+[buffer_stream_tr,idx_str_tr]=make_idx_str(dimtr,buffer_stream_tr,'train',
+                                             save_shuffle=is_chief)
+[buffer_stream_ts,idx_str_ts]=make_idx_str(dimts,buffer_stream_ts,'test',
+                                             save_shuffle=is_chief)
+# Horovod: shard train buffers across ranks (test stays full; only rank 0 evaluates).
+idx_str_tr = shard_idx_str(idx_str_tr, hvd_mod, 'train')
 
 
 ### Loop parameters
@@ -315,6 +463,12 @@ restart=restart_par
 ##If we are not restarting, we initialiaze the optimizer and the learning rate
 if full_param['restart'] in ['no','only_afs','all_params']:
     print("STAF-CG: Not previous optimizer state point will be loaded since restart_par ",restart_par," has been selected")
+    # Horovod: keep YAML learning rates (no × hvd.size() linear scale).
+    if hvd_mod is not None:
+        print(
+            "STAF-CG: horovod keeps YAML learning rates "
+            "(no × hvd.size() scale)"
+        )
     lr_net_param=full_param['lr_dense_net'].split()
     lr_net=build_learning_rate(lr_net_param,ne,nb,idx_str_tr.shape[0],'net',0)
 
@@ -329,6 +483,11 @@ else:
          config_net=pickle.load(source)
     opt_net=tf.keras.optimizers.Adam()
     opt_net=opt_net.from_config(config_net)
+if hvd_mod is not None:
+    opt_net = hvd_mod.DistributedOptimizer(opt_net)
+    if 'opt_phys' in locals():
+        opt_phys = hvd_mod.DistributedOptimizer(opt_phys)
+    print("STAF-CG: optimizers wrapped with hvd.DistributedOptimizer")
 
 ##Here we fix the value that prevents the explosion of the exponential
 try:
@@ -361,41 +520,52 @@ Physics_Layers=[physics_layer(init_alpha2b[num_type],init_alpha3b[num_type],
                                 in range(number_of_NN)]
 ##Initialise Log layer
 Lognorm_Layers=[lognorm_layer(init_mu[num_type]) for num_type in range(number_of_NN)]
-##Initialise force layer
-Force_Layer=force_layer(rad_buff,ang_buff)
+##Initialise force layer (virial ops for e+f+v)
+if _need_virial:
+    Force_Layer=force_virial_layer(rad_buff,ang_buff,with_grad=True)
+else:
+    Force_Layer=force_layer(rad_buff,ang_buff)
 ########Define Loss
-[model_loss,val_loss,pe,pf,pb]=make_loss(full_param)
+[model_loss,val_loss,pe,pf,pb,pv]=make_loss(full_param)
 ###Compose the model by concatenation of layers
 model=alpha_nes_full(Physics_Layers,Force_Layer,1,model_loss,
              val_loss,opt_net,alpha_bound,Lognorm_Layers,
              color_type_map,restart,seed_par,full_param)
-[trainmeth,testmeth]=make_method(full_param,model)
+[trainmeth,testmeth,train_meth]=make_method(full_param,model)
+_hvd_need_bcast = (hvd_mod is not None)
 #################################################################################
 #################################################################################
 
 bestval=10**5
-if restart_par!='no' and restart_par!='only_afs':
-   fileOU=open('lcurve.out','a')
-   print("STAF-CG: learning curve restart from ",restart_par)
-   out_time=open("time_story_restart.dat",'a')
-   lr_file=open("lr_step.dat",'a')
+_devnull = open(os.devnull, 'w')
+if is_chief:
+    if restart_par!='no' and restart_par!='only_afs':
+       fileOU=open('lcurve.out','a')
+       print("STAF-CG: learning curve restart from ",restart_par)
+       out_time=open("time_story_restart.dat",'a')
+       lr_file=open("lr_step.dat",'a')
+    else:
+       fileOU=open('lcurve.out','w')
+       print("#num_step #num_epoch #RMSE_e   #RMSE_f   #Loss_Tot   #lr_net\n",file=fileOU)
+       out_time=open("time_story.dat",'w')
+       print("#Time per epoch training  #Time per epoch test\n",file=out_time)
+       lr_file=open("lr_step.dat",'w')
 else:
-   fileOU=open('lcurve.out','w')
-   print("#num_step #num_epoch #RMSE_e   #RMSE_f   #Loss_Tot   #lr_net\n",file=fileOU)
-   out_time=open("time_story.dat",'w')
-   print("#Time per epoch training  #Time per epoch test\n",file=out_time)
-   lr_file=open("lr_step.dat",'w')
+    fileOU = _devnull
+    out_time = _devnull
+    lr_file = _devnull
 
 model_name=full_param['model_name']
 if full_param['restart']  in ['no','only_afs','all_params']:
     restart_ep=0
-    os.mkdir(model_name)
-    model.save_model_init(model_name)
-    print("STAF-CG: Optimizer state will be initialized from zero")
-    for k in range(number_of_NN):
-       Physics_Layers[k].savealphas(model_name,"type"+str(k)+"initial_")
-       Lognorm_Layers[k].savemu(model_name,"type"+str(k)+"initial_")
-       accumul=0
+    if is_chief:
+        os.mkdir(model_name)
+        model.save_model_init(model_name)
+        print("STAF-CG: Optimizer state will be initialized from zero")
+        for k in range(number_of_NN):
+           Physics_Layers[k].savealphas(model_name,"type"+str(k)+"initial_")
+           Lognorm_Layers[k].savemu(model_name,"type"+str(k)+"initial_")
+    accumul=0
 else:
     restart_ep=int(restart_par.split('log')[-1])+1
     accumul=restart_ep*nb*idx_str_tr.shape[0]
@@ -405,12 +575,32 @@ else:
     intmap2b,intmap3b,intder2b,
     intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(tf.constant(pos_map_tr[index]),tf.constant(box_map_tr[index]),tf.constant(map_intra))
     k=0
-    [dummyloss,dummylosse,dummylossb,dummylossf]=trainmeth(raddescr[k*bs:(k+1)*bs],angdescr[k*bs:(k+1)*bs],des3bsupp[k*bs:(k+1)*bs],intmap2b[k*bs:(k+1)*bs],intder2b[k*bs:(k+1)*bs],intmap3b[k*bs:(k+1)*bs],intder3b[k*bs:(k+1)*bs],intder3bsupp[k*bs:(k+1)*bs],numtriplet[k*bs:(k+1)*bs],e_map_tr[index][k*bs:(k+1)*bs],f_map_tr[index][k*bs:(k+1)*bs],0.,0.,0.)
+    sl = slice(k*bs, (k+1)*bs)
+    if _need_virial:
+        [dummyloss,dummylosse,dummylossb,dummylossf,dummyv]=trainmeth(
+            raddescr[sl],angdescr[sl],des3bsupp[sl],intmap2b[sl],
+            intder2b[sl],intmap3b[sl],intder3b[sl],intder3bsupp[sl],
+            numtriplet[sl],
+            pos_map_tr[index][sl],box_map_tr[index][sl],
+            e_map_tr[index][sl],f_map_tr[index][sl],v_map_tr[index][sl],
+            0.,0.,0.,0.)
+    else:
+        [dummyloss,dummylosse,dummylossb,dummylossf]=trainmeth(
+            raddescr[sl],angdescr[sl],des3bsupp[sl],intmap2b[sl],
+            intder2b[sl],intmap3b[sl],intder3b[sl],intder3bsupp[sl],
+            numtriplet[sl],e_map_tr[index][sl],f_map_tr[index][sl],0.,0.,0.)
     model.build_opt_weights()
     model.set_opt_weight()
+    if _hvd_need_bcast:
+        hvd_mod.broadcast_variables(collect_broadcast_variables(model), root_rank=0)
+        _hvd_need_bcast = False
+        print("STAF-CG: horovod broadcast after restart warm-up (root=0)")
 
 
-lcurve_notmean=open('lcurve_notmean','w')
+if is_chief:
+    lcurve_notmean=open('lcurve_notmean','w')
+else:
+    lcurve_notmean = _devnull
 try:
    displ_freq=int(full_param['displ_freq'])
 except:
@@ -441,23 +631,45 @@ for ep in range(restart_ep,ne):
         nb=int(buffer_stream_tr/bs)
         for k in range(nb):
             start3=time.time()
-            [loss,losse,loss_bound,lossf]=trainmeth(raddescr[k*bs:(k+1)*bs],angdescr[k*bs:(k+1)*bs],des3bsupp[k*bs:(k+1)*bs],intmap2b[k*bs:(k+1)*bs],intder2b[k*bs:(k+1)*bs],intmap3b[k*bs:(k+1)*bs],intder3b[k*bs:(k+1)*bs],intder3bsupp[k*bs:(k+1)*bs],numtriplet[k*bs:(k+1)*bs],e_map_tr[el][k*bs:(k+1)*bs],f_map_tr[el][k*bs:(k+1)*bs],pe,pf,pb)
+            sl = slice(k*bs, (k+1)*bs)
+            if _need_virial:
+                [loss,losse,loss_bound,lossf,lossv]=trainmeth(
+                    raddescr[sl],angdescr[sl],des3bsupp[sl],intmap2b[sl],
+                    intder2b[sl],intmap3b[sl],intder3b[sl],intder3bsupp[sl],
+                    numtriplet[sl],
+                    pos_map_tr[el][sl],box_map_tr[el][sl],
+                    e_map_tr[el][sl],f_map_tr[el][sl],v_map_tr[el][sl],
+                    pe,pf,pv,pb)
+            else:
+                [loss,losse,loss_bound,lossf]=trainmeth(
+                    raddescr[sl],angdescr[sl],des3bsupp[sl],intmap2b[sl],
+                    intder2b[sl],intmap3b[sl],intder3b[sl],intder3bsupp[sl],
+                    numtriplet[sl],e_map_tr[el][sl],f_map_tr[el][sl],pe,pf,pb)
+            if _hvd_need_bcast:
+                hvd_mod.broadcast_variables(
+                    collect_broadcast_variables(model), root_rank=0)
+                _hvd_need_bcast = False
+                print("STAF-CG: horovod broadcast after first train step (root=0)")
             lrnow=model.get_lrnet()
-            print(losse.numpy(),lossf.numpy(),loss_bound.numpy(),file=lcurve_notmean)
-            lcurve_notmean.flush()
-            lr_file.write(str(lrnow.numpy())+'\n')
-            lr_file.flush()
+            if is_chief:
+                print(losse.numpy(),lossf.numpy(),loss_bound.numpy(),file=lcurve_notmean)
+                lcurve_notmean.flush()
+                lr_file.write(str(lrnow.numpy())+'\n')
+                lr_file.flush()
             accumul=accumul+1
             loss_buffer+=loss
         losstot+=loss_buffer
-        if accumul%displ_freq==0:
+        if is_chief and accumul%displ_freq==0:
            print("Epoch ",ep," step ",accumul,". Time to elaborate ",displ_freq," batch of ",bs," frames is",(time.time()-start_loc))
            print("Epoch ",ep," step ",accumul,". Time to elaborate ",displ_freq," batch of ",bs," frames is",(time.time()-start_loc),file=out_time)
            start_loc=time.time()
     losstot*=1/(k+1)/(numbuf+1)
     stop_tr=time.time()
-    lcurve_notmean.flush()
-    if (ep%freq_test==0):
+    if is_chief:
+        lcurve_notmean.flush()
+        lr_file.flush()
+    # Test + checkpoint: rank 0 only under Horovod (avoids racing model_log*).
+    if is_chief and (ep%freq_test==0):
        for numbuf,el in enumerate(idx_str_ts):
            vallosstot_buff=0.
            vallosstote_buff=0.
@@ -467,7 +679,19 @@ for ep in range(restart_ep,ne):
            intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(tf.constant(pos_map_ts[el]),tf.constant(box_map_ts[el]),tf.constant(map_intra))
            nb=int(buffer_stream_ts/bs_test)
            for k in range(nb):
-               [val_loss,val_lossf,val_losse]=testmeth(raddescr[k*bs_test:(k+1)*bs_test],angdescr[k*bs_test:(k+1)*bs_test],des3bsupp[k*bs_test:(k+1)*bs_test],intmap2b[k*bs_test:(k+1)*bs_test],intder2b[k*bs_test:(k+1)*bs_test],intmap3b[k*bs_test:(k+1)*bs_test],intder3b[k*bs_test:(k+1)*bs_test],intder3bsupp[k*bs_test:(k+1)*bs_test],numtriplet[k*bs_test:(k+1)*bs_test],e_map_ts[el][k*bs_test:(k+1)*bs_test],f_map_ts[el][k*bs_test:(k+1)*bs_test])
+               sl = slice(k*bs_test, (k+1)*bs_test)
+               if _need_virial:
+                   [val_loss,val_lossf,val_losse,val_lossv]=testmeth(
+                       raddescr[sl],angdescr[sl],des3bsupp[sl],intmap2b[sl],
+                       intder2b[sl],intmap3b[sl],intder3b[sl],intder3bsupp[sl],
+                       numtriplet[sl],
+                       pos_map_ts[el][sl],box_map_ts[el][sl],
+                       e_map_ts[el][sl],f_map_ts[el][sl],v_map_ts[el][sl])
+               else:
+                   [val_loss,val_lossf,val_losse]=testmeth(
+                       raddescr[sl],angdescr[sl],des3bsupp[sl],intmap2b[sl],
+                       intder2b[sl],intmap3b[sl],intder3b[sl],intder3bsupp[sl],
+                       numtriplet[sl],e_map_ts[el][sl],f_map_ts[el][sl])
                vallosstot_buff+=val_loss
                vallosstote_buff+=val_losse
                vallosstotf_buff+=val_lossf

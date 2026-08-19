@@ -1,0 +1,31 @@
+# STAF-CG LAMMPS smoke / parity — single force eval (run 0), 24-bead origami dimer
+# Paths relative to test/test-lammps-staf-cg-parity/
+# Intra Rc=50 so ghosts need comm_modify cutoff 50.
+# Override: -var modeldir /path -var dumpfile forces.dump
+
+variable        modeldir index ../test-cg-inference/model_onnx_double
+variable        dumpfile index forces.dump
+
+units           metal
+atom_style      atomic
+boundary        p p p
+newton          on
+atom_modify     sort 0 0.0
+
+read_data       data.origami24
+
+pair_style      staf/cg 50 50 float
+pair_coeff      * * ${modeldir}
+neighbor        2.0 bin
+neigh_modify    delay 0 every 1 check yes
+comm_modify     cutoff 50
+
+velocity        all set 0.0 0.0 0.0 units box
+
+thermo          1
+thermo_style    custom step pe pxx pyy pzz evdwl press vol
+
+dump            1 all custom 1 ${dumpfile} id type fx fy fz
+dump_modify     1 sort id
+
+run             0

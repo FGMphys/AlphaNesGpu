@@ -1,0 +1,85 @@
+# Example makefile for LAMMPS + USER-STAF-CG (libstaf_cg, no full-atom libstaf).
+# Copy to $LAMMPS/src/MAKE/MINE/Makefile.staf_cg then:
+#   source $STAF_ROOT/scripts/staf_gpu_env.sh
+#   cd $LAMMPS/src && make staf_cg -j
+# Produces lmp_staf_cg. Do not replace lmp_staf.
+
+SHELL = /bin/sh
+
+STAF_ROOT ?= /home/francegm/AlphaNesGpu
+LIBSTAF_CG_DIR ?= $(STAF_ROOT)/libstaf_cg/build
+CUDA_HOME ?= /home/francegm/programmi/cuda
+ORT_ROOT ?= $(STAF_ROOT)/third_party/onnxruntime-cuda11
+CUDNN_LIB ?= /home/francegm/programmi/cudaNN/cuda-11.8/lib
+
+CC =		mpic++
+CCFLAGS =	-g -O3 -std=c++14 -fopenmp \
+		-I$(STAF_ROOT)/libstaf_cg/include \
+		-I$(STAF_ROOT)/libstaf_cg/vendor/jmd \
+		-DSTAF_WITH_JMD=1
+SHFLAGS =	-fPIC
+DEPFLAGS =	-M
+
+LINK =		mpic++
+LINKFLAGS =	-g -O3 -fopenmp
+LIB = \
+		-L$(LIBSTAF_CG_DIR) -L$(CUDA_HOME)/lib64 -L$(ORT_ROOT)/lib -L$(CUDNN_LIB) \
+		-Wl,-rpath,$(CUDA_HOME)/lib64 \
+		-Wl,-rpath,$(ORT_ROOT)/lib \
+		-Wl,-rpath,$(CUDNN_LIB) \
+		-Wl,--start-group \
+		$(LIBSTAF_CG_DIR)/libstaf.a \
+		$(LIBSTAF_CG_DIR)/libstaf_jmd_nn.a \
+		-Wl,--end-group \
+		-lonnxruntime \
+		-lcudart -lcuda -lcudadevrt \
+		-lgsl -lgslcblas -lpthread -ldl -lm
+SIZE =		size
+
+ARCHIVE =	ar
+ARFLAGS =	-rc
+SHLIBFLAGS =	-shared
+
+LMP_INC =	-DLAMMPS_GZIP -DLAMMPS_MEMALIGN=64
+MPI_INC =       -DMPICH_SKIP_MPICXX -DOMPI_SKIP_MPICXX=1
+MPI_PATH =
+MPI_LIB =
+FFT_INC =
+FFT_PATH =
+FFT_LIB =
+JPG_INC =
+JPG_PATH =
+JPG_LIB =
+
+include Makefile.package.settings
+include Makefile.package
+
+EXTRA_INC = $(LMP_INC) $(PKG_INC) $(MPI_INC) $(FFT_INC) $(JPG_INC) $(PKG_SYSINC)
+EXTRA_PATH = $(PKG_PATH) $(MPI_PATH) $(FFT_PATH) $(JPG_PATH) $(PKG_SYSPATH)
+EXTRA_LIB = $(PKG_LIB) $(MPI_LIB) $(FFT_LIB) $(JPG_LIB) $(PKG_SYSLIB)
+EXTRA_CPP_DEPENDS = $(PKG_CPP_DEPENDS)
+EXTRA_LINK_DEPENDS = $(PKG_LINK_DEPENDS)
+
+vpath %.cpp ..
+vpath %.h ..
+
+$(EXE): main.o $(LMPLIB) $(EXTRA_LINK_DEPENDS)
+	$(LINK) $(LINKFLAGS) main.o $(EXTRA_PATH) $(LMPLINK) $(EXTRA_LIB) $(LIB) -o $@
+	$(SIZE) $@
+
+lib: $(LMPLIB)
+
+$(LMPLIB): $(OBJ)
+	$(ARCHIVE) $(ARFLAGS) $(LMPLIB) $(OBJ)
+
+%.o:%.cpp
+	$(CC) $(EXTRA_INC) $(CCFLAGS) -c $<
+
+%.d:%.cpp
+	$(CC) $(EXTRA_INC) $(DEPFLAGS) $< > $@
+
+.PHONY: clean
+clean:
+	rm -f *.o *.d
+
+sinclude *.d
