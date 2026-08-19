@@ -58,7 +58,56 @@ Do **not** run float and double GPU jobs in parallel on a single GPU.
 | Parity vs `neuralmdGPU` / `jmd_nn` export | Deferred to Linea **B** (LAMMPS / libstaf) |
 | CPU OpenMP parity | Deferred to **A4** |
 | Multi-GPU | **Closed:** A3 CUDA per-device ctx + **A5** `distribute: horovod` (Leonardo 1×4 / 2×4). `mirrored` removed. |
-| DEV/ CG trees | Deferred to Linea **C** |
+| DEV/ CG trees | Linea **C**: official tree is **`STAF-CG/`** (see CG gates below). `DEV/` remains archive. |
+| RDF / reweighting | Linea **E** — prototipo `DEV/AlphaNesGpu_double_RDF`; **waiting on FGM latex** |
+| Multi-body inference | **A6** `--decompose`: isolated n-mer vacuum energies (n=2..5). Closed-form 2-body: **TODO(FGM) latex** |
+
+## STAF-CG gates (Sprint 3)
+
+Any modification of **STAF-CG** must stay comparable to the freeze in
+[`DEV/staf_cg_freeze/FREEZE_NUMBERS.md`](../DEV/staf_cg_freeze/FREEZE_NUMBERS.md)
+before it is considered acceptable.
+
+From repo root, with `.venv` active. **Do not** run float and double GPU
+jobs in parallel.
+
+```bash
+# 0) Build ops (once per machine / after CUDA edits)
+cd STAF-CG && bash install_path.sh all && cd ..
+
+# Full sequence (double then float):
+bash test/test-cg-pipeline/run_sprint3.sh
+```
+
+Or piece-wise:
+
+```bash
+# 1) 1-epoch subsample vs freeze RMSE_f ≈ 38.3526 (Seed 60, 80/20, batch 8)
+bash test/test-cg-pipeline/run_one_epoch.sh
+python test/test-cg-pipeline/export_and_check.py
+
+# 2) Inference float↔double compatibility (1-epoch export)
+cd test/test-cg-inference
+python run_inference.py --precision double --model model_double
+python run_inference.py --precision float --model model_float
+python analyze_compatibility.py
+# expect: Compatible  (energy and force max|Δ| < 1e-3)
+
+# 3) Analytical vs FD forces
+cd ../test-cg-regression/regression-force
+python run_force_regression.py --precision double --model ../../test-cg-inference/model1896_infer
+python run_force_regression.py --precision float --model ../../test-cg-inference/model_float
+# expect: corr ≥ 0.99 for δ=0.01 and 0.001
+
+# 4) Parameter grads vs FD (training path, 1-epoch checkpoint)
+cd ../regression-grad-param
+python run_grad_param_regression.py --precision double --n-per-family 20
+# expect: Loss_E corr ≈ 1 at dw=1e-3 on dense and AF families
+#   (Loss_F is reported too; alpha3b F is noisier unless active angular slots are used)
+```
+
+Checklist: [`DEV/STAF_CG_SPRINTS.md`](../DEV/STAF_CG_SPRINTS.md).
+
 
 ## A1 residual
 

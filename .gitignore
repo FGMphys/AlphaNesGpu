@@ -31,6 +31,13 @@ test/test-inference-pipeline/inference_*/**
 test/test-regression/**/results_*/
 test/test-regression/**/*_run.log
 test/test-regression/**/cutoff_curve.dat
+test/test-cg-inference/frames/*.npy
+test/test-cg-inference/inference_*/**
+test/test-cg-inference/model1896_infer/
+test/test-cg-inference/model_float/
+test/test-cg-inference/model_double/
+test/test-cg-pipeline/work/
+test/test-cg-regression/**/results_*/
 **/*.npy
 
 # Editor / OS

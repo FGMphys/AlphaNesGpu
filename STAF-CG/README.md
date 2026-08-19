@@ -13,6 +13,12 @@ python staf_cg_infer.py --model MODEL --precision double --pos pos.npy --box box
 
 YAML `precision: float|double`. CUDA uses `real` via [`STAF/include/staf_real.h`](../STAF/include/staf_real.h). Horovod / virial arrive in later sprints.
 
+Regression gates: [`test/ACCEPTANCE.md`](../test/ACCEPTANCE.md) (STAF-CG section). One-shot:
+
+```bash
+bash test/test-cg-pipeline/run_sprint3.sh
+```
+
 | Path | Role |
 |------|------|
 | `staf_cg_models/` | Training + inference models |

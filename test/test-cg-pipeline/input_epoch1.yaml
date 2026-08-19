@@ -1,0 +1,49 @@
+# STAF-CG Sprint 3: 1 epoch subsample on USCGSITE (Seed 60)
+precision: double
+
+dataset_folder: dataset_uscgsite
+
+buffer_stream_dim_ts: 8
+buffer_stream_dim_tr: 8
+displ_freq: 1
+freq_test: 1
+subsampling: '80 20'
+
+model_name: 'staf_cg_freeze_ep1'
+restart: 'no'
+afs_param_folder:
+
+Rc: 50.
+Rs: 25
+Rc_Angular: 50.
+Rc_Inter: 20.
+Rc_Angular_Inter: 20.
+Rs_Inter: 10.
+Radial_Buffer: 24
+Max_Angular_Neigh: 24
+
+map_rad_afs: {0: [0,0,10]}
+map_ang_afs: {0: [0,0,5,0,0,0]}
+map_NN_layer: {0: [25,25]}
+number_of_epochs: 1
+activation_function: ['tanh']
+
+color_interaction_file: map_color_interaction.dat
+map_intra_file: map_intra.dat
+
+batch_size: 8
+batch_size_test: 8
+alpha_bound: 7.
+
+loss_energy_prefactor: 0.
+loss_force_prefactor: 0.5
+
+optimizer_net: adam
+optimizer_phys: adam
+loss_method: huber
+type_of_training: energy+force
+
+lr_dense_net: cosann 0.001 2.5 1.4 0.9 0.0000001
+lr_phys_net:  cosann 0.001 2.5 1.4 0.9 0.0000001
+
+Seed: 60

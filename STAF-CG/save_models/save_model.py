@@ -1,4 +1,4 @@
-#!/home/francegm/miniconda3/envs/fsenv/bin/python3
+#!/usr/bin/env python3
 #IMPORT NN and math libraries
 import tensorflow as tf
 import argparse
@@ -59,6 +59,8 @@ newmodel=[tf.keras.Sequential() for k in range(nt)]
 res=[newmodel[k].add(Input(shape=(nAFs[k]))) for k in range(nt)]
 for num,typemodel in enumerate(newmodel):
     for el in model[num].layers:
+        if el.__class__.__name__ == "InputLayer":
+            continue
         typemodel.add(el)
 
 
@@ -71,7 +73,18 @@ call = [toexport[k].testmodel.get_concrete_function(tf.TensorSpec([None,None,nAF
 
 
 ###Save the model
-sh.copy(input_model+'/model_error',namemodel)
+for aux in (
+    "model_error",
+    "cutoff_info",
+    "color_type_map.dat",
+    "map_color_interaction.dat",
+    "map_intra.dat",
+):
+    src = os.path.join(input_model, aux)
+    if os.path.exists(src):
+        sh.copy(src, namemodel)
+with open(os.path.join(namemodel, "number_of_nn.dat"), "w") as fh:
+    fh.write(str(nt) + "\n")
 for k in range(nt):
     sh.copy(input_model+'/type'+str(k)+'_alpha_2body.dat',namemodel)
     sh.copy(input_model+'/type'+str(k)+'_alpha_3body.dat',namemodel)
@@ -80,6 +93,3 @@ for k in range(nt):
     sh.copy(input_model+'/type'+str(k)+'_type_emb_3b_sq.dat',namemodel)
     sh.copy(input_model+'/type'+str(k)+'_type_emb_2b.dat',namemodel)
     sh.copy(input_model+'/type'+str(k)+'_type_emb_3b.dat',namemodel)
-    sh.copy(input_model+'/color_type_map.dat',namemodel)
-    sh.copy(input_model+'/map_color_interaction.dat',namemodel)
-    sh.copy(input_model+'/map_intra.dat',namemodel)

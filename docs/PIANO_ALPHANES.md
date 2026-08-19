@@ -670,6 +670,8 @@ Solo quando inter/intra origami sono stabili:
 
 ## 4. Linea C — CG AlphaNes per Origami (intra OK-ish, inter bloccato)
 
+**Port ufficiale:** [`STAF-CG/`](../STAF-CG/) (Sprint 1–3 closed 2026-08-19; checklist [`DEV/STAF_CG_SPRINTS.md`](../DEV/STAF_CG_SPRINTS.md)). `DEV/AlphaNesGpu_double_CG_dv_RC/` resta freeze. Gate: `bash test/test-cg-pipeline/run_sprint3.sh`.
+
 ### C0. Diagnosi sintetica
 
 | Aspetto | Intra | Inter |

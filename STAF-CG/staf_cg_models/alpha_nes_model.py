@@ -252,6 +252,83 @@ class alpha_nes_full(tf.Module):
         return loss,loss_energy,loss_bound,loss_force
 
     @tf.function()
+    def full_loss_e_f(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,
+                     intder3bsupp,numtriplet,etrue,ftrue,pe,pf,pb):
+        """Same Loss as full_train_e_f, without apply_gradients (FD / analytic grads)."""
+        number_of_NN=self.number_of_NN
+        fingerprint=[self.physics_layer[k](x1,x3bsupp,
+        int2b,x2,int3b,numtriplet,self.color_type_map,self.map_color_interaction,self.map_intra)
+                    for k in range(number_of_NN)]
+        log_norm_projdes=[self.lognorm_layer[k](finger)
+                         for k,finger in enumerate(fingerprint)]
+        energy=[self.nets[k](cp) for k,cp in enumerate(log_norm_projdes)]
+        grad_ene=[tf.gradients(energy[k],cp) for k,cp in enumerate(fingerprint)]
+        totene=tf.concat(energy,axis=1)
+        totenergy=tf.reduce_mean(totene,axis=(-1,-2))*0.5
+        grad_listed=[tf.split(grad_ene[k][0],[self.physics_layer[k].nalpha_r,
+                                    self.physics_layer[k].nalpha_a],axis=2) for k in range(number_of_NN)]
+        force_list=[self.force_layer(grad_listed[k][0],x1,
+                                 intder2b,int2b,
+                                 self.physics_layer[k].alpha2b,
+                                 grad_listed[k][1],x2,x3bsupp,
+                                 intder3b,intder3bsupp,int3b,
+                                 numtriplet,
+                                 self.physics_layer[k].alpha3b,
+                                 self.physics_layer[k].type_emb_2b,
+                                 self.physics_layer[k].type_emb_3b,
+                                 self.color_type_map,self.map_color_interaction,
+                                 k,self.map_intra) for k in range(number_of_NN)]
+        force=tf.math.add_n(force_list)
+        loss_energy=self.lossfunction(totenergy,etrue)
+        loss_force=self.lossfunction(force,ftrue)
+        loss_bound_2b=[tf.math.reduce_sum(self.relu_bound(self.physics_layer[k].alpha2b))
+              for k in range(number_of_NN)]
+        loss_bound_3b=[tf.math.reduce_sum(self.relu_bound(self.physics_layer[k].alpha3b))
+                 for k in range(number_of_NN)]
+        loss_bound=tf.add_n(loss_bound_2b)+tf.add_n(loss_bound_3b)
+        loss=pb*loss_bound+pf*loss_force
+        grad_w=[tf.gradients(loss,net.trainable_variables) for net in self.nets]
+        grad_2b=[tf.gradients(loss,physlay.alpha2b) for physlay in self.physics_layer]
+        grad_3b=[tf.gradients(loss,physlay.alpha3b) for physlay in self.physics_layer]
+        return loss,loss_energy,loss_bound,loss_force,grad_w,grad_2b,grad_3b
+
+    @tf.function()
+    def full_mse_grads_e_f(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,
+                     intder3bsupp,numtriplet,etrue,ftrue):
+        """MSE Loss_E / Loss_F + analytic param grads (no bound, no apply_gradients)."""
+        number_of_NN=self.number_of_NN
+        fingerprint=[self.physics_layer[k](x1,x3bsupp,
+        int2b,x2,int3b,numtriplet,self.color_type_map,self.map_color_interaction,self.map_intra)
+                    for k in range(number_of_NN)]
+        log_norm_projdes=[self.lognorm_layer[k](finger)
+                         for k,finger in enumerate(fingerprint)]
+        energy=[self.nets[k](cp) for k,cp in enumerate(log_norm_projdes)]
+        grad_ene=[tf.gradients(energy[k],cp) for k,cp in enumerate(fingerprint)]
+        totene=tf.concat(energy,axis=1)
+        totenergy=tf.reduce_mean(totene,axis=(-1,-2))*0.5
+        grad_listed=[tf.split(grad_ene[k][0],[self.physics_layer[k].nalpha_r,
+                                    self.physics_layer[k].nalpha_a],axis=2) for k in range(number_of_NN)]
+        force_list=[self.force_layer(grad_listed[k][0],x1,
+                                 intder2b,int2b,
+                                 self.physics_layer[k].alpha2b,
+                                 grad_listed[k][1],x2,x3bsupp,
+                                 intder3b,intder3bsupp,int3b,
+                                 numtriplet,
+                                 self.physics_layer[k].alpha3b,
+                                 self.physics_layer[k].type_emb_2b,
+                                 self.physics_layer[k].type_emb_3b,
+                                 self.color_type_map,self.map_color_interaction,
+                                 k,self.map_intra) for k in range(number_of_NN)]
+        force=tf.math.add_n(force_list)
+        loss_energy=self.val_loss(totenergy,etrue)
+        loss_force=self.val_loss(force,ftrue)
+        vars_net=self.nets[0].trainable_variables
+        probe_vars=[vars_net[0], vars_net[1], self.physics_layer[0].alpha2b, self.physics_layer[0].alpha3b]
+        grad_E=[tf.gradients(loss_energy,v)[0] for v in probe_vars]
+        grad_F=[tf.gradients(loss_force,v)[0] for v in probe_vars]
+        return loss_energy,loss_force,grad_E,grad_F
+
+    @tf.function()
     def full_test_e_f(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,intder3bsupp,
                      numtriplet,etrue,ftrue):
         self.x2b = x1

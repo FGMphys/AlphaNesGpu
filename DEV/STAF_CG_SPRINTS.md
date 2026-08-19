@@ -50,13 +50,15 @@ Plan: Cursor `staf-cg_linea_c`. Living science plan: [`docs/PIANO_ALPHANES.md`](
 
 ## Sprint 3 — STAF-like regression gates
 
-- [ ] `test/test-cg-inference/analyze_compatibility.py` — E,F float↔double Compatible
-- [ ] `test/test-cg-regression/regression-force` — analytic vs FD
-- [ ] `test/test-cg-regression/regression-grad-param` — ∂Loss/∂param vs FD
-- [ ] `test/test-cg-pipeline/` — 1-epoch subsample vs freeze
-- [ ] GPU sequence: double then float
+- [x] `test/test-cg-inference/analyze_compatibility.py` — E,F float↔double Compatible
+- [x] `test/test-cg-regression/regression-force` — analytic vs FD
+- [x] `test/test-cg-regression/regression-grad-param` — ∂Loss/∂param vs FD
+- [x] `test/test-cg-pipeline/` — 1-epoch subsample vs freeze
+- [x] GPU sequence: double then float
 
 **Done when:** three gates green (thresholds in ACCEPTANCE CG).
+
+**Closed 2026-08-19:** `bash test/test-cg-pipeline/run_sprint3.sh`. Force FD double (MODEL1896) corr≥0.999 at δ=0.01. 1-epoch RMSE_f=38.352589 vs freeze 38.352598. Float↔double Compatible (max|ΔE|=2.7e-6, max|ΔF|=1.7e-7). Force FD float corr≥0.999. Grad-param: MSE Loss_E corr≈1 on dense/AF; FD forward uses `full_test_e_f` (no nested param grads).
 
 ---
 
