@@ -72,7 +72,9 @@ def main(argv: list[str] | None = None) -> int:
     w = np.asarray(virial).reshape(-1)
     print(f"STAF: energy={e:.10f}")
     print(f"STAF: force shape={f.shape} |F|_rms={float(np.sqrt(np.mean(f * f))):.6e}")
-    print(f"STAF: virial_diag (eV) Wxx={w[0]:.6f} Wyy={w[1]:.6f} Wzz={w[2]:.6f}")
+    # W is (9,) row-major; diagonal is indices 0,4,8
+    wxx, wyy, wzz = (float(w[0]), float(w[4]), float(w[8])) if w.size >= 9 else (float(w[0]), float(w[1]), float(w[2]))
+    print(f"STAF: virial_diag (eV) Wxx={wxx:.6f} Wyy={wyy:.6f} Wzz={wzz:.6f}")
 
     if args.json_out is not None:
         payload = {
@@ -81,7 +83,8 @@ def main(argv: list[str] | None = None) -> int:
             "energy": e,
             "force_rms": float(np.sqrt(np.mean(f * f))),
             "n_atoms": int(f.size // 3),
-            "virial_diag": [float(x) for x in w[:3]],
+            "virial": [float(x) for x in w.reshape(-1)],
+            "virial_diag": [wxx, wyy, wzz],
         }
         args.json_out.write_text(json.dumps(payload, indent=2) + "\n")
         print(f"STAF: wrote {args.json_out}")

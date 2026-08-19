@@ -168,3 +168,128 @@ class ComputeForceTriplGradOp : public OpKernel {
 }
 };
 REGISTER_KERNEL_BUILDER(Name("ComputeForceTriplGrad").Device(DEVICE_GPU), ComputeForceTriplGradOp);
+
+void gradforce_tripl_virial_Launcher(
+                                      const real*  prevgrad_T_d,const real* prevgrad_virial,
+                                      const real*  netderiv_T_d, const real* desr_T_d,
+                                      const real* desa_T_d,const real* intderiv_r_T_d,
+                                      const real* intderiv_a_T_d,const int* intmap_r_T_d,
+                                      const int* intmap_a_T_d,int nr, int na, int N,
+                                      int dimbat,int num_finger,const real* type_emb3b_d,int nt,
+                                      const int* tipos_T,const int* actual_type,
+                                      const int *num_triplets_d,const real* smooth_a_T,
+                                      const int* type_map_T_d,
+                                      const real* pos_d,const real* box_d,
+                                      int prod,real* gradnet_3b_T_d,
+                                      real* grad_alpha3b_T_d,real* grad_emb3b_T_d, cudaStream_t stream);
+
+REGISTER_OP("ComputeForceTriplVirialGrad")
+    .Input("prevgrad: " STAF_TF_DTYPE)
+    .Input("prevgrad_virial: " STAF_TF_DTYPE)
+    .Input("netderiv: " STAF_TF_DTYPE)
+    .Input("radial_descriptor: " STAF_TF_DTYPE)
+    .Input("angular_descriptor: " STAF_TF_DTYPE)
+    .Input("descriptor_derivative_rad: " STAF_TF_DTYPE)
+    .Input("descriptor_derivative_ang: " STAF_TF_DTYPE)
+    .Input("interaction_map_rad: int32")
+    .Input("interaction_map_ang: int32")
+    .Input("alpha3b_parameters: " STAF_TF_DTYPE)
+    .Input("type_emb3b_parameters: " STAF_TF_DTYPE)
+    .Input("type_map: int32")
+    .Input("tipos: int32")
+    .Input("actual_type: int32")
+    .Input("num_triplets: int32")
+    .Input("pos: " STAF_TF_DTYPE)
+    .Input("box: " STAF_TF_DTYPE)
+    .Output("gradnet: " STAF_TF_DTYPE)
+    .Output("gradalpha: " STAF_TF_DTYPE)
+    .Output("gradck: " STAF_TF_DTYPE);
+
+class ComputeForceTriplVirialGradOp : public OpKernel {
+ public:
+  explicit ComputeForceTriplVirialGradOp(OpKernelConstruction* context) : OpKernel(context) {}
+  void Compute(OpKernelContext* context) override {
+    const cudaStream_t stream = context->eigen_device<Eigen::GpuDevice>().stream();
+
+    const Tensor& prevgrad_T = context->input(0);
+    const Tensor& prevgrad_virial_T = context->input(1);
+    const Tensor& netderiv_T = context->input(2);
+    const Tensor& desr_T = context->input(3);
+    const Tensor& desa_T = context->input(4);
+    const Tensor& intderiv_r_T = context->input(5);
+    const Tensor& intderiv_a_T = context->input(6);
+    const Tensor& intmap_r_T = context->input(7);
+    const Tensor& intmap_a_T = context->input(8);
+    const Tensor& smooth_a_T = context->input(9);
+    const Tensor& type_emb3b_T = context->input(10);
+    const Tensor& type_map_T = context->input(11);
+    const Tensor& tipos_T = context->input(12);
+    const Tensor& actual_type_T = context->input(13);
+    const Tensor& num_triplets_T=context->input(14);
+    const Tensor& pos_T = context->input(15);
+    const Tensor& box_T = context->input(16);
+
+    int dimbat = desr_T.shape().dim_size(0);
+    int nr = desr_T.shape().dim_size(2);
+    int na = desa_T.shape().dim_size(2);
+    int N = type_map_T.shape().dim_size(0);
+    int Nlocal = desr_T.shape().dim_size(1);
+    int nt = tipos_T.shape().dim_size(0);
+    int nt_couple=nt*(nt+1)/2;
+    const int* actual_type=actual_type_T.flat<int>().data();
+    int num_finger=int(smooth_a_T.shape().dim_size(1)/3);
+
+    auto prevgrad_T_d=prevgrad_T.flat<real>();
+    auto prevgrad_virial_d=prevgrad_virial_T.flat<real>();
+    auto netderiv_T_d=netderiv_T.flat<real>();
+    auto desr_T_d= desr_T.flat<real>();
+    auto desa_T_d= desa_T.flat<real>();
+    auto intderiv_r_T_d=intderiv_r_T.flat<real>();
+    auto intderiv_a_T_d=intderiv_a_T.flat<real>();
+    auto intmap_r_T_d=intmap_r_T.flat<int>();
+    auto intmap_a_T_d=intmap_a_T.flat<int>();
+    auto type_emb3b_T_d=type_emb3b_T.flat<real>();
+    auto smooth_a_T_d=smooth_a_T.flat<real>();
+    auto type_map_T_d=type_map_T.flat<int>();
+    auto tipos_T_d=tipos_T.flat<int>();
+    auto num_triplets_T_d=num_triplets_T.flat<int>();
+
+    Tensor* gradnet_3b_T = NULL;
+    TensorShape gradnet_3b_shape ;
+    gradnet_3b_shape.AddDim (dimbat);
+    gradnet_3b_shape.AddDim (Nlocal);
+    gradnet_3b_shape.AddDim (num_finger);
+    OP_REQUIRES_OK(context, context->allocate_output(0, gradnet_3b_shape, &gradnet_3b_T));
+    set_tensor_to_zero_real(gradnet_3b_T->flat<real>().data(),dimbat*Nlocal*num_finger, stream);
+
+    Tensor* grad_alpha3b_T = NULL;
+    TensorShape grad_alpha3b_shape ;
+    grad_alpha3b_shape.AddDim (nt_couple);
+    grad_alpha3b_shape.AddDim (3*num_finger);
+    OP_REQUIRES_OK(context, context->allocate_output(1, grad_alpha3b_shape, &grad_alpha3b_T));
+    set_tensor_to_zero_real(grad_alpha3b_T->flat<real>().data(),nt_couple*3*num_finger, stream);
+
+    Tensor* grad_emb3b_T = NULL;
+    TensorShape grad_emb3b_shape;
+    grad_emb3b_shape.AddDim (nt_couple);
+    grad_emb3b_shape.AddDim (num_finger);
+    OP_REQUIRES_OK(context, context->allocate_output(2, grad_emb3b_shape, &grad_emb3b_T));
+    set_tensor_to_zero_real(grad_emb3b_T->flat<real>().data(),nt_couple*num_finger, stream);
+
+    int prod=dimbat*Nlocal*na;
+    gradforce_tripl_virial_Launcher(
+                        prevgrad_T_d.data(),prevgrad_virial_d.data(),
+                        netderiv_T_d.data(), desr_T_d.data(), desa_T_d.data(),
+                        intderiv_r_T_d.data(),intderiv_a_T_d.data(),
+                        intmap_r_T_d.data(),intmap_a_T_d.data(),
+                        nr, na, N, dimbat,num_finger,type_emb3b_T_d.data(),nt,
+                        tipos_T_d.data(),
+                        actual_type,num_triplets_T_d.data(),smooth_a_T_d.data(),
+                        type_map_T_d.data(),
+                        pos_T.flat<real>().data(),box_T.flat<real>().data(),
+                        prod,gradnet_3b_T->flat<real>().data(),
+                        grad_alpha3b_T->flat<real>().data(),
+  			grad_emb3b_T->flat<real>().data(), stream);
+}
+};
+REGISTER_KERNEL_BUILDER(Name("ComputeForceTriplVirialGrad").Device(DEVICE_GPU), ComputeForceTriplVirialGradOp);

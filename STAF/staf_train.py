@@ -128,16 +128,65 @@ def init_distribute(full_param):
     )
     return 'horovod', hvd
 
+def shard_idx_str(idx_str, hvd_mod, name):
+    """Frame-buffer sharding across MPI ranks (train path)."""
+    if hvd_mod is None or hvd_mod.size() <= 1:
+        return idx_str
+    shard = idx_str[hvd_mod.rank()::hvd_mod.size()]
+    if shard.shape[0] == 0:
+        sys.exit(
+            "STAF: horovod shard empty for %s on rank %d (size=%d); "
+            "use fewer ranks or a larger dataset"
+            % (name, hvd_mod.rank(), hvd_mod.size())
+        )
+    print(
+        "STAF: horovod sharded %s buffers %d → %d (rank %d/%d)"
+        % (name, idx_str.shape[0], shard.shape[0], hvd_mod.rank(), hvd_mod.size())
+    )
+    return shard
 
-def make_dataset_stream(base_pattern,mode):
+def collect_broadcast_variables(model):
+    """Model + optimizer variables for hvd.broadcast_variables."""
+    vars_ = []
+    for net in model.nets:
+        vars_.extend(list(net.variables))
+    for phys in model.physics_layer:
+        vars_.extend([phys.alpha2b, phys.alpha3b, phys.type_emb_2b, phys.type_emb_3b])
+    for logn in model.lognorm_layer:
+        vars_.append(logn.mu)
+    try:
+        vars_.extend(list(model.opt_net.variables()))
+    except Exception:
+        pass
+    try:
+        vars_.extend(list(model.opt_phys.variables()))
+    except Exception:
+        pass
+    return vars_
+
+@tf.function()
+def MSE(ypred,y):
+   loss_function=tf.reduce_mean(tf.square((ypred-y)))
+   return loss_function
+
+def make_dataset_stream(base_pattern,mode,need_virial=False):
     energy_on_disk=np.load(base_pattern+'/'+mode+'/'+'energy.npy',mmap_mode='r')
     force_on_disk=np.load(base_pattern+'/'+mode+'/'+'force.npy',mmap_mode='r')
 
     pos_on_disk=np.load(base_pattern+'/'+mode+'/'+'pos.npy',mmap_mode='r')
     box_on_disk=np.load(base_pattern+'/'+mode+'/'+'box.npy',mmap_mode='r')
+    if not need_virial:
+        return energy_on_disk,force_on_disk,pos_on_disk,box_on_disk
 
-
-    return energy_on_disk,force_on_disk,pos_on_disk,box_on_disk
+    vir_path = base_pattern+'/'+mode+'/'+'virial.npy'
+    if not os.path.isfile(vir_path):
+        sys.exit(
+            "STAF: type_of_training=energy+force+virial requires virial.npy under "
+            "%s/%s/ (total eV, shape [nframe,9], no /N). Missing: %s"
+            % (base_pattern, mode, vir_path)
+        )
+    virial_on_disk=np.load(vir_path,mmap_mode='r')
+    return energy_on_disk,force_on_disk,pos_on_disk,box_on_disk,virial_on_disk
 
 def check_dimension(buffdim,dimension,mode):
     res=buffdim
@@ -221,8 +270,14 @@ def make_loss(full_param):
         pf=tf.constant(1.,dtype=dt)
         pb=tf.constant(1.,dtype=dt)
         print("STAF: pe and pf set to default value 1 1",sep=' ',end='\n')
+    try:
+        pv=tf.constant(float(full_param['loss_virial_prefactor']),dtype=dt)
+        print("STAF: pv (virial prefactor) set to", float(pv.numpy()))
+    except Exception:
+        pv=tf.constant(1.,dtype=dt)
+        print("STAF: pv (virial prefactor) default 1")
 
-    return model_loss,val_loss,pe,pf,pb
+    return model_loss,val_loss,pe,pf,pb,pv
 
 def make_method(full_param,model):
     try:
@@ -233,13 +288,20 @@ def make_method(full_param,model):
        trainmeth=model.full_train_e_f
        testmeth=model.full_test_e_f
        print("STAF: training will be on both energies and forces")
+    elif train_meth=='energy+force+virial':
+       trainmeth=model.full_train_e_f_v
+       testmeth=model.full_test_e_f_v
+       print("STAF: training will be on energy + force + full virial tensor (9)")
     elif train_meth=='energy':
          trainmeth=model.full_train_e
          testmeth=model.full_test_e
          print("STAF: training will be on  energies only")
     else:
-        sys.exit("STAF: Error in type_of_training key. Possible choices are energy+force or energy")
-    return trainmeth,testmeth
+        sys.exit(
+            "STAF: Error in type_of_training key. Possible choices are "
+            "energy+force, energy+force+virial, or energy"
+        )
+    return trainmeth,testmeth,train_meth
 
 
 
@@ -275,6 +337,9 @@ from gradient_utility import register_force_3bAFs_grad
 from gradient_utility import register_force_2bAFs_grad
 from gradient_utility import register_3bAFs_grad
 from gradient_utility import register_2bAFs_grad
+if full_param.get('type_of_training', 'energy+force') == 'energy+force+virial':
+    from gradient_utility import register_force_2bAFs_virial_grad  # noqa: F401
+    from gradient_utility import register_force_3bAFs_virial_grad  # noqa: F401
 
 from staf_models.staf_model import staf_full
 from source_routine.descriptor_builder import descriptor_layer
@@ -282,6 +347,7 @@ from source_routine.descriptor_builder import descriptor_layer
 from source_routine.physics_layer_mod import physics_layer
 from source_routine.physics_layer_mod import lognorm_layer
 from source_routine.force_layer_mod import force_layer
+from source_routine.force_layer_mod import force_virial_layer
 
 
 
@@ -302,12 +368,25 @@ except:
     tf.random.set_seed(seed_par+1)
     os.environ['PYTHONHASHSEED']=str(seed_par)
     print("STAF: seed fixed by default 12345\n")
+_train_type = full_param.get('type_of_training', 'energy+force')
+_need_virial = (_train_type == 'energy+force+virial')
 #Read dataset map on disk
-[e_map_tr,f_map_tr,pos_map_tr,box_map_tr]=make_dataset_stream(base_pattern,'training')
-[e_map_ts,f_map_ts,pos_map_ts,box_map_ts]=make_dataset_stream(base_pattern,'test')
-###Check dimension of dataset
-check_along_frames([e_map_tr,f_map_tr,pos_map_tr,box_map_tr],0)
-check_along_frames([e_map_ts,f_map_ts,pos_map_ts,box_map_ts],0)
+if _need_virial:
+    [e_map_tr,f_map_tr,pos_map_tr,box_map_tr,v_map_tr]=make_dataset_stream(
+        base_pattern,'training',need_virial=True)
+    [e_map_ts,f_map_ts,pos_map_ts,box_map_ts,v_map_ts]=make_dataset_stream(
+        base_pattern,'test',need_virial=True)
+    check_along_frames([e_map_tr,f_map_tr,pos_map_tr,box_map_tr,v_map_tr],0)
+    check_along_frames([e_map_ts,f_map_ts,pos_map_ts,box_map_ts,v_map_ts],0)
+    if v_map_tr.shape[-1] != 9 or v_map_ts.shape[-1] != 9:
+        sys.exit("STAF: virial.npy last dim must be 9 (full tensor, total eV)")
+else:
+    [e_map_tr,f_map_tr,pos_map_tr,box_map_tr]=make_dataset_stream(base_pattern,'training')
+    [e_map_ts,f_map_ts,pos_map_ts,box_map_ts]=make_dataset_stream(base_pattern,'test')
+    v_map_tr = v_map_ts = None
+    ###Check dimension of dataset
+    check_along_frames([e_map_tr,f_map_tr,pos_map_tr,box_map_tr],0)
+    check_along_frames([e_map_ts,f_map_ts,pos_map_ts,box_map_ts],0)
 #Building a stream vector
 buffer_stream_tr=full_param['buffer_stream_dim_tr']
 buffer_stream_ts=full_param['buffer_stream_dim_ts']
@@ -431,15 +510,18 @@ np.random.set_state(new_rng_state)
 max_batch=int(np.max([buffer_stream_tr,buffer_stream_ts]))
 Descriptor_Layer=descriptor_layer(rc,rad_buff,rc_ang,ang_buff,N,box_map_tr[0],Rs,max_batch)
 ########Define Loss
-[model_loss,val_loss,pe,pf,pb]=make_loss(full_param)
+[model_loss,val_loss,pe,pf,pb,pv]=make_loss(full_param)
 #######Initialise AFS Layer
 Physics_Layers=[physics_layer(init_alpha2b[num_type],init_alpha3b[num_type],
                                 initial_type_emb[num_type]) for num_type
                                 in range(nt)]
 ##Initialise Log layer
 Lognorm_Layers=[lognorm_layer(init_mu[num_type]) for num_type in range(nt)]
-##Initialise force layer
-Force_Layer=force_layer(rad_buff,ang_buff)
+##Initialise force layer (virial ops for e+f+v)
+if _need_virial:
+    Force_Layer=force_virial_layer(rad_buff,ang_buff,with_grad=True)
+else:
+    Force_Layer=force_layer(rad_buff,ang_buff)
 ###Compose the model by concatenation of layers
 model=staf_full(Physics_Layers,Force_Layer,nhl,nD,actfun,1,model_loss,
              val_loss,opt_net,opt_phys,alpha_bound,Lognorm_Layers,tipos,
@@ -461,17 +543,27 @@ if is_chief:
        fileOU=open('lcurve.out','w')
        # xmgrace: xmgrace -nxy lcurve.out
        print("# STAF epoch validation curve (test-set RMSE + training loss)", file=fileOU)
-       print("# Columns: step RMSE_e RMSE_f Loss_Tot lr_net lr_phys epoch", file=fileOU)
+       if _need_virial:
+           print("# Columns: step RMSE_e RMSE_f RMSE_v Loss_Tot lr_net lr_phys epoch", file=fileOU)
+       else:
+           print("# Columns: step RMSE_e RMSE_f Loss_Tot lr_net lr_phys epoch", file=fileOU)
        print("# Plot: xmgrace -nxy lcurve.out", file=fileOU)
        print("@    title \"STAF validation curve\"", file=fileOU)
        print("@    xaxis  label \"Global step\"", file=fileOU)
        print("@    yaxis  label \"RMSE / Loss\"", file=fileOU)
        print("@    s0 legend \"RMSE_e (test)\"", file=fileOU)
        print("@    s1 legend \"RMSE_f (test)\"", file=fileOU)
-       print("@    s2 legend \"Loss_Tot (train)\"", file=fileOU)
-       print("@    s3 legend \"lr_net\"", file=fileOU)
-       print("@    s4 legend \"lr_phys\"", file=fileOU)
-       print("@    s5 legend \"epoch\"", file=fileOU)
+       if _need_virial:
+           print("@    s2 legend \"RMSE_v (test)\"", file=fileOU)
+           print("@    s3 legend \"Loss_Tot (train)\"", file=fileOU)
+           print("@    s4 legend \"lr_net\"", file=fileOU)
+           print("@    s5 legend \"lr_phys\"", file=fileOU)
+           print("@    s6 legend \"epoch\"", file=fileOU)
+       else:
+           print("@    s2 legend \"Loss_Tot (train)\"", file=fileOU)
+           print("@    s3 legend \"lr_net\"", file=fileOU)
+           print("@    s4 legend \"lr_phys\"", file=fileOU)
+           print("@    s5 legend \"epoch\"", file=fileOU)
        out_time=open("time_story.dat",'w')
        print("#Time per epoch training  #Time per epoch test\n",file=out_time)
        lr_file=open("lr_step.dat",'w')
@@ -505,7 +597,20 @@ else:
     intmap2b,intmap3b,intder2b,
     intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(pos_map_tr[index],box_map_tr[index])
     k=0
-    [dummyloss,dummylosse,dummylossb,dummylossf]=trainmeth(raddescr[k*bs:(k+1)*bs],angdescr[k*bs:(k+1)*bs],des3bsupp[k*bs:(k+1)*bs],intmap2b[k*bs:(k+1)*bs],intder2b[k*bs:(k+1)*bs],intmap3b[k*bs:(k+1)*bs],intder3b[k*bs:(k+1)*bs],intder3bsupp[k*bs:(k+1)*bs],numtriplet[k*bs:(k+1)*bs],e_map_tr[index][k*bs:(k+1)*bs],f_map_tr[index][k*bs:(k+1)*bs],0.,0.,0.)
+    sl = slice(k*bs, (k+1)*bs)
+    if _need_virial:
+        _dt_warm = tf_dtype()
+        trainmeth(raddescr[sl],angdescr[sl],des3bsupp[sl],intmap2b[sl],
+                  intder2b[sl],intmap3b[sl],intder3b[sl],intder3bsupp[sl],
+                  numtriplet[sl],
+                  tf.convert_to_tensor(pos_map_tr[index][sl],dtype=_dt_warm),
+                  tf.convert_to_tensor(box_map_tr[index][sl],dtype=_dt_warm),
+                  e_map_tr[index][sl],f_map_tr[index][sl],v_map_tr[index][sl],
+                  0.,0.,0.,0.)
+    else:
+        trainmeth(raddescr[sl],angdescr[sl],des3bsupp[sl],intmap2b[sl],
+                  intder2b[sl],intmap3b[sl],intder3b[sl],intder3bsupp[sl],
+                  numtriplet[sl],e_map_tr[index][sl],f_map_tr[index][sl],0.,0.,0.)
     model.build_opt_weights()
     model.set_opt_weight()
     if _hvd_need_bcast:
@@ -518,14 +623,21 @@ if is_chief:
     lcurve_notmean=open('lcurve_notmean','w')
     # xmgrace: xmgrace -nxy lcurve_notmean
     print("# STAF per-batch losses (not epoch-averaged)", file=lcurve_notmean)
-    print("# Columns: step Loss_E Loss_F Loss_Bound", file=lcurve_notmean)
+    if _need_virial:
+        print("# Columns: step Loss_E Loss_F Loss_V Loss_Bound", file=lcurve_notmean)
+    else:
+        print("# Columns: step Loss_E Loss_F Loss_Bound", file=lcurve_notmean)
     print("# Plot: xmgrace -nxy lcurve_notmean", file=lcurve_notmean)
     print("@    title \"STAF batch losses (lcurve_notmean)\"", file=lcurve_notmean)
     print("@    xaxis  label \"Global step\"", file=lcurve_notmean)
     print("@    yaxis  label \"Batch loss\"", file=lcurve_notmean)
     print("@    s0 legend \"Loss_E\"", file=lcurve_notmean)
     print("@    s1 legend \"Loss_F\"", file=lcurve_notmean)
-    print("@    s2 legend \"Loss_Bound\"", file=lcurve_notmean)
+    if _need_virial:
+        print("@    s2 legend \"Loss_V\"", file=lcurve_notmean)
+        print("@    s3 legend \"Loss_Bound\"", file=lcurve_notmean)
+    else:
+        print("@    s2 legend \"Loss_Bound\"", file=lcurve_notmean)
 else:
     lcurve_notmean = _devnull
 try:
@@ -550,12 +662,15 @@ except:
 _dt = tf_dtype()
 _np_dtype = np.float64 if _dt == tf.float64 else np.float32
 
-def _load_buffer_host(pos_map, box_map, e_map, f_map, el):
+def _load_buffer_host(pos_map, box_map, e_map, f_map, el, v_map=None):
     """Copy mmap slices on a host thread so GPU can train the previous buffer."""
-    return (np.asarray(pos_map[el], dtype=_np_dtype),
-            np.asarray(box_map[el], dtype=_np_dtype),
-            np.asarray(e_map[el], dtype=_np_dtype),
-            np.asarray(f_map[el], dtype=_np_dtype))
+    out = (np.asarray(pos_map[el], dtype=_np_dtype),
+           np.asarray(box_map[el], dtype=_np_dtype),
+           np.asarray(e_map[el], dtype=_np_dtype),
+           np.asarray(f_map[el], dtype=_np_dtype))
+    if v_map is not None:
+        out = out + (np.asarray(v_map[el], dtype=_np_dtype),)
+    return out
 
 print("STAF: reduce_retracing on train/test + host buffer prefetch")
 start_loc=time.time()
@@ -565,23 +680,28 @@ for ep in range(restart_ep,ne):
     vallosstot=zero()
     vallosstote=zero()
     vallosstotf=zero()
+    vallosstotv=zero()
     nbuf_tr = idx_str_tr.shape[0]
     fut = _prefetch_pool.submit(
-        _load_buffer_host, pos_map_tr, box_map_tr, e_map_tr, f_map_tr, idx_str_tr[0]
+        _load_buffer_host, pos_map_tr, box_map_tr, e_map_tr, f_map_tr, idx_str_tr[0],
+        v_map_tr
     ) if nbuf_tr else None
     for numbuf in range(nbuf_tr):
         loss_buffer=0.
         start=time.time()
-        pos_np, box_np, e_np, f_np = fut.result()
+        buf = fut.result()
+        pos_np, box_np, e_np, f_np = buf[:4]
+        v_np = buf[4] if _need_virial else None
         if numbuf + 1 < nbuf_tr:
             fut = _prefetch_pool.submit(
                 _load_buffer_host, pos_map_tr, box_map_tr, e_map_tr, f_map_tr,
-                idx_str_tr[numbuf + 1]
+                idx_str_tr[numbuf + 1], v_map_tr
             )
         pos_t = tf.convert_to_tensor(pos_np, dtype=_dt)
         box_t = tf.convert_to_tensor(box_np, dtype=_dt)
         e_t = tf.convert_to_tensor(e_np, dtype=_dt)
         f_t = tf.convert_to_tensor(f_np, dtype=_dt)
+        v_t = tf.convert_to_tensor(v_np, dtype=_dt) if _need_virial else None
         [raddescr,angdescr,des3bsupp,
         intmap2b,intmap3b,intder2b,
         intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(pos_t, box_t)
@@ -595,13 +715,19 @@ for ep in range(restart_ep,ne):
         nb=int(buffer_stream_tr/bs)
         for k in range(nb):
             start3=time.time()
-            [loss,losse,loss_bound,lossf]=trainmeth(
-                raddescr[k*bs:(k+1)*bs], angdescr[k*bs:(k+1)*bs],
-                des3bsupp[k*bs:(k+1)*bs], intmap2b[k*bs:(k+1)*bs],
-                intder2b[k*bs:(k+1)*bs], intmap3b[k*bs:(k+1)*bs],
-                intder3b[k*bs:(k+1)*bs], intder3bsupp[k*bs:(k+1)*bs],
-                numtriplet[k*bs:(k+1)*bs], e_t[k*bs:(k+1)*bs], f_t[k*bs:(k+1)*bs],
-                pe, pf, pb)
+            sl = slice(k*bs, (k+1)*bs)
+            if _need_virial:
+                [loss,losse,loss_bound,lossf,lossv]=trainmeth(
+                    raddescr[sl], angdescr[sl], des3bsupp[sl], intmap2b[sl],
+                    intder2b[sl], intmap3b[sl], intder3b[sl], intder3bsupp[sl],
+                    numtriplet[sl], pos_t[sl], box_t[sl],
+                    e_t[sl], f_t[sl], v_t[sl], pe, pf, pv, pb)
+            else:
+                [loss,losse,loss_bound,lossf]=trainmeth(
+                    raddescr[sl], angdescr[sl], des3bsupp[sl], intmap2b[sl],
+                    intder2b[sl], intmap3b[sl], intder3b[sl], intder3bsupp[sl],
+                    numtriplet[sl], e_t[sl], f_t[sl], pe, pf, pb)
+                lossv = None
             if _hvd_need_bcast:
                 hvd_mod.broadcast_variables(
                     collect_broadcast_variables(model), root_rank=0)
@@ -612,8 +738,13 @@ for ep in range(restart_ep,ne):
             accumul=accumul+1
             loss_buffer+=loss
             if is_chief and accumul % log_batch_freq == 0:
-                print(accumul, float(losse.numpy()), float(lossf.numpy()),
-                      float(loss_bound.numpy()), file=lcurve_notmean)
+                if _need_virial:
+                    print(accumul, float(losse.numpy()), float(lossf.numpy()),
+                          float(lossv.numpy()), float(loss_bound.numpy()),
+                          file=lcurve_notmean)
+                else:
+                    print(accumul, float(losse.numpy()), float(lossf.numpy()),
+                          float(loss_bound.numpy()), file=lcurve_notmean)
                 lr_file.write(str(float(lrnow.numpy())) + '\n')
             if is_chief and accumul % displ_freq == 0:
                 lcurve_notmean.flush()
@@ -631,64 +762,94 @@ for ep in range(restart_ep,ne):
     if is_chief and (ep%freq_test==0):
        nbuf_ts = idx_str_ts.shape[0]
        fut_ts = _prefetch_pool.submit(
-           _load_buffer_host, pos_map_ts, box_map_ts, e_map_ts, f_map_ts, idx_str_ts[0]
+           _load_buffer_host, pos_map_ts, box_map_ts, e_map_ts, f_map_ts, idx_str_ts[0],
+           v_map_ts
        ) if nbuf_ts else None
        for numbuf in range(nbuf_ts):
            vallosstot_buff=0.
            vallosstote_buff=0.
            vallosstotf_buff=0.
-           pos_np, box_np, e_np, f_np = fut_ts.result()
+           vallosstotv_buff=0.
+           buf = fut_ts.result()
+           pos_np, box_np, e_np, f_np = buf[:4]
+           v_np = buf[4] if _need_virial else None
            if numbuf + 1 < nbuf_ts:
                fut_ts = _prefetch_pool.submit(
                    _load_buffer_host, pos_map_ts, box_map_ts, e_map_ts, f_map_ts,
-                   idx_str_ts[numbuf + 1]
+                   idx_str_ts[numbuf + 1], v_map_ts
                )
            pos_t = tf.convert_to_tensor(pos_np, dtype=_dt)
            box_t = tf.convert_to_tensor(box_np, dtype=_dt)
            e_t = tf.convert_to_tensor(e_np, dtype=_dt)
            f_t = tf.convert_to_tensor(f_np, dtype=_dt)
+           v_t = tf.convert_to_tensor(v_np, dtype=_dt) if _need_virial else None
            [raddescr,angdescr,des3bsupp,
            intmap2b,intmap3b,intder2b,
            intder3b,intder3bsupp,numtriplet]=Descriptor_Layer(pos_t, box_t)
            nb=int(buffer_stream_ts/bs_test)
            for k in range(nb):
-               [val_loss,val_lossf,val_losse]=testmeth(
-                   raddescr[k*bs_test:(k+1)*bs_test], angdescr[k*bs_test:(k+1)*bs_test],
-                   des3bsupp[k*bs_test:(k+1)*bs_test], intmap2b[k*bs_test:(k+1)*bs_test],
-                   intder2b[k*bs_test:(k+1)*bs_test], intmap3b[k*bs_test:(k+1)*bs_test],
-                   intder3b[k*bs_test:(k+1)*bs_test], intder3bsupp[k*bs_test:(k+1)*bs_test],
-                   numtriplet[k*bs_test:(k+1)*bs_test],
-                   e_t[k*bs_test:(k+1)*bs_test], f_t[k*bs_test:(k+1)*bs_test])
+               sl = slice(k*bs_test, (k+1)*bs_test)
+               if _need_virial:
+                   [val_loss,val_lossf,val_losse,val_lossv]=testmeth(
+                       raddescr[sl], angdescr[sl], des3bsupp[sl], intmap2b[sl],
+                       intder2b[sl], intmap3b[sl], intder3b[sl], intder3bsupp[sl],
+                       numtriplet[sl], pos_t[sl], box_t[sl],
+                       e_t[sl], f_t[sl], v_t[sl])
+                   vallosstotv_buff+=val_lossv
+               else:
+                   [val_loss,val_lossf,val_losse]=testmeth(
+                       raddescr[sl], angdescr[sl], des3bsupp[sl], intmap2b[sl],
+                       intder2b[sl], intmap3b[sl], intder3b[sl], intder3bsupp[sl],
+                       numtriplet[sl], e_t[sl], f_t[sl])
                vallosstot_buff+=val_loss
                vallosstote_buff+=val_losse
                vallosstotf_buff+=val_lossf
            vallosstot+=vallosstot_buff
            vallosstote+=vallosstote_buff
            vallosstotf+=vallosstotf_buff
+           vallosstotv+=vallosstotv_buff
        vallosstot=vallosstot/(k+1)/(numbuf+1)
        vallosstote=vallosstote/(k+1)/(numbuf+1)
        vallosstotf=vallosstotf/(k+1)/(numbuf+1)
+       if _need_virial:
+           vallosstotv=vallosstotv/(k+1)/(numbuf+1)
 
 
        outfold_name=model_name+str(ep)
        model.save_model(outfold_name)
        rmse_e=float(np.sqrt(vallosstote.numpy()))
        rmse_f=float(np.sqrt(vallosstotf.numpy()))
+       rmse_v=float(np.sqrt(vallosstotv.numpy())) if _need_virial else None
        loss_tot_v=float(losstot.numpy())
        lr_net_v=float(lrnow.numpy())
        lr_finger_v=float(lrnow2.numpy())
-       np.savetxt(outfold_name+"/model_error",[rmse_e,rmse_f],header='RMSE_e  RMSE_f ')
-       print(accumul,rmse_e,rmse_f,loss_tot_v,lr_net_v,lr_finger_v,ep,sep=' ',end='\n',file=fileOU)
-       print("Testing model at global step",accumul," and epoch ",ep," val_lossE ",rmse_e," val_lossF ",rmse_f," loss_Tot ",loss_tot_v," lr_net ",lr_net_v," lr_finger ",lr_finger_v,sep=' ',end='\n')
-       metrics_log.log(
-           global_step=int(accumul),
-           epoch=int(ep),
-           rmse_e=rmse_e,
-           rmse_f=rmse_f,
-           loss_tot=loss_tot_v,
-           lr_net=lr_net_v,
-           lr_finger=lr_finger_v,
-       )
+       if _need_virial:
+           np.savetxt(outfold_name+"/model_error",[rmse_e,rmse_f,rmse_v],
+                      header='RMSE_e  RMSE_f  RMSE_v ')
+           print(accumul,rmse_e,rmse_f,rmse_v,loss_tot_v,lr_net_v,lr_finger_v,ep,
+                 sep=' ',end='\n',file=fileOU)
+           print("Testing model at global step",accumul," and epoch ",ep,
+                 " val_lossE ",rmse_e," val_lossF ",rmse_f," val_lossV ",rmse_v,
+                 " loss_Tot ",loss_tot_v," lr_net ",lr_net_v," lr_finger ",lr_finger_v,
+                 sep=' ',end='\n')
+           metrics_log.log(
+               global_step=int(accumul), epoch=int(ep),
+               rmse_e=rmse_e, rmse_f=rmse_f, rmse_v=rmse_v,
+               loss_tot=loss_tot_v, lr_net=lr_net_v, lr_finger=lr_finger_v,
+           )
+       else:
+           np.savetxt(outfold_name+"/model_error",[rmse_e,rmse_f],header='RMSE_e  RMSE_f ')
+           print(accumul,rmse_e,rmse_f,loss_tot_v,lr_net_v,lr_finger_v,ep,sep=' ',end='\n',file=fileOU)
+           print("Testing model at global step",accumul," and epoch ",ep," val_lossE ",rmse_e," val_lossF ",rmse_f," loss_Tot ",loss_tot_v," lr_net ",lr_net_v," lr_finger ",lr_finger_v,sep=' ',end='\n')
+           metrics_log.log(
+               global_step=int(accumul),
+               epoch=int(ep),
+               rmse_e=rmse_e,
+               rmse_f=rmse_f,
+               loss_tot=loss_tot_v,
+               lr_net=lr_net_v,
+               lr_finger=lr_finger_v,
+           )
        print("We are at epoch ",ep)
        fileOU.flush()
        out_time.flush()

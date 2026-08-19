@@ -73,13 +73,18 @@ class force_debug_layer(tf.Module):
 
 
 class force_virial_layer(tf.Module):
-      """Inference force layer with diagonal virial (jmd-compatible)."""
+      """Unified F + full virial tensor W (batch,9), trainable with RegisterGradient."""
 
-      def __init__(self, radbuff, angbuff):
+      def __init__(self, radbuff, angbuff, with_grad=True):
           self.force2b = tf.load_op_library(_ops('src/force/rad/reforce.so'))
           self.force3b = tf.load_op_library(_ops('src/force/ang/reforce.so'))
           self.force2b.init_force_radial(radbuff)
           self.force3b.init_force_tripl(angbuff)
+          if with_grad:
+              self.gradforce2b = tf.load_op_library(_ops('src/grad_force/rad/reforce.so'))
+              self.gradforce3b = tf.load_op_library(_ops('src/grad_force/ang/reforce.so'))
+              self.gradforce2b.init_grad_force_radial(radbuff)
+              self.gradforce3b.init_grad_force_tripl(angbuff)
 
       @tf.function()
       def __call__(self, net_der_r, x2b, intder2b, int2b, alpha2b, net_der_a,

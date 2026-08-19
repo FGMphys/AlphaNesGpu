@@ -46,4 +46,7 @@ output = Model.full_test(Pos, Box)
 print("energy[0]", float(np.asarray(output[0]).reshape(-1)[0]))
 print("force shape", np.asarray(output[1]).shape)
 w = np.asarray(output[2]).reshape(-1)
-print("virial_diag", w[0], w[1], w[2])
+if w.size >= 9:
+    print("virial_diag", w[0], w[4], w[8])
+else:
+    print("virial_diag", w[0], w[1], w[2])

@@ -309,6 +309,127 @@ class staf_full(tf.Module):
         loss=loss_energy+loss_force
         return loss, loss_force,loss_energy
 
+    @tf.function(reduce_retracing=True)
+    def full_train_e_f_v(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,
+                         intder3bsupp,numtriplet,pos,box,etrue,ftrue,vtrue,
+                         pe,pf,pv,pb):
+        """Train energy + force + full virial tensor (batch,9), total eV labels."""
+        nt=self.ntipos
+
+        self.x2b=tf.split(x1,self.tipos,axis=1)
+        self.x3b=tf.split(x2,self.tipos,axis=1)
+        self.x3bsupp=tf.split(x3bsupp,self.tipos,axis=1)
+        self.int2b=tf.split(int2b,self.tipos,axis=1)
+        self.int3b=tf.split(int3b,self.tipos,axis=1)
+        self.intder2b=tf.split(intder2b,self.tipos,axis=1)
+        self.intder3b=tf.split(intder3b,self.tipos,axis=1)
+        self.intder3bsupp=tf.split(intder3bsupp,self.tipos,axis=1)
+        self.numtriplet=tf.split(numtriplet,self.tipos,axis=1)
+
+        self.fingerprint=[self.physics_layer[k](self.x2b[k],self.x3bsupp[k],
+        self.int2b[k],self.x3b[k],self.int3b[k],self.numtriplet[k],self.type_map)
+                    for k in range(nt)]
+        self.log_norm_projdes=[self.lognorm_layer[k](finger)
+                         for k,finger in enumerate(self.fingerprint)]
+        self.energy=[self.nets[k](cp) for k,cp in enumerate(self.log_norm_projdes)]
+        self.grad_ene=[tf.gradients(self.energy[k],cp) for k,cp in enumerate(self.fingerprint)]
+
+        self.totene=tf.concat(self.energy,axis=1)
+        self.totenergy=tf.reduce_mean(self.totene,axis=(-1,-2))*0.5
+
+        self.grad_listed=[tf.split(self.grad_ene[k][0],[self.physics_layer[k].nalpha_r,
+                                    self.physics_layer[k].nalpha_a],axis=2) for k in range(nt)]
+
+        force_vir_list=[self.force_layer(self.grad_listed[k][0],self.x2b[k],
+                                 self.intder2b[k],self.int2b[k],
+                                 self.physics_layer[k].alpha2b,
+                                 self.grad_listed[k][1],self.x3b[k],self.x3bsupp[k],
+                                 self.intder3b[k],self.intder3bsupp[k],self.int3b[k],
+                                 self.numtriplet[k],
+                                 self.physics_layer[k].alpha3b,
+                                 self.physics_layer[k].type_emb_2b,
+                                 self.physics_layer[k].type_emb_3b,
+                                 self.type_map,self.tipos,k,pos,box) for k in range(nt)]
+        self.force=tf.math.add_n([fv[0] for fv in force_vir_list])
+        self.virial=tf.math.add_n([fv[1] for fv in force_vir_list])
+
+        loss_energy=self.lossfunction(self.totenergy,etrue)
+        loss_force=self.lossfunction(self.force,ftrue)
+        loss_virial=self.lossfunction(self.virial,vtrue)
+        loss_bound_2b=[tf.math.reduce_sum(self.relu_bound(self.physics_layer[k].alpha2b))
+              for k in range(nt)]
+        loss_bound_3b=[tf.math.reduce_sum(self.relu_bound(self.physics_layer[k].alpha3b))
+                 for k in range(nt)]
+        loss_bound=tf.add_n(loss_bound_2b)+tf.add_n(loss_bound_3b)
+
+        loss=pe*loss_energy+pb*loss_bound+pf*loss_force+pv*loss_virial
+
+        grad_w=[tf.gradients(loss,net.trainable_variables) for net  in  self.nets]
+        grad_2b=[tf.gradients(loss,physlay.alpha2b) for physlay in self.physics_layer]
+        grad_3b=[tf.gradients(loss,physlay.alpha3b) for physlay in self.physics_layer]
+        grad_mu=[tf.gradients(loss,lognorm.mu) for lognorm in self.lognorm_layer]
+
+        grads_and_vars_net=[]
+        for k in range(nt):
+            grad_var_pairs = [(grad, param) for grad, param in zip(grad_w[k], self.nets[k].trainable_variables)]
+            grads_and_vars_net.extend(grad_var_pairs)
+        grads_and_vars_afs = []
+        for k in range(nt):
+            grads_and_vars_afs.extend([(grad_2b[k][0], self.physics_layer[k].alpha2b)])
+            grads_and_vars_afs.extend([(grad_3b[k][0], self.physics_layer[k].alpha3b)])
+            grads_and_vars_afs.extend([(grad_mu[k][0], self.lognorm_layer[k].mu)])
+        grads_and_vars_all = grads_and_vars_afs + grads_and_vars_net
+        self.opt_net.apply_gradients(grads_and_vars_all)
+        self.global_step=self.global_step+1
+        return loss,loss_energy,loss_bound,loss_force,loss_virial
+
+    @tf.function(reduce_retracing=True)
+    def full_test_e_f_v(self,x1,x2,x3bsupp,int2b,intder2b,int3b,intder3b,intder3bsupp,
+                        numtriplet,pos,box,etrue,ftrue,vtrue):
+        nt=self.ntipos
+
+        self.x2b=tf.split(x1,self.tipos,axis=1)
+        self.x3b=tf.split(x2,self.tipos,axis=1)
+        self.x3bsupp=tf.split(x3bsupp,self.tipos,axis=1)
+        self.int2b=tf.split(int2b,self.tipos,axis=1)
+        self.int3b=tf.split(int3b,self.tipos,axis=1)
+        self.intder2b=tf.split(intder2b,self.tipos,axis=1)
+        self.intder3b=tf.split(intder3b,self.tipos,axis=1)
+        self.intder3bsupp=tf.split(intder3bsupp,self.tipos,axis=1)
+        self.numtriplet=tf.split(numtriplet,self.tipos,axis=1)
+
+        self.fingerprint=[self.physics_layer[k](self.x2b[k],self.x3bsupp[k],
+        self.int2b[k],self.x3b[k],self.int3b[k],self.numtriplet[k],self.type_map)
+                    for k in range(nt)]
+        self.log_norm_projdes=[self.lognorm_layer[k](finger)
+                         for k,finger in enumerate(self.fingerprint)]
+        self.energy=[self.nets[k](cp) for k,cp in enumerate(self.log_norm_projdes)]
+        self.grad_ene=[tf.gradients(self.energy[k],cp) for k,cp in enumerate(self.fingerprint)]
+
+        self.totene=tf.concat(self.energy,axis=1)
+        self.totenergy=tf.reduce_mean(self.totene,axis=(-1,-2))*0.5
+        self.grad_listed=[tf.split(self.grad_ene[k][0],[self.physics_layer[k].nalpha_r,
+                                    self.physics_layer[k].nalpha_a],axis=2) for k in range(nt)]
+
+        force_vir_list=[self.force_layer(self.grad_listed[k][0],self.x2b[k],
+                                 self.intder2b[k],self.int2b[k],
+                                 self.physics_layer[k].alpha2b,
+                                 self.grad_listed[k][1],self.x3b[k],self.x3bsupp[k],
+                                 self.intder3b[k],self.intder3bsupp[k],self.int3b[k],
+                                 self.numtriplet[k],
+                                 self.physics_layer[k].alpha3b,
+                                 self.physics_layer[k].type_emb_2b,
+                                 self.physics_layer[k].type_emb_3b,
+                                 self.type_map,self.tipos,k,pos,box) for k in range(nt)]
+        self.force=tf.math.add_n([fv[0] for fv in force_vir_list])
+        self.virial=tf.math.add_n([fv[1] for fv in force_vir_list])
+
+        loss_energy=self.val_loss(self.totenergy,etrue)
+        loss_force=self.val_loss(self.force,ftrue)
+        loss_virial=self.val_loss(self.virial,vtrue)
+        loss=loss_energy+loss_force+loss_virial
+        return loss, loss_force, loss_energy, loss_virial
+
 
     def save_model(self,folder_ou):
         for k,net in enumerate(self.nets):

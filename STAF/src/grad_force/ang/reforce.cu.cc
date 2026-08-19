@@ -4,6 +4,8 @@
 #include "tensorflow/core/util/gpu_kernel_helper.h"
 #include "tensorflow/core/util/gpu_launch_config.h"
 #include "staf_real.h"
+#define STAF_FORCE_PBC_DEFINE
+#include "staf_force_pbc.cuh"
 #include <mutex>
 #include <unordered_map>
 #include <cuda_runtime.h>
@@ -265,6 +267,211 @@ void set_tensor_to_zero_real(real* tensor,int dimten, cudaStream_t stream){
      dim3 dimBlock(300,1,1);
      // No DeviceSynchronize: ordered on same stream as subsequent GpuLaunchKernel.
      TF_CHECK_OK(::tensorflow::GpuLaunchKernel(set_tensor_to_zero_real_kernel,dimGrid,dimBlock, 0, stream,tensor,dimten));
+}
+
+/* Angular F+W grad: for each pair force g^{ij},g^{ik}:
+   ∂L/∂g_a = (∂L/∂F_neigh - ∂L/∂F_i)_a - Σ_b (∂L/∂W_ab) r_b */
+__global__ void gradforce_tripl_virial_kernel(
+                                       const real*  prevgrad_T_d,const real* prevgrad_virial,
+                                       const real*  netderiv_T,
+                                       const real* desr_T, const real* desa_T,
+                                       const real* intderiv_r_T, const real* intderiv_a_T_l,
+                                       const int* intmap_r_T,const int* intmap_a_T_l,
+                                       int nr, const int na, int N, int dimbat , int num_finger,
+                                       const real* type_emb3b,int nt,const int* tipos_T,
+                                       const int* actual_type_p,
+                                       const int *num_triplets,const real* smooth_a_T_l,
+                                       const int* type_map_T_d,
+                                       const real* pos_d,const real* box_d,
+                                       real* gradnet_3b_T_d,
+                                      real* grad_alpha3b_T,real* grad_emb3b_T_d,int nt_couple,int BLOCK_DIM)
+{
+    int actual_type=actual_type_p[0];
+    int N_local=tipos_T[actual_type];
+    const int req_alpha = blockIdx.y / nt_couple;
+    const int req_sum = blockIdx.y % nt_couple;
+
+    int tipos_shift=0;
+    for (int y=0;y<actual_type;y++){
+        tipos_shift=tipos_shift+tipos_T[y];
+    }
+    const real2* intderiv_a_T=(const real2 *)intderiv_a_T_l;
+    const int2* intmap_a_T=(const int2 *) intmap_a_T_l;
+    const real3* smooth_a_T=(const real3 *)smooth_a_T_l;
+    const real3* pos_d_l=(const real3*)pos_d;
+    real3* grad_alpha3b_T_d=(real3*)grad_alpha3b_T;
+    int t=blockIdx.x*blockDim.x+threadIdx.x;
+
+    extern __shared__ real4 allgrad[];
+    allgrad[threadIdx.x].x=real(0.);
+    allgrad[threadIdx.x].y=real(0.);
+    allgrad[threadIdx.x].z=real(0.);
+    allgrad[threadIdx.x].w=real(0.);
+    __syncthreads();
+
+    real3 local_alpha= {real(0.), real(0.), real(0.)};
+    real local_net=real(0.);
+
+    int b=t/(na*N_local);
+    int reminder=t%(na*N_local);
+    int par=reminder/na;
+    int nn=reminder%na;
+    int absolute_par=par+tipos_shift;
+    int sum;
+    int actgrad=0;
+    if (t<N_local*dimbat*na)
+    {
+        int na_particle=num_triplets[b*N_local+par];
+        int nn_particle=(na_particle*(na_particle-1))/2;
+	int na_dim=na_particle;
+
+	int actual=b*N_local*nr+par*nr;
+        int actual_ang=b*N_local*na+par*na;
+        actgrad=b*N_local*num_finger+par*num_finger;
+        if (nn<nn_particle)
+        {
+            int j=0;
+            int prev_row=0;
+            int next_row=na_dim-j-1;
+            while (nn>=next_row)
+            {
+                j+=1;
+                prev_row=next_row;
+                next_row+=na_dim-j-1;
+            }
+            int k=nn-prev_row+1+j;
+
+            int2 neigh=intmap_a_T[b*(N_local*na)+na*par+nn];
+            int j_type=type_map_T_d[neigh.x];
+            int k_type=type_map_T_d[neigh.y];
+            sum=j_type+k_type;
+	    if (req_sum==sum){
+
+               real angulardes=desa_T[actual_ang+nn];
+               real radialdes_j=desr_T[actual+j];
+               real radialdes_k=desr_T[actual+k];
+
+	       real accumulate_1=real(0.);
+               real accumulate_3=real(0.);
+               real accumulate_4=real(0.);
+               real accumulate_5=real(0.);
+               real NGel=netderiv_T[actgrad+req_alpha];
+               real3 alphas=smooth_a_T[sum*num_finger+req_alpha];
+               real chtjk_par=type_emb3b[sum*num_finger+req_alpha];
+
+               real expbeta=staf_exp(alphas.z*angulardes);
+               real sim1=staf_exp(alphas.y*radialdes_j+alphas.x*radialdes_k);
+               real sim2=staf_exp(alphas.x*radialdes_j+alphas.y*radialdes_k);
+               real sum_sim=sim1+sim2;
+               real delta=expbeta*(real(1.0)+alphas.z*angulardes)*sum_sim*real(0.5);
+               real suppj=(alphas.x*sim2+alphas.y*sim1)*expbeta;
+               real suppk=(alphas.x*sim1+alphas.y*sim2)*expbeta;
+               real Bp_j=suppj*angulardes*real(0.5);
+               real Bp_k=suppk*angulardes*real(0.5);
+
+               real rijx,rijy,rijz,rikx,riky,rikz;
+               staf_min_image_cart_from_cart(
+                   pos_d_l[b*N+absolute_par].x, pos_d_l[b*N+absolute_par].y, pos_d_l[b*N+absolute_par].z,
+                   pos_d_l[b*N+neigh.x].x, pos_d_l[b*N+neigh.x].y, pos_d_l[b*N+neigh.x].z,
+                   box_d + b*6, rijx, rijy, rijz);
+               staf_min_image_cart_from_cart(
+                   pos_d_l[b*N+absolute_par].x, pos_d_l[b*N+absolute_par].y, pos_d_l[b*N+absolute_par].z,
+                   pos_d_l[b*N+neigh.y].x, pos_d_l[b*N+neigh.y].y, pos_d_l[b*N+neigh.y].z,
+                   box_d + b*6, rikx, riky, rikz);
+               const real* Wg = prevgrad_virial + b*9;
+               real rij[3]={rijx,rijy,rijz};
+               real rik[3]={rikx,riky,rikz};
+
+ 	       int cor;
+               for (cor=0;cor<3;cor++){
+                    real2 intder = intderiv_a_T[b*(N_local*na)*3+par*na*3+cor*na+nn];
+                    real intder_r_j=intderiv_r_T[b*N_local*3*nr+nr*3*par+cor*nr+j];
+                    real intder_r_k=intderiv_r_T[b*N_local*3*nr+nr*3*par+cor*nr+k];
+                    real prevgrad_loc=prevgrad_T_d[b*(N*3)+absolute_par*3+cor];
+                    real prevgrad_neighj=prevgrad_T_d[b*(N*3)+neigh.x*3+cor];
+                    real prevgrad_neighk=prevgrad_T_d[b*(N*3)+neigh.y*3+cor];
+                    real wdot_ij = Wg[cor*3+0]*rij[0]+Wg[cor*3+1]*rij[1]+Wg[cor*3+2]*rij[2];
+                    real wdot_ik = Wg[cor*3+0]*rik[0]+Wg[cor*3+1]*rik[1]+Wg[cor*3+2]*rik[2];
+                    real coeff_ij = prevgrad_neighj - prevgrad_loc - wdot_ij;
+                    real coeff_ik = prevgrad_neighk - prevgrad_loc - wdot_ik;
+
+                    real gradxij=chtjk_par*delta*intder.x+chtjk_par*Bp_j*intder_r_j;
+                    real gradxik=chtjk_par*delta*intder.y+chtjk_par*Bp_k*intder_r_k;
+                    accumulate_1+=coeff_ij*real(0.5)*gradxij+coeff_ik*real(0.5)*gradxik;
+
+                    real buff_a1_ang=expbeta*(real(1.)+alphas.z*angulardes)*(sim1*radialdes_k+sim2*radialdes_j)*real(0.5);
+                    real buff_a2_ang=expbeta*(real(1.)+alphas.z*angulardes)*(sim1*radialdes_j+sim2*radialdes_k)*real(0.5);
+                    real buff_beta_ang=expbeta*angulardes*(real(2.)+alphas.z*angulardes)*sum_sim*real(0.5);
+                    real buff_beta_r_j=suppj*angulardes*angulardes*real(0.5);
+                    real buff_beta_r_k=suppk*angulardes*angulardes*real(0.5);
+                    real buff_a1_r_j=(sim2+alphas.x*sim2*radialdes_j+alphas.y*sim1*radialdes_k)*expbeta*real(0.5)*angulardes;
+                    real buff_a2_r_j=(sim1+alphas.y*sim1*radialdes_j+alphas.x*sim2*radialdes_k)*expbeta*real(0.5)*angulardes;
+                    real buff_a1_r_k=(sim1+alphas.x*sim1*radialdes_k+alphas.y*sim2*radialdes_j)*expbeta*real(0.5)*angulardes;
+                    real buff_a2_r_k=(sim2+alphas.y*sim2*radialdes_k+alphas.x*sim1*radialdes_j)*expbeta*real(0.5)*angulardes;
+
+                    real grad_a1_xij=chtjk_par*buff_a1_ang*intder.x+chtjk_par*buff_a1_r_j*intder_r_j;
+                    real grad_a1_xik=chtjk_par*buff_a1_ang*intder.y+chtjk_par*buff_a1_r_k*intder_r_k;
+                    real grad_a2_xij=chtjk_par*buff_a2_ang*intder.x+chtjk_par*buff_a2_r_j*intder_r_j;
+                    real grad_a2_xik=chtjk_par*buff_a2_ang*intder.y+chtjk_par*buff_a2_r_k*intder_r_k;
+                    real grad_beta_xij=chtjk_par*buff_beta_ang*intder.x+chtjk_par*buff_beta_r_j*intder_r_j;
+                    real grad_beta_xik=chtjk_par*buff_beta_ang*intder.y+chtjk_par*buff_beta_r_k*intder_r_k;
+
+                    accumulate_3+=coeff_ij*real(0.5)*NGel*grad_a1_xij+coeff_ik*real(0.5)*NGel*grad_a1_xik;
+                    accumulate_4+=coeff_ij*real(0.5)*NGel*grad_a2_xij+coeff_ik*real(0.5)*NGel*grad_a2_xik;
+                    accumulate_5+=coeff_ij*real(0.5)*NGel*grad_beta_xij+coeff_ik*real(0.5)*NGel*grad_beta_xik;
+               }
+
+               allgrad[threadIdx.x].w=accumulate_1;
+	       allgrad[threadIdx.x].x=accumulate_3;
+	       allgrad[threadIdx.x].y=accumulate_4;
+	       allgrad[threadIdx.x].z=accumulate_5;
+	     }
+            }
+    }
+    __syncthreads();
+    if (threadIdx.x==0){
+       for (int dd=0;dd<BLOCK_DIM;dd++){
+           local_alpha.x+=allgrad[dd].x;
+           local_alpha.y+=allgrad[dd].y;
+           local_alpha.z+=allgrad[dd].z;
+           local_net+=allgrad[dd].w;
+           }
+       if (t < N_local*dimbat*na){
+         atomicAdd((real*)&(gradnet_3b_T_d[actgrad+req_alpha]),local_net);
+       }
+       atomicAdd((real*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].x),local_alpha.x);
+       atomicAdd((real*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].y),local_alpha.y);
+       atomicAdd((real*)&(grad_alpha3b_T_d[req_sum*num_finger+req_alpha].z),local_alpha.z);
+      }
+}
+
+void gradforce_tripl_virial_Launcher(
+                                      const real*  prevgrad_T_d,const real* prevgrad_virial,
+                                      const real*  netderiv_T_d, const real* desr_T_d,
+                                      const real* desa_T_d,const real* intderiv_r_T_d,
+                                      const real* intderiv_a_T_d,const int* intmap_r_T_d,
+                                      const int* intmap_a_T_d,int nr, int na, int N,
+                                      int dimbat,int num_finger,const real* type_emb3b_d,int nt,
+                                      const int* tipos_T,const int* actual_type,
+                                      const int *num_triplets_d,const real* smooth_a_T,
+                                      const int* type_map_T_d,
+                                      const real* pos_d,const real* box_d,
+                                      int prod,real* gradnet_3b_T_d,
+                                      real* grad_alpha3b_T_d,real* grad_emb3b_T_d, cudaStream_t stream){
+
+    int nt_couple=nt*(nt+1)/2;
+    const int BLOCK_DIM = current_block_dim();
+    dim3 dimGrid(ceil(real(prod)/real(BLOCK_DIM)), num_finger * nt_couple, 1);
+    dim3 dimBlock(BLOCK_DIM,1,1);
+    TF_CHECK_OK(::tensorflow::GpuLaunchKernel(gradforce_tripl_virial_kernel,dimGrid,
+                dimBlock, BLOCK_DIM*sizeof(real4), stream,
+                prevgrad_T_d,prevgrad_virial,netderiv_T_d,desr_T_d,desa_T_d,
+                intderiv_r_T_d,intderiv_a_T_d,intmap_r_T_d,
+                intmap_a_T_d,nr,na,N,dimbat,num_finger,
+                type_emb3b_d,nt,tipos_T,actual_type,
+                num_triplets_d,smooth_a_T,type_map_T_d,
+                pos_d,box_d,
+                gradnet_3b_T_d,grad_alpha3b_T_d,grad_emb3b_T_d,nt_couple,BLOCK_DIM));
 }
 
 #endif

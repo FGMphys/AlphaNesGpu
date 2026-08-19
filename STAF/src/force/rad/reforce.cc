@@ -127,7 +127,7 @@ void computeforce_doublets_virial_Launcher(
                     int nr, int N, int dimbat,int num_alpha_radiale,
                     const real* alpha_radiale,const real* type_emb2b,int nt,
                     const int* tipos_T,const int* actual_type,real* forces2b,const int* type_map,int prod,
-                    real* virial_diagonal_d,const real* pos_d,const real* box_d,
+                    real* virial_d,const real* pos_d,const real* box_d,
                     cudaStream_t stream);
 
 REGISTER_OP("ComputeForceRadialVirial")
@@ -143,7 +143,7 @@ REGISTER_OP("ComputeForceRadialVirial")
     .Input("pos: " STAF_TF_DTYPE)
     .Input("box: " STAF_TF_DTYPE)
     .Output("force: " STAF_TF_DTYPE)
-    .Output("virial_diag: " STAF_TF_DTYPE);
+    .Output("virial: " STAF_TF_DTYPE);  /* (batch, 9) row-major 3x3 */
 
 class ComputeForceRadialVirialOp : public OpKernel {
  public:
@@ -182,11 +182,11 @@ class ComputeForceRadialVirialOp : public OpKernel {
     Tensor* virial_T = NULL;
     TensorShape virial_shape;
     virial_shape.AddDim(dimbat);
-    virial_shape.AddDim(3);
+    virial_shape.AddDim(9);
     OP_REQUIRES_OK(context, context->allocate_output(1, virial_shape, &virial_T));
 
     set_tensor_to_zero_real(forces2b_T->flat<real>().data(), dimbat*3*N, stream);
-    set_tensor_to_zero_real(virial_T->flat<real>().data(), dimbat*3, stream);
+    set_tensor_to_zero_real(virial_T->flat<real>().data(), dimbat*9, stream);
 
     int prod=dimbat*Nlocal*nr;
     computeforce_doublets_virial_Launcher(

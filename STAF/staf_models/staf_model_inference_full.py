@@ -83,11 +83,11 @@ class staf_full_inference(tf.Module):
 
           self.nets=[tf.saved_model.load(modelname+'/model_type'+str(k))
                           for k in range(self.ntipos)]
-          self.force_layer=force_virial_layer(self.rad_buff,self.ang_buff)
+          self.force_layer=force_virial_layer(self.rad_buff,self.ang_buff,with_grad=False)
 
 #      @tf.function()
       def full_test(self,pos,box):
-          """Return (energy [B], force [B,N*3], virial_diag [B,3])."""
+          """Return (energy [B], force [B,N*3], virial [B,9] row-major)."""
 
           [x1,x2,x3bsupp,
         int2b,int3b,intder2b,
@@ -132,5 +132,5 @@ class staf_full_inference(tf.Module):
                                  self.type_map,self.tipos,k, pos, box) for k in range(nt)]
 
           self.force = tf.math.add_n([fv[0] for fv in force_vir])
-          self.virial_diag = tf.math.add_n([fv[1] for fv in force_vir])
-          return self.totenergy, self.force, self.virial_diag
+          self.virial = tf.math.add_n([fv[1] for fv in force_vir])
+          return self.totenergy, self.force, self.virial

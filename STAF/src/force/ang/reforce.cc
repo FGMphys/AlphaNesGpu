@@ -153,7 +153,7 @@ void computeforce_tripl_virial_Launcher(
                         const real* intderiv_r_T_d, const real* intderiv_a_T_d,
                         const int* intmap_r_T_d,const int* intmap_a_T_d,
                          int nr, int na, int N, int dimbat,int num_finger,const real* type_emb3b_d,int nt,const int* tipos_T,const int* actual_type,real* forces3b_T_d,const int *num_triplets_d,const real* smooth_a_T,const int* type_map_T_d,int prod,
-                         real* virial_diagonal_d,const real* pos_d,const real* box_d,
+                         real* virial_d,const real* pos_d,const real* box_d,
                          cudaStream_t stream);
 
 REGISTER_OP("ComputeForceTriplVirial")
@@ -173,7 +173,7 @@ REGISTER_OP("ComputeForceTriplVirial")
     .Input("pos: " STAF_TF_DTYPE)
     .Input("box: " STAF_TF_DTYPE)
     .Output("force: " STAF_TF_DTYPE)
-    .Output("virial_diag: " STAF_TF_DTYPE);
+    .Output("virial: " STAF_TF_DTYPE);  /* (batch, 9) row-major 3x3 */
 
 class ComputeForceTriplVirialOp : public OpKernel {
  public:
@@ -214,11 +214,11 @@ class ComputeForceTriplVirialOp : public OpKernel {
     Tensor* virial_T = NULL;
     TensorShape virial_shape;
     virial_shape.AddDim(dimbat);
-    virial_shape.AddDim(3);
+    virial_shape.AddDim(9);
     OP_REQUIRES_OK(context, context->allocate_output(1, virial_shape, &virial_T));
 
     set_tensor_to_zero_real(forces3b_T->flat<real>().data(), dimbat*3*N, stream);
-    set_tensor_to_zero_real(virial_T->flat<real>().data(), dimbat*3, stream);
+    set_tensor_to_zero_real(virial_T->flat<real>().data(), dimbat*9, stream);
 
     int prod=netderiv_T.shape().dim_size(0)*netderiv_T.shape().dim_size(1)*desa_T.shape().dim_size(2);
     computeforce_tripl_virial_Launcher(
