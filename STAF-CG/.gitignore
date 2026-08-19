@@ -1,0 +1,13 @@
+# STAF-CG (flattened from AlphaNesGpu_double_CG_dv_RC)
+**/*.so
+**/*.o
+**/__pycache__/
+ops_float/
+ops_double/
+cutoff_curve_*.dat
+lcurve.out
+lcurve_notmean
+shuffle_dataset_vec
+time_story.dat
+lr_step.dat
+model_log*/

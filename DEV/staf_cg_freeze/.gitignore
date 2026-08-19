@@ -1,0 +1,12 @@
+# Freeze workdir artifacts (keep YAML, JSON, lcurve, scripts)
+model1896_infer/
+staf_cg_smoke/
+staf_cg_smoke_s2/
+staf_cg_freeze_ep1*/
+dataset_uscgsite/
+cutoff_curve_*.dat
+shuffle_dataset_vec
+time_story.dat
+lr_step.dat
+lcurve_notmean
+**/__pycache__/

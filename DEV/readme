@@ -1,1 +1,4 @@
-questa cartella contiene tutti i rpgressi e gli sviluppi del programma principale
+questa cartella contiene tutti i progressi e gli sviluppi del programma principale.
+
+Checklist operativa del port CG ufficiale: [`STAF_CG_SPRINTS.md`](STAF_CG_SPRINTS.md)
+(`DEV/AlphaNesGpu_double_CG_dv_RC/` resta il freeze storico; il tree ufficiale è `../STAF-CG/`).

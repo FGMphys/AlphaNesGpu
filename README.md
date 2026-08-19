@@ -22,7 +22,9 @@ python STAF/save_models/export_mlp_onnx.py -imodel model_log0 -modelname model_o
 
 Experimental variants remain under `DEV/` (not part of the A2 full-atom unify).
 
-See `STAF/README.md`, `test/ACCEPTANCE.md`, and `test/A2_PROGRESS.md`.
+**STAF-CG** (origami dual-cutoff, in progress): official tree [`STAF-CG/`](STAF-CG/), sprint checklist [`DEV/STAF_CG_SPRINTS.md`](DEV/STAF_CG_SPRINTS.md). DEV `AlphaNesGpu_double_CG_dv_RC/` is the freeze, not the working copy.
+
+See `STAF/README.md`, `test/ACCEPTANCE.md`, `test/A2_PROGRESS.md`, and the living plan [`docs/PIANO_ALPHANES.md`](docs/PIANO_ALPHANES.md).
 
 ## Performance baseline (reference)
 
