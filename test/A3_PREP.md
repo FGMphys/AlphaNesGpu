@@ -93,33 +93,24 @@ A/B on `test/test-inference-pipeline` frames (10 frames, float and double):
 `int2b` / `int3b` (howmany, neighbor set, order) are **bit-identical** between pre-C CPU neighbor list and current GPU NL.
 Harness: `test/test-inference-pipeline/compare_intmap_cpu_vs_gpu.py`.
 
-## A3 slice — per-device CUDA ctx + `distribute` (2026-07-24)
+## A3 — closed (2026-08-19): per-device CUDA + Horovod-only multi-GPU
 
-**CUDA (same-process multi-GPU prep)**
+**CUDA prep (kept):**
 
 - `descriptor_builder/reforce.cc`: file-scope static buffers → `StafDescriptorConfig` + per-device `StafDescriptorCtx` (mutex + `unordered_map` keyed by `cudaGetDevice()`).
 - `force|grad_force/{rad,ang}/reforce.cu.cc`: `BLOCK_DIM` is per-device (`init_block_dim` / `current_block_dim`).
 
-**Training YAML**
+**Training YAML (current):**
 
 ```yaml
-distribute: none          # none | mirrored | horovod
-# devices: [0, 1]         # mirrored only; horovod uses hvd.local_rank()
+distribute: none          # none | horovod
 ```
 
-- `none`: current single-device path.
-- `mirrored`: `tf.distribute.MirroredStrategy`; model/opts under `strategy.scope()`.
-  - **1 GPU:** train step is the normal path (no `strategy.run`) so Huber
-    `SUM_OVER_BATCH_SIZE` stays valid; smoke YAML:
-    `test/test-training-pipeline/run_float/input_mirrored_smoke.yaml`.
-  - **≥2 GPU:** `strategy.run` + Huber `Reduction.SUM` (mean across replicas
-    in the wrapper). Full scaling / global-batch LR equivalence still TBD on
-    Leonardo.
-- `horovod`: see **A5** below.
+- `none`: single device.
+- `horovod`: official multi-GPU / multi-node path (see **A5**). Launch with `mpirun -np N`.
+- **`mirrored` removed** (2026-08-19): `tf.distribute.MirroredStrategy` was never accepted on ≥2 GPUs; production multi-GPU is Horovod only (Leonardo 1×4 / 2×4). Selecting `distribute: mirrored` now exits with an error.
 
-**Not done in A3:** true multi-GPU scaling validation (needs ≥2 GPUs); MultiWorker.
-
-### Gates after A3 slice (V100, 2026-07-24)
+### Gates after A3 CUDA slice (V100, 2026-07-24)
 
 | Gate | float | double |
 | --- | --- | --- |
@@ -127,9 +118,8 @@ distribute: none          # none | mirrored | horovod
 | Grad-param dw=1e-3 | families ≈1 | families ≈1 |
 | Inference float↔double | Compatible | Compatible |
 | `time_story` 1-epoch (none) | **~77.7 ms/frame** (×0.85 vs 91.5) | **~142.1 ms/frame** (×0.95 vs 149.7) |
-| Mirrored 1-GPU smoke | OK (~78.5 ms/frame, `model_log0`) | OK (~145.8 ms/frame, `model_log0`) |
 
-## A5 — Horovod MPI+GPU (2026-07-24)
+## A5 — Horovod MPI+GPU (2026-07-24; production multi-GPU)
 
 Same repo / YAML switch. Requires `horovod` + MPI launcher.
 
@@ -150,23 +140,23 @@ Wiring in `STAF/staf_train.py`:
 
 Smoke YAMLs: `run_{float,double}/input_horovod_smoke.yaml`.
 
-Local gates (V100, `mpirun -np 1`, Horovod 0.28.1): float OK + `model_log0`; double OK + `model_log0`. Multi-rank scaling still Leonardo.
+Local gates (V100, `mpirun -np 1`, Horovod 0.28.1): float OK + `model_log0`; double OK + `model_log0`. Multi-rank scaling: Leonardo (see root `README.md`).
 
 ### Distribute loss parity (`lcurve_notmean`)
 
-Same Seed / 1 epoch / every-step `log_batch_freq=1`, compare `none` vs `mirrored` vs `horovod` (`mpirun -np 1`):
+Same Seed / 1 epoch / every-step `log_batch_freq=1`, compare `none` vs `horovod` (`mpirun -np 1`):
 
 ```bash
 python test/test-training-pipeline/compare_distribute_lcurve.py --precision float
 python test/test-training-pipeline/compare_distribute_lcurve.py --precision double
 ```
 
-Results (V100, 2026-07-24), 125 steps:
+Results (V100, 2026-07-24), 125 steps (none vs horovod):
 
-| precision | none vs mirrored | none vs horovod | notes |
-| --- | --- | --- | --- |
-| **double** | max‖ΔF‖ ≈ 1.6e-13 | max‖ΔF‖ ≈ 3.3e-14 | bit-identical within tol |
-| **float** | max‖ΔF‖ ≈ 2.0e-6 | max‖ΔF‖ ≈ 3.9e-6 | GPU order noise; all ‖ΔF‖ under 1e-5 |
+| precision | none vs horovod | notes |
+| --- | --- | --- |
+| **double** | max‖ΔF‖ ≈ 3.3e-14 | bit-identical within tol |
+| **float** | max‖ΔF‖ ≈ 3.9e-6 | GPU order noise; under 1e-5 |
 
 Artifacts: `test/test-training-pipeline/parity_distribute/{float,double}/`.
 

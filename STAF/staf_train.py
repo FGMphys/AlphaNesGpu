@@ -1,7 +1,6 @@
 import os
 import time
 import sys
-import contextlib
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
@@ -68,7 +67,10 @@ def _configure_gpu_memory_growth(gpus, list_logical=True):
         print(e)
 
 def init_distribute(full_param):
-    """Return (mode, strategy|None, hvd_module|None).
+    """Return (mode, hvd_module|None).
+
+    Multi-GPU is Horovod only (``distribute: horovod``). MirroredStrategy was
+    removed — use ``mpirun -np N`` on one or more nodes instead.
 
     GPU memory growth / visibility is configured here (after YAML) so Horovod
     can pin each MPI rank to gpus[local_rank] before TF initializes devices.
@@ -77,136 +79,55 @@ def init_distribute(full_param):
     if mode in ('', 'none', 'null', 'single'):
         _configure_gpu_memory_growth(tf.config.list_physical_devices('GPU'))
         print("STAF: distribute=none (single device)")
-        return 'none', None, None
+        return 'none', None
 
-    if mode == 'horovod':
-        try:
-            import horovod.tensorflow as hvd
-        except ImportError:
+    if mode == 'mirrored':
+        sys.exit(
+            "STAF: distribute=mirrored was removed.\n"
+            "  Use distribute: horovod with mpirun -np <N> "
+            "(same-node or multi-node)."
+        )
+
+    if mode != 'horovod':
+        sys.exit(
+            "STAF: unknown distribute=%r (use none | horovod)" % mode
+        )
+
+    try:
+        import horovod.tensorflow as hvd
+    except ImportError:
+        sys.exit(
+            "STAF: distribute=horovod requires the horovod package.\n"
+            "  Install (example): HOROVOD_WITH_TENSORFLOW=1 pip install horovod\n"
+            "  Launch: mpirun -np <N> python staf_train.py <input.yaml>"
+        )
+    hvd.init()
+    gpus = tf.config.list_physical_devices('GPU')
+    # Do NOT list_logical_devices before pinning — that initializes CUDA.
+    _configure_gpu_memory_growth(gpus, list_logical=False)
+    if gpus:
+        # Slurm may already expose a single GPU via CUDA_VISIBLE_DEVICES.
+        if len(gpus) == 1:
+            target = gpus[0]
+        elif hvd.local_rank() >= len(gpus):
             sys.exit(
-                "STAF: distribute=horovod requires the horovod package.\n"
-                "  Install (example): HOROVOD_WITH_TENSORFLOW=1 pip install horovod\n"
-                "  Launch: mpirun -np <N> python staf_train.py <input.yaml>"
+                "STAF: horovod local_rank=%d but only %d GPU(s) visible"
+                % (hvd.local_rank(), len(gpus))
             )
-        hvd.init()
-        gpus = tf.config.list_physical_devices('GPU')
-        # Do NOT list_logical_devices before pinning — that initializes CUDA.
-        _configure_gpu_memory_growth(gpus, list_logical=False)
-        if gpus:
-            # Slurm may already expose a single GPU via CUDA_VISIBLE_DEVICES.
-            if len(gpus) == 1:
-                target = gpus[0]
-            elif hvd.local_rank() >= len(gpus):
-                sys.exit(
-                    "STAF: horovod local_rank=%d but only %d GPU(s) visible"
-                    % (hvd.local_rank(), len(gpus))
-                )
-            else:
-                target = gpus[hvd.local_rank()]
-            tf.config.set_visible_devices(target, 'GPU')
-            logical_gpus = tf.config.list_logical_devices('GPU')
-            print(
-                "STAF: horovod pinned GPU; physical=%d logical=%d"
-                % (len(gpus), len(logical_gpus))
-            )
+        else:
+            target = gpus[hvd.local_rank()]
+        tf.config.set_visible_devices(target, 'GPU')
+        logical_gpus = tf.config.list_logical_devices('GPU')
         print(
-            "STAF: distribute=horovod size=%d rank=%d local_rank=%d"
-            % (hvd.size(), hvd.rank(), hvd.local_rank())
-        )
-        return 'horovod', None, hvd
-
-    if mode != 'mirrored':
-        sys.exit(
-            "STAF: unknown distribute=%r (use none | mirrored | horovod)" % mode
-        )
-
-    _configure_gpu_memory_growth(tf.config.list_physical_devices('GPU'))
-    devices_yaml = full_param.get('devices', None)
-    if devices_yaml is not None:
-        # devices: optional list of logical GPU indices (ignored for horovod).
-        dev_names = ['/GPU:%d' % int(i) for i in devices_yaml]
-        strategy = tf.distribute.MirroredStrategy(devices=dev_names)
-        print(
-            "STAF: distribute=mirrored replicas=%d devices=%s"
-            % (strategy.num_replicas_in_sync, dev_names)
-        )
-    else:
-        strategy = tf.distribute.MirroredStrategy()
-        print(
-            "STAF: distribute=mirrored replicas=%d devices=all_visible"
-            % strategy.num_replicas_in_sync
-        )
-    return 'mirrored', strategy, None
-
-def wrap_train_method(trainmeth, strategy):
-    """Call trainmeth under strategy.run; unwrap PerReplica for host logging.
-
-    With 1 replica, skip strategy.run so Keras losses keep SUM_OVER_BATCH_SIZE
-    (allowed only outside Strategy.run). Multi-replica uses SUM losses + mean.
-    Horovod uses DistributedOptimizer instead (no strategy.run).
-    """
-    if strategy is None or strategy.num_replicas_in_sync <= 1:
-        return trainmeth
-
-    @tf.function(reduce_retracing=True)
-    def _distributed(*args):
-        return strategy.run(trainmeth, args=args)
-
-    def _call(*args):
-        out = _distributed(*args)
-        unwrapped = []
-        for x in out:
-            parts = strategy.experimental_local_results(x)
-            if len(parts) == 1:
-                unwrapped.append(parts[0])
-            else:
-                unwrapped.append(
-                    tf.add_n(list(parts)) / float(len(parts))
-                )
-        return tuple(unwrapped)
-
-    return _call
-
-def shard_idx_str(idx_str, hvd_mod, name):
-    """Frame-buffer sharding across MPI ranks (train path)."""
-    if hvd_mod is None or hvd_mod.size() <= 1:
-        return idx_str
-    shard = idx_str[hvd_mod.rank()::hvd_mod.size()]
-    if shard.shape[0] == 0:
-        sys.exit(
-            "STAF: horovod shard empty for %s on rank %d (size=%d); "
-            "use fewer ranks or a larger dataset"
-            % (name, hvd_mod.rank(), hvd_mod.size())
+            "STAF: horovod pinned GPU; physical=%d logical=%d"
+            % (len(gpus), len(logical_gpus))
         )
     print(
-        "STAF: horovod sharded %s buffers %d → %d (rank %d/%d)"
-        % (name, idx_str.shape[0], shard.shape[0], hvd_mod.rank(), hvd_mod.size())
+        "STAF: distribute=horovod size=%d rank=%d local_rank=%d"
+        % (hvd.size(), hvd.rank(), hvd.local_rank())
     )
-    return shard
+    return 'horovod', hvd
 
-def collect_broadcast_variables(model):
-    """Model + optimizer variables for hvd.broadcast_variables."""
-    vars_ = []
-    for net in model.nets:
-        vars_.extend(list(net.variables))
-    for phys in model.physics_layer:
-        vars_.extend([phys.alpha2b, phys.alpha3b, phys.type_emb_2b, phys.type_emb_3b])
-    for logn in model.lognorm_layer:
-        vars_.append(logn.mu)
-    try:
-        vars_.extend(list(model.opt_net.variables()))
-    except Exception:
-        pass
-    try:
-        vars_.extend(list(model.opt_phys.variables()))
-    except Exception:
-        pass
-    return vars_
-
-@tf.function()
-def MSE(ypred,y):
-   loss_function=tf.reduce_mean(tf.square((ypred-y)))
-   return loss_function
 
 def make_dataset_stream(base_pattern,mode):
     energy_on_disk=np.load(base_pattern+'/'+mode+'/'+'energy.npy',mmap_mode='r')
@@ -271,12 +192,8 @@ def order_folder(x):
         res=-1
     return res
 
-def make_loss(full_param, distribute_mode='none', n_replicas=1):
-    # MirroredStrategy.run forbids SUM_OVER_BATCH_SIZE; use SUM only with ≥2 GPUs.
-    if distribute_mode == 'mirrored' and n_replicas > 1:
-        huber_red = tf.keras.losses.Reduction.SUM
-    else:
-        huber_red = tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE
+def make_loss(full_param):
+    huber_red = tf.keras.losses.Reduction.SUM_OVER_BATCH_SIZE
     try:
         loss_meth=full_param['loss_method']
         if loss_meth=='huber':
@@ -331,12 +248,8 @@ def make_method(full_param,model):
 with open(sys.argv[1]) as file:
     full_param = yaml.load(file, Loader=yaml.FullLoader)
 set_precision(full_param.get("precision"))
-distribute_mode, strategy, hvd_mod = init_distribute(full_param)
+distribute_mode, hvd_mod = init_distribute(full_param)  # none | horovod
 is_chief = (hvd_mod is None) or (hvd_mod.rank() == 0)
-
-def dist_scope():
-    """Fresh strategy.scope() each time (context managers are single-use)."""
-    return strategy.scope() if strategy is not None else contextlib.nullcontext()
 
 base_pattern=full_param['dataset_folder']
 try:
@@ -462,39 +375,37 @@ except:
 restart=restart_par
 
 ##If we are not restarting, we initialiaze the optimizer and the learning rate
-## (under MirroredStrategy.scope when distribute=mirrored)
-with dist_scope():
-    if restart_par=='no' or restart_par=='only_afs':
-        # Horovod: keep YAML learning rates (no × hvd.size() linear scale).
-        if hvd_mod is not None:
-            print(
-                "STAF: horovod keeps YAML learning rates "
-                "(no × hvd.size() scale)"
-            )
-        lr_net_param=full_param['lr_dense_net'].split()
-        lr_net=build_learning_rate(lr_net_param,ne,nb,idx_str_tr.shape[0],'net',0)
-
-        opt_net_param=full_param['optimizer_net'].split()
-        opt_net=build_optimizer(opt_net_param,lr_net,0)
-
-        lr_phys_param=full_param['lr_phys_net'].split()
-        lr_phys=build_learning_rate(lr_phys_param,ne,nb,idx_str_tr.shape[0],'phys',0)
-        opt_phys_param=full_param['optimizer_phys'].split()
-        opt_phys=build_optimizer(opt_phys_param,lr_phys,0)
-    ##else we load the internal state of optimizer at the given point of previous training
-    else:
-        with open(restart+'/opt_net_conf','rb') as source:
-             config_net=pickle.load(source)
-        opt_net=tf.keras.optimizers.Adam()
-        opt_net=opt_net.from_config(config_net)
-        with open(restart+'/opt_phys_conf','rb') as source:
-             config_phys=pickle.load(source)
-        opt_phys=tf.keras.optimizers.Adam()
-        opt_phys=opt_phys.from_config(config_phys)
+if restart_par=='no' or restart_par=='only_afs':
+    # Horovod: keep YAML learning rates (no × hvd.size() linear scale).
     if hvd_mod is not None:
-        opt_net = hvd_mod.DistributedOptimizer(opt_net)
-        opt_phys = hvd_mod.DistributedOptimizer(opt_phys)
-        print("STAF: optimizers wrapped with hvd.DistributedOptimizer")
+        print(
+            "STAF: horovod keeps YAML learning rates "
+            "(no × hvd.size() scale)"
+        )
+    lr_net_param=full_param['lr_dense_net'].split()
+    lr_net=build_learning_rate(lr_net_param,ne,nb,idx_str_tr.shape[0],'net',0)
+
+    opt_net_param=full_param['optimizer_net'].split()
+    opt_net=build_optimizer(opt_net_param,lr_net,0)
+
+    lr_phys_param=full_param['lr_phys_net'].split()
+    lr_phys=build_learning_rate(lr_phys_param,ne,nb,idx_str_tr.shape[0],'phys',0)
+    opt_phys_param=full_param['optimizer_phys'].split()
+    opt_phys=build_optimizer(opt_phys_param,lr_phys,0)
+##else we load the internal state of optimizer at the given point of previous training
+else:
+    with open(restart+'/opt_net_conf','rb') as source:
+         config_net=pickle.load(source)
+    opt_net=tf.keras.optimizers.Adam()
+    opt_net=opt_net.from_config(config_net)
+    with open(restart+'/opt_phys_conf','rb') as source:
+         config_phys=pickle.load(source)
+    opt_phys=tf.keras.optimizers.Adam()
+    opt_phys=opt_phys.from_config(config_phys)
+if hvd_mod is not None:
+    opt_net = hvd_mod.DistributedOptimizer(opt_net)
+    opt_phys = hvd_mod.DistributedOptimizer(opt_phys)
+    print("STAF: optimizers wrapped with hvd.DistributedOptimizer")
 
 ##Here we fix the value that prevents the explosion of the exponential
 try:
@@ -519,25 +430,21 @@ np.random.set_state(new_rng_state)
 #######Initialise Descriptor Layer###################################################
 max_batch=int(np.max([buffer_stream_tr,buffer_stream_ts]))
 Descriptor_Layer=descriptor_layer(rc,rad_buff,rc_ang,ang_buff,N,box_map_tr[0],Rs,max_batch)
-########Define Loss (host-side constants; safe outside strategy.scope)
-_n_replicas = strategy.num_replicas_in_sync if strategy is not None else 1
-[model_loss,val_loss,pe,pf,pb]=make_loss(full_param, distribute_mode, _n_replicas)
-### Layers + model under MirroredStrategy.scope when distribute=mirrored
-with dist_scope():
-    #######Initialise AFS Layer
-    Physics_Layers=[physics_layer(init_alpha2b[num_type],init_alpha3b[num_type],
-                                    initial_type_emb[num_type]) for num_type
-                                    in range(nt)]
-    ##Initialise Log layer
-    Lognorm_Layers=[lognorm_layer(init_mu[num_type]) for num_type in range(nt)]
-    ##Initialise force layer
-    Force_Layer=force_layer(rad_buff,ang_buff)
-    ###Compose the model by concatenation of layers
-    model=staf_full(Physics_Layers,Force_Layer,nhl,nD,actfun,1,model_loss,
-                 val_loss,opt_net,opt_phys,alpha_bound,Lognorm_Layers,tipos,
-                 type_map,restart,seed_par)
-[trainmeth,testmeth]=make_method(full_param,model)
-trainmeth=wrap_train_method(trainmeth, strategy)
+########Define Loss
+[model_loss,val_loss,pe,pf,pb]=make_loss(full_param)
+#######Initialise AFS Layer
+Physics_Layers=[physics_layer(init_alpha2b[num_type],init_alpha3b[num_type],
+                                initial_type_emb[num_type]) for num_type
+                                in range(nt)]
+##Initialise Log layer
+Lognorm_Layers=[lognorm_layer(init_mu[num_type]) for num_type in range(nt)]
+##Initialise force layer
+Force_Layer=force_layer(rad_buff,ang_buff)
+###Compose the model by concatenation of layers
+model=staf_full(Physics_Layers,Force_Layer,nhl,nD,actfun,1,model_loss,
+             val_loss,opt_net,opt_phys,alpha_bound,Lognorm_Layers,tipos,
+             type_map,restart,seed_par)
+[trainmeth,testmeth,train_meth]=make_method(full_param,model)
 _hvd_need_bcast = (hvd_mod is not None)
 #################################################################################
 #################################################################################

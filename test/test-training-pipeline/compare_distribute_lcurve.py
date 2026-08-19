@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare lcurve_notmean across distribute modes (none / mirrored / horovod).
+"""Compare lcurve_notmean across distribute modes (none / horovod).
 
 Runs 1-epoch training per mode (same Seed / YAML base), then checks that
 Loss_E / Loss_F / Loss_Bound match within a tolerance.
@@ -23,7 +23,7 @@ import yaml
 
 REPO = Path(__file__).resolve().parents[2]
 STAF_TRAIN = REPO / "STAF" / "staf_train.py"
-MODES = ("none", "mirrored", "horovod")
+MODES = ("none", "horovod")
 
 
 def _run_dir(precision: str) -> Path:
@@ -121,7 +121,6 @@ def run_mode(precision: str, mode: str, n_epochs: int, out_root: Path) -> Path:
     text = log_path.read_text(errors="replace")
     needle = {
         "none": "distribute=none",
-        "mirrored": "distribute=mirrored",
         "horovod": "distribute=horovod",
     }[mode]
     if needle not in text:

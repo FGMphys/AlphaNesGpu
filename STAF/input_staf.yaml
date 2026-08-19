@@ -6,14 +6,12 @@
 precision: float
 
 # Multi-GPU distribution (same repo; select mode here only).
-# Options: none | mirrored | horovod
+# Options: none | horovod
 #   none     — single device (default if omitted)
-#   mirrored — tf.distribute.MirroredStrategy on one node (1+ GPUs)
 #   horovod  — MPI ranks × 1 GPU (same- or multi-node); launch with mpirun
 #              YAML learning rates are not auto-scaled; train buffers are sharded.
-# Optional devices: logical GPU indices for mirrored only (ignored for horovod).
+# MirroredStrategy was removed; use horovod for multi-GPU.
 distribute: none
-# devices: [0, 1]
 
 # Dataset root (expects train/ and test/ with .npy frames).
 dataset_folder: /leonardo_work/IscrB_NNPWATER/ALPHAGPU_2/dataset
@@ -70,7 +68,9 @@ batch_size_test: 1
 # Loss weights and recipe.
 loss_energy_prefactor: 1.
 loss_force_prefactor: 1.
-# Options: energy | energy+force
+# Virial loss weight (used only with energy+force+virial). Labels: total eV, shape (n,9).
+loss_virial_prefactor: 1.
+# Options: energy | energy+force | energy+force+virial
 type_of_training: energy+force
 # Options: huber | MSE  (validation always uses MSE)
 loss_method: huber

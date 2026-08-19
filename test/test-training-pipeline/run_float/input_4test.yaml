@@ -3,10 +3,8 @@
 # float32 | float64 (aliases: float|double). If omitted, inferred from code tree name.
 precision: float
 
-# Multi-GPU. none | mirrored | horovod (MPI×GPU; mpirun -np N).
-# Optional devices: logical GPU indices for mirrored only (default = all visible).
+# Multi-GPU. none | horovod (MPI×GPU; mpirun -np N).
 distribute: none
-# devices: [0, 1]
 
 #Dataset Path
 dataset_folder: dataset

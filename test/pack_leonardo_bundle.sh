@@ -177,7 +177,6 @@ def dump(path, precision, dataset_rel, distribute):
 prod = stage / "production"
 dump(prod / "input_staf_float.yaml", "float", "../datasets/mbpol_full_float", "horovod")
 dump(prod / "input_staf_double.yaml", "double", "../datasets/mbpol_full_double", "horovod")
-dump(prod / "input_staf_float_mirrored.yaml", "float", "../datasets/mbpol_full_float", "mirrored")
 dump(prod / "input_staf_float_none.yaml", "float", "../datasets/mbpol_full_float", "none")
 print("production YAMLs OK")
 PY

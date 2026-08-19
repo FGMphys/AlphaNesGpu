@@ -3,10 +3,8 @@ rtol=0.0001 atol=1e-05
 n_rows_ref=125
 OVERALL_OK=True
 
-none_vs_mirrored: ok=True steps_match=True n=125
-  Loss_E: max_abs=5.346374e-08 max_rel=8.681127e-04 allclose=True
-  Loss_F: max_abs=1.981854e-06 max_rel=6.286392e-05 allclose=True
-  Loss_Bound: max_abs=0.000000e+00 max_rel=0.000000e+00 allclose=True
+# Note (2026-08-19): mirrored mode removed; historical none_vs_mirrored
+# lines dropped. Re-run compare_distribute_lcurve.py to refresh.
 
 none_vs_horovod: ok=True steps_match=True n=125
   Loss_E: max_abs=4.083267e-08 max_rel=1.143690e-03 allclose=True

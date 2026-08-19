@@ -14,7 +14,7 @@ STAF_leonardo_test_bundle.tar.gz   # bash test/pack_leonardo_bundle.sh
 | Gate ufficiali | [`ACCEPTANCE.md`](ACCEPTANCE.md) |
 | Multi-GPU / Horovod | [`A3_PREP.md`](A3_PREP.md) |
 | Baseline perf V100 | [`test-training-pipeline/comparison/`](test-training-pipeline/comparison/) |
-| Parità `none`/`mirrored`/`horovod` | [`test-training-pipeline/parity_distribute/`](test-training-pipeline/parity_distribute/) |
+| Parità `none`/`horovod` | [`test-training-pipeline/parity_distribute/`](test-training-pipeline/parity_distribute/) |
 | Compat inference (testo) | [`test-inference-pipeline/comparison_summary.txt`](test-inference-pipeline/comparison_summary.txt) |
 | Script force / grad-param | [`test-regression/`](test-regression/) |
 
@@ -33,7 +33,6 @@ STAF_leonardo_test_bundle/
     afsparam_2/
     input_staf_float.yaml          # distribute: horovod, subsampling: no
     input_staf_double.yaml
-    input_staf_float_mirrored.yaml
     input_staf_float_none.yaml
   training/run_{float,double}/    # YAML acceptance + hardlink allo stesso dataset
   inference_models/model_{float,double}/
@@ -85,10 +84,8 @@ python compare_distribute_lcurve.py --precision double
 
 ```bash
 cd STAF_leonardo_test_bundle/production
-# 4 GPU / nodo
+# 4 GPU / nodo (Horovod only; MirroredStrategy removed)
 mpirun -np 4 python ../../STAF/staf_train.py input_staf_float.yaml
-# oppure mirrored same-node:
-# python ../../STAF/staf_train.py input_staf_float_mirrored.yaml
 ```
 
 Annotare: job OK, `model_log*` da rank 0, speed-up vs 1 GPU, loss stabile.
