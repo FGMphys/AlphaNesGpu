@@ -129,6 +129,15 @@ Pass: `max|ΔE| < 1e-3`, `max|ΔF| < 1e-3` (per component), and
 `|ΔP|/max(|P|,1) < 0.05` **or** `max|ΔW_diag| < 1e-2` (`p_gate` in
 `summary.json`). DD vs np=1 uses 1e-4 like full-atom `test-lammps-dd-parity`.
 
+Production MODEL1896 (SavedModel → float32 ONNX, same frame):
+
+```bash
+python test/test-cg-libstaf/run_model1896_md_parity.py
+```
+
+Expect max|ΔE| / max|ΔF| ~1e-6 vs Python double (float32 MLP). See
+[`DEV/staf_cg_freeze/FREEZE_NUMBERS.md`](../DEV/staf_cg_freeze/FREEZE_NUMBERS.md).
+
 Build: `bash lammps/USER-STAF-CG/Install.sh $LAMMPS_SRC && make staf_cg`
 → `lmp_staf_cg`. Do not overwrite `lmp_staf`.
 

@@ -83,7 +83,9 @@ Plan: Cursor `staf-cg_linea_c`. Living science plan: [`docs/PIANO_ALPHANES.md`](
 
 **Done when:** libstaf_cg matches Python on one frame.
 
-**Closed 2026-08-19:** `cmake --build libstaf_cg/build` links `staf_force_smoke`. Float32 ONNX from `test/test-cg-pipeline/work/staf_cg_freeze_ep10` → `test/test-cg-inference/model_onnx_double/` (MODEL1896 is SavedModel-only; same export is reusable in Sprint 6). Frame 0 (24 beads, box 280): Python float32 vs libstaf_cg float32 `max|ΔE|≈9.5e-7`, `max|ΔF|≈8.3e-8` (`test/test-cg-libstaf/summary.txt` pass true). WCA/LJ not linked (STAF-only). No `DEV/AlphaNesGpu_double_CG_dv_RC` edits; CUDA trees stay separate.
+**Closed 2026-08-19:** `cmake --build libstaf_cg/build` links `staf_force_smoke`. Float32 ONNX from `test/test-cg-pipeline/work/staf_cg_freeze_ep10` → `test/test-cg-inference/model_onnx_double/`. Frame 0 (24 beads, box 280): Python float32 vs libstaf_cg float32 `max|ΔE|≈9.5e-7`, `max|ΔF|≈8.3e-8` (`test/test-cg-libstaf/summary.txt` pass true). WCA/LJ not linked (STAF-only). No `DEV/AlphaNesGpu_double_CG_dv_RC` edits; CUDA trees stay separate.
+
+**MODEL1896 (2026-08-20):** `export_mlp_grad_onnx.py` rebuilds keras Dense from `model_type*` SavedModel (`type0` 20→50→50→1, `type1` 20→25→25→1) and writes `type{k}_alpha_mu.dat`. Gate: `python test/test-cg-libstaf/run_model1896_md_parity.py`.
 
 ---
 
@@ -97,7 +99,9 @@ Plan: Cursor `staf-cg_linea_c`. Living science plan: [`docs/PIANO_ALPHANES.md`](
 
 **Done when:** `staf/cg` runs; **E/F/P = Python**; DD parity; DEV remains archive.
 
-**Closed 2026-08-19:** binary `/home/francegm/programmi/lammps-23Jun2022/src/lmp_staf_cg` (`lmp_staf` unchanged). Frame 0 (24 beads, box 280, float32 ONNX): max|ΔE|≈7.0e-7, max|ΔF|≈8.3e-8, |ΔP|/max(|P|,1)≈1.4e-8 (`p_gate: rel_P`; also max|ΔW_diag|≈2.4e-7). DD np=1/2/4 bit-identical E/F/P on 1×V100 (ranks share GPU; dimer sits in one subdomain, empty ranks skip compute). Intra Rc=50 ⇒ `comm_modify cutoff 50`.
+**Closed 2026-08-19:** binary `/home/francegm/programmi/lammps-23Jun2022/src/lmp_staf_cg` (`lmp_staf` unchanged). Frame 0 (24 beads, box 280, 1-epoch float32 ONNX): max|ΔE|≈7.0e-7, max|ΔF|≈8.3e-8, |ΔP|/max(|P|,1)≈1.4e-8 (`p_gate: rel_P`; also max|ΔW_diag|≈2.4e-7). DD np=1/2/4 bit-identical E/F/P on 1×V100 (ranks share GPU; dimer sits in one subdomain, empty ranks skip compute). Intra Rc=50 ⇒ `comm_modify cutoff 50`.
+
+**MODEL1896 production MD (2026-08-20):** same 24-bead frame, Python STAF-CG double SavedModel vs libstaf_cg vs LAMMPS `staf/cg` (float32 ONNX). E_python=356.7282025. max|ΔE|_libstaf≈7.9e-6, max|ΔF|_libstaf≈2.2e-6; max|ΔE|_lammps≈7.5e-6, max|ΔF|_lammps≈2.0e-6, |ΔP|_rel≈1.6e-6. Residual is float32 ONNX vs float64 SavedModel. Harness: `test/test-cg-libstaf/run_model1896_md_parity.py`.
 
 ---
 
@@ -107,4 +111,4 @@ Plan: Cursor `staf-cg_linea_c`. Living science plan: [`docs/PIANO_ALPHANES.md`](
 - oxDNA / linea D
 - Merging CG and full-atom CUDA
 - Deleting DEV
-- Replacing production `jmd_nn` origami before LAMMPS smoke
+- Replacing production `jmd_nn` origami MD (LAMMPS `staf/cg` now matches MODEL1896 E/F/P; switch is a deployment choice)

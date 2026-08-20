@@ -2,7 +2,7 @@
 
 **Autore contesto:** Francesco Guidarelli Mattioli  
 **Data piano:** 2026-07-22  
-**Aggiornamenti:** 2026-07-24 parallelismo CPU/MPI + oxDNA AL; 2026-08-19 linea **E** (RDF/reweighting) + **A6** (decomposizione multi-body in inference); 2026-08-19 avvio port **STAF-CG/** (linea C, checklist [`DEV/STAF_CG_SPRINTS.md`](../DEV/STAF_CG_SPRINTS.md)).  
+**Aggiornamenti:** 2026-07-24 parallelismo CPU/MPI + oxDNA AL; 2026-08-19 linea **E** (RDF/reweighting) + **A6** (decomposizione multi-body in inference); 2026-08-19 avvio port **STAF-CG/** (linea C, checklist [`DEV/STAF_CG_SPRINTS.md`](../DEV/STAF_CG_SPRINTS.md)); 2026-08-20 **MODEL1896** MD-CG = STAF-CG (libstaf_cg + LAMMPS `staf/cg`).  
 **Copia canonica:** questo file in `docs/PIANO_ALPHANES.md` (repo `AlphaNesGpu`). Non lasciare copie sparse in `$HOME`.
 
 **Scope:** cinque linee di lavoro collegate.
@@ -660,13 +660,13 @@ Suite:
 
 ### B4. Estensione CG (dopo MVP water, allineata a linea C)
 
-`pair_style staf/cg` **esiste** (Sprint 6): package [`lammps/USER-STAF-CG/`](../lammps/USER-STAF-CG/), runtime [`libstaf_cg/`](../libstaf_cg/), binary `lmp_staf_cg` (non sostituisce `lmp_staf`). Gate: `test/test-lammps-staf-cg-parity/` — stesso frame 24 bead, LAMMPS vs Python STAF-CG su energia, forze e pressione configurazionale (solo pair virial). Intra `Rc=50` Å ⇒ `comm_modify cutoff 50`. DD 1 vs 2 vs 4 rank (una V100, rank che condividono la GPU). WCA/LJ extras non sono nel pair; restano `hybrid` se servono. Scientific C4 (inter RMSE) è ancora dopo questo wiring.
+`pair_style staf/cg` **esiste** (Sprint 6): package [`lammps/USER-STAF-CG/`](../lammps/USER-STAF-CG/), runtime [`libstaf_cg/`](../libstaf_cg/), binary `lmp_staf_cg` (non sostituisce `lmp_staf`). Gate 1-epoca: `test/test-lammps-staf-cg-parity/`. Gate **MODEL1896** (modello MD di produzione): `python test/test-cg-libstaf/run_model1896_md_parity.py` — Python STAF-CG double vs libstaf_cg vs LAMMPS, stesso frame 24 bead, max|ΔE|≈7.5e-6, max|ΔF|≈2e-6, |ΔP|_rel≈1.6e-6. Intra `Rc=50` Å ⇒ `comm_modify cutoff 50`. DD 1 vs 2 vs 4 rank (una V100, rank che condividono la GPU). WCA/LJ extras non sono nel pair; restano `hybrid` se servono. Scientific C4 (inter RMSE) è ancora dopo questo wiring.
 
 ---
 
 ## 4. Linea C — CG AlphaNes per Origami (intra OK-ish, inter bloccato)
 
-**Port ufficiale:** [`STAF-CG/`](../STAF-CG/) (Sprint 1–5 closed 2026-08-19; checklist [`DEV/STAF_CG_SPRINTS.md`](../DEV/STAF_CG_SPRINTS.md)). `DEV/AlphaNesGpu_double_CG_dv_RC/` resta freeze. Gate Python: `bash test/test-cg-pipeline/run_sprint3.sh`. **LAMMPS:** `pair_style staf/cg` (`lammps/USER-STAF-CG/`, `lmp_staf_cg`) — Sprint 6, parity E/F/P_config in `test/test-lammps-staf-cg-parity/`.
+**Port ufficiale:** [`STAF-CG/`](../STAF-CG/) (Sprint 1–6 closed 2026-08-19; MODEL1896 MD parity 2026-08-20; checklist [`DEV/STAF_CG_SPRINTS.md`](../DEV/STAF_CG_SPRINTS.md)). `DEV/AlphaNesGpu_double_CG_dv_RC/` resta freeze. Gate Python: `bash test/test-cg-pipeline/run_sprint3.sh`. **LAMMPS:** `pair_style staf/cg` (`lammps/USER-STAF-CG/`, `lmp_staf_cg`) — E/F/P_config vs Python su 1-epoca e su **MODEL1896** (`test/test-cg-libstaf/run_model1896_md_parity.py`).
 
 ### C0. Diagnosi sintetica
 
@@ -733,10 +733,10 @@ Protocollo sperimentale a griglia piccola ma sistematica:
 
 ### C5. MD end-to-end origami
 
-- Engine: `neuralmdGPU/DEV/CG_and_WCA_LJ2_inter/jmd_nn`  
+- Engine produzione oggi: `neuralmdGPU/DEV/CG_and_WCA_LJ2_inter/jmd_nn`  
+- Wiring LAMMPS: `pair_style staf/cg` (`lmp_staf_cg`) — E/F/P su MODEL1896 allineati a Python STAF-CG (2026-08-20). Sostituire `jmd_nn` in campagna MD è una scelta di deployment, non un gap di port.  
 - Test: dimero box 280, T di riferimento delle campagne `ORIGAMI_DYNAMICS`  
-- Metriche: stabilità sticky bond, g(r) picco sticky, no collasso, no esplosione  
-- Solo dopo: considerare `pair_staf/cg` in LAMMPS (B4)
+- Metriche: stabilità sticky bond, g(r) picco sticky, no collasso, no esplosione
 
 **Nota dati:** le campagne C3–C5 vanno integrate con la **linea D** (oxDNA + active learning) appena il mapping bead è stabile: i buchi del dataset (inter, unbound, rare sticky) non si risolvono solo con reweighting dei 91k frame esistenti.
 

@@ -43,4 +43,5 @@ comm_modify     cutoff 50
 newton          on
 ```
 
-Parity gate: `python test/test-lammps-staf-cg-parity/run_compare.py` (energy, forces, configurational pair-virial pressure vs Python STAF-CG).
+Parity gate (1-epoch ONNX): `python test/test-lammps-staf-cg-parity/run_compare.py`.
+Production MODEL1896: `python test/test-cg-libstaf/run_model1896_md_parity.py`.

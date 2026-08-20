@@ -44,7 +44,246 @@ def _detect_ntypes(input_model: str) -> int:
             nt += 1
         else:
             break
+    if nt:
+        return nt
+    for guess in range(100):
+        sm = os.path.join(input_model, f"model_type{guess}")
+        if os.path.isdir(sm) and (
+            os.path.isfile(os.path.join(sm, "saved_model.pb"))
+            or os.path.isdir(os.path.join(sm, "variables"))
+        ):
+            nt += 1
+        else:
+            break
     return nt
+
+
+def _dense_index(name: str) -> int:
+    import re
+
+    m = re.search(r"dense(?:_(\d+))?", name)
+    if not m:
+        return 10**9
+    return int(m.group(1) or 0)
+
+
+def _n_af_from_alpha(input_model: str, k: int):
+    rad = os.path.join(input_model, f"type{k}_alpha_2body.dat")
+    ang = os.path.join(input_model, f"type{k}_alpha_3body.dat")
+    if not (os.path.isfile(rad) and os.path.isfile(ang)):
+        return None
+    a2 = np.loadtxt(rad, dtype=np.float64).reshape(3, -1)
+    a3 = np.loadtxt(ang, dtype=np.float64).reshape(6, -1)
+    return int(a2.shape[1] + a3.shape[1])
+
+
+def _collect_dense_vars(sm):
+    """TF SavedModel TestModel keeps Dense weights on .newmodel, not .variables."""
+    for src in (getattr(sm, "newmodel", None), sm):
+        if src is None:
+            continue
+        vs = getattr(src, "variables", None)
+        if vs:
+            return list(vs)
+        vs = getattr(src, "trainable_variables", None)
+        if vs:
+            return list(vs)
+        keras_api = getattr(src, "keras_api", None)
+        if keras_api is not None:
+            vs = getattr(keras_api, "variables", None)
+            if vs:
+                return list(vs)
+    return []
+
+
+def _keras_layers_from_newmodel(sm):
+    net = getattr(sm, "newmodel", None)
+    if net is None:
+        return []
+    for src in (net, getattr(net, "keras_api", None)):
+        if src is None or not hasattr(src, "layers"):
+            continue
+        try:
+            layers = [
+                el
+                for el in src.layers
+                if type(el).__name__ != "InputLayer"
+            ]
+        except Exception:
+            continue
+        if layers:
+            return layers
+    return []
+
+
+def _keras_from_savedmodel(sm_dir: str, dtype, np_dtype):
+    """Rebuild a Dense Sequential + mu from an inference SavedModel (MODEL1896)."""
+    import tensorflow as tf
+    from tensorflow.keras.layers import Dense, Input
+
+    sm = tf.saved_model.load(sm_dir)
+    mu = None
+    am = getattr(sm, "alphamu", None)
+    if am is not None:
+        mu = np.asarray(am.numpy() if hasattr(am, "numpy") else am, dtype=np_dtype).reshape(-1)
+
+    net = getattr(sm, "newmodel", None)
+    layers = _keras_layers_from_newmodel(sm)
+
+    dtype_name = "float32" if np_dtype == np.float32 else "float64"
+    rebuilt = tf.keras.Sequential(name=os.path.basename(sm_dir) + "_mlp")
+    acts: list[str] = []
+
+    if layers:
+        try:
+            first = layers[0]
+            n_af = int(first.kernel.shape[0]) if hasattr(first, "kernel") else int(mu.shape[0])
+            rebuilt.add(Input(shape=(n_af,), dtype=dtype, name="logdes_flat"))
+            for el in layers:
+                cfg = el.get_config()
+                if "dtype" in cfg:
+                    cfg["dtype"] = dtype_name
+                new_el = el.__class__.from_config(cfg)
+                rebuilt.add(new_el)
+                w = el.get_weights()
+                if w:
+                    new_el.set_weights([np.asarray(x, dtype=np_dtype) for x in w])
+                if hasattr(el, "activation"):
+                    acts.append(
+                        el.activation.__name__ if hasattr(el.activation, "__name__") else "linear"
+                    )
+            if mu is None:
+                mu = np.zeros((n_af,), dtype=np_dtype)
+            _validate_savedmodel_mlp(sm, rebuilt, mu, dtype)
+            return rebuilt, mu, acts
+        except Exception as exc:
+            print(f"    newmodel clone failed ({exc}); falling back to variables")
+            rebuilt = tf.keras.Sequential(name=os.path.basename(sm_dir) + "_mlp")
+            acts = []
+
+    kernels = []
+    rank1 = []
+    for v in _collect_dense_vars(sm):
+        arr = np.asarray(v.numpy())
+        name = v.name
+        if arr.ndim == 2:
+            kernels.append((name, np.asarray(arr, dtype=np_dtype)))
+        elif arr.ndim == 1:
+            rank1.append((name, np.asarray(arr, dtype=np_dtype)))
+        elif arr.ndim == 0:
+            continue
+
+    if not kernels:
+        raise RuntimeError(f"no Dense kernels in SavedModel {sm_dir}")
+    kernels.sort(key=lambda kv: (_dense_index(kv[0]), kv[0]))
+
+    used = set()
+    pairs = []
+    for kn, W in kernels:
+        prefix = kn.rsplit("/", 1)[0] if "/" in kn else kn.split(":")[0]
+        b = None
+        for i, (bn, bv) in enumerate(rank1):
+            if i in used:
+                continue
+            if bv.shape[0] != W.shape[1]:
+                continue
+            if prefix in bn or _dense_index(bn) == _dense_index(kn):
+                b = bv
+                used.add(i)
+                break
+        if b is None:
+            for i, (bn, bv) in enumerate(rank1):
+                if i not in used and bv.shape[0] == W.shape[1]:
+                    b = bv
+                    used.add(i)
+                    break
+        if b is None:
+            raise RuntimeError(f"no bias for kernel {kn} shape {W.shape} in {sm_dir}")
+        pairs.append((W, b))
+
+    n_af = int(pairs[0][0].shape[0])
+    if mu is None:
+        for i, (bn, bv) in enumerate(rank1):
+            if i in used:
+                continue
+            if bv.shape[0] == n_af:
+                mu = bv
+                used.add(i)
+                break
+    if mu is None:
+        raise RuntimeError(f"could not find alphamu in {sm_dir} (n_AF={n_af})")
+
+    rebuilt.add(Input(shape=(n_af,), dtype=dtype, name="logdes_flat"))
+    for i, (W, b) in enumerate(pairs):
+        last = i == len(pairs) - 1
+        act = "linear" if last else "tanh"
+        layer = Dense(int(W.shape[1]), activation=act, dtype=dtype_name)
+        rebuilt.add(layer)
+        layer.build((None, int(W.shape[0])))
+        layer.set_weights([W, b])
+        acts.append(act)
+
+    _validate_savedmodel_mlp(sm, rebuilt, mu, dtype)
+    return rebuilt, np.asarray(mu, dtype=np_dtype).reshape(-1), acts
+
+
+def _validate_savedmodel_mlp(sm, keras_net, mu, dtype) -> None:
+    import tensorflow as tf
+
+    n_af = int(np.asarray(mu).reshape(-1).shape[0])
+    rng = np.random.default_rng(0)
+    n_atoms = 6
+    af = rng.random((1, n_atoms, n_af)) * 0.2 + 0.05
+    af_tf = tf.constant(af, dtype=tf.float64)
+    e_sm, _g = sm.testmodel(af_tf)
+    e_sm = float(np.asarray(e_sm).reshape(-1)[0])
+    mu64 = np.asarray(mu, dtype=np.float64).reshape(-1)
+    logdes = np.log(af + 1e-3) - mu64
+    atomic = keras_net(tf.constant(logdes.reshape(-1, n_af), dtype=dtype), training=False)
+    e_k = 0.5 * float(np.sum(np.asarray(atomic, dtype=np.float64)))
+    err = abs(e_sm - e_k)
+    scale = max(abs(e_sm), 1.0)
+    if err > 1e-6 and err / scale > 1e-7:
+        raise RuntimeError(
+            f"SavedModel MLP rebuild mismatch |ΔE|={err:.3g} "
+            f"(SM={e_sm:.10g} keras={e_k:.10g})"
+        )
+    print(f"    SavedModel↔keras MLP |ΔE|={err:.3g} (n_AF={n_af})")
+
+
+def _load_keras_mlp(input_model: str, k: int, dtype, np_dtype):
+    """Keras Sequential + mu from net_model_type{k} or model_type{k} SavedModel."""
+    import tensorflow as tf
+
+    keras_dir = os.path.join(input_model, f"net_model_type{k}")
+    mu_path = os.path.join(input_model, f"type{k}_alpha_mu.dat")
+    mu = None
+    if os.path.isfile(mu_path):
+        mu = np.loadtxt(mu_path, dtype=np_dtype)
+        if mu.ndim == 0:
+            mu = np.array([mu], dtype=np_dtype)
+
+    if os.path.exists(keras_dir):
+        net = tf.keras.models.load_model(keras_dir)
+        if mu is None:
+            raise RuntimeError(f"missing {mu_path} for keras net type{k}")
+        return net, mu
+
+    sm_dir = os.path.join(input_model, f"model_type{k}")
+    if not os.path.isdir(sm_dir):
+        raise RuntimeError(f"no net_model_type{k} or model_type{k} under {input_model}")
+    # MODEL1896 SavedModel is float64; rebuild in f64 then let export cast.
+    net, mu_sm, _acts = _keras_from_savedmodel(sm_dir, tf.float64, np.float64)
+    if mu is None:
+        mu = np.asarray(mu_sm, dtype=np_dtype)
+    n_af_alpha = _n_af_from_alpha(input_model, k)
+    n_mu = int(np.asarray(mu).reshape(-1).shape[0])
+    if n_af_alpha is not None and n_mu != n_af_alpha:
+        print(
+            f"  WARNING type{k}: mu n_AF={n_mu} vs alpha files n_AF={n_af_alpha} "
+            "(using SavedModel mu)"
+        )
+    return net, np.asarray(mu, dtype=np_dtype).reshape(-1)
 
 
 def _bake_constant_inputs(model: onnx.ModelProto, mu: np.ndarray) -> None:
@@ -219,12 +458,11 @@ def _export_type(
     import tf2onnx
     from onnxruntime.training import artifacts
 
-    mu = np.loadtxt(os.path.join(input_model, f"type{k}_alpha_mu.dat"), dtype=np_dtype)
-    if mu.ndim == 0:
-        mu = np.array([mu], dtype=np_dtype)
+    net, mu = _load_keras_mlp(input_model, k, dtype, np_dtype)
+    mu = np.asarray(mu, dtype=np_dtype).reshape(-1)
     n_af = int(mu.shape[0])
+    np.savetxt(os.path.join(out_dir, f"type{k}_alpha_mu.dat"), mu)
 
-    net = tf.keras.models.load_model(os.path.join(input_model, f"net_model_type{k}"))
     rebuilt = tf.keras.Sequential(name=f"staf_mlp_type{k}")
     rebuilt.add(tf.keras.Input(shape=(n_af,), dtype=dtype, name="logdes_flat"))
     acts = []
@@ -388,7 +626,10 @@ def main() -> int:
     out_dir = args.modelname
     nt = _detect_ntypes(input_model)
     if nt == 0:
-        print(f"STAF: no net_model_type* under {input_model}", file=sys.stderr)
+        print(
+            f"STAF: no net_model_type* or model_type* SavedModel under {input_model}",
+            file=sys.stderr,
+        )
         return 1
     print(f"STAF-CG: grad-export {nt} type(s) → {out_dir}")
     os.makedirs(out_dir, exist_ok=True)
@@ -425,7 +666,10 @@ def main() -> int:
         fh.write("onnx output: dE_daf [batch,n_atoms,n_AF] = d(sum atomic)/daf\n")
         fh.write("TanhGrad rewritten to Mul/Sub; no training-only ops\n")
         fh.write("CG maps: color_type_map.dat, map_color_interaction.dat, map_intra.dat\n")
-        fh.write("Note: MODEL1896 is SavedModel-only; 1-epoch keras ckpt is OK for Sprint 5/6.\n")
+        fh.write(
+            "Accepts net_model_type* (keras train export) or model_type* "
+            "SavedModel (e.g. MODEL1896); writes type{k}_alpha_mu.dat for libstaf_cg.\n"
+        )
     return 0
 
 

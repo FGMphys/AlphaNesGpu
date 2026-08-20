@@ -40,9 +40,10 @@ Ghosts: `staf_compute` with a LAMMPS neighbor list supports `nall = nlocal + ngh
 into `color_type_map.dat`). Owned `nlocal` must equal the model bead count (empty
 ranks skip compute). Sprint 5 1-rank `howmany==NULL` path is unchanged.
 
-Sprint 5 uses a **1-epoch keras checkpoint** (`net_model_type0`) for ONNX.
-MODEL1896 is SavedModel-only (no `net_model_type*`); Sprint 6 can reuse the
-same export.
+Sprint 5 used a **1-epoch keras checkpoint** (`net_model_type0`) for ONNX.
+`export_mlp_grad_onnx.py` also accepts MODEL1896-style `model_type*` SavedModels
+(rebuilds Dense + writes `type{k}_alpha_mu.dat`). Parity vs Python STAF-CG on
+the 24-bead frame: `python test/test-cg-libstaf/run_model1896_md_parity.py`.
 
 ## Build
 

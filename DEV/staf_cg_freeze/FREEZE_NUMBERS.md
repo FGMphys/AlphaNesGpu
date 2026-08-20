@@ -61,6 +61,17 @@ STAF-CG smoke (`.venv`, same YAML; Sprint 2 after `staf_real`):
 
 Sprint 2 MODEL1896 double infer vs this freeze: max|dE| ≈ 6.8e-6, max|dF0| ≈ 8e-7 (literals `0.5f` promoted to `real`).
 
+## MODEL1896 MD-CG vs STAF-CG (2026-08-20)
+
+Same 24-bead frame (`data.origami24` = USCGSITE frame 0). Python STAF-CG is the staged SavedModel (`ops_double`, E=356.7282025, matches Sprint 2 vs this freeze). libstaf_cg / LAMMPS `staf/cg` use float32 ONNX from `export_mlp_grad_onnx.py` (`model_type*` rebuild).
+
+| vs Python | max\|ΔE\| | max\|ΔF\| | \|ΔP\| rel |
+|-----------|----------:|----------:|-----------:|
+| libstaf_cg | 7.9e-6 | 2.2e-6 | — |
+| LAMMPS `staf/cg` | 7.5e-6 | 2.0e-6 | 1.6e-6 |
+
+Gate: `python test/test-cg-libstaf/run_model1896_md_parity.py`.
+
 Reproduce DEV freeze:
 
 ```bash
