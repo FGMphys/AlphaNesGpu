@@ -86,8 +86,11 @@ class staf_full_inference(tf.Module):
           self.force_layer=force_virial_layer(self.rad_buff,self.ang_buff,with_grad=False)
 
 #      @tf.function()
-      def full_test(self,pos,box):
-          """Return (energy [B], force [B,N*3], virial [B,9] row-major)."""
+      def full_test(self,pos,box,energy_only=False):
+          """Return (energy [B], force [B,N*3], virial [B,9] row-major).
+
+          energy_only: skip force/virial (zeros) — used by A6 cluster sums.
+          """
 
           [x1,x2,x3bsupp,
         int2b,int3b,intder2b,
@@ -116,6 +119,11 @@ class staf_full_inference(tf.Module):
           self.totenergy=tf.reduce_sum(self.totene,axis=(-1))
 
 
+          if energy_only:
+              zf = tf.zeros((tf.shape(pos)[0], self.N * 3), dtype=self.totenergy.dtype)
+              zv = tf.zeros((tf.shape(pos)[0], 9), dtype=self.totenergy.dtype)
+              return self.totenergy, zf, zv
+
           self.grad_listed=[tf.split(self.outmodel[k][1],[self.physics_layer[k].nalpha_r,
                                       self.physics_layer[k].nalpha_a],axis=-1) for k in range(nt)]
 
@@ -134,3 +142,41 @@ class staf_full_inference(tf.Module):
           self.force = tf.math.add_n([fv[0] for fv in force_vir])
           self.virial = tf.math.add_n([fv[1] for fv in force_vir])
           return self.totenergy, self.force, self.virial
+
+      def energy_of_n_atoms(self, pos_n, types_n, box6):
+          """STAF energy of an n-atom vacuum cluster (A6). Positions already unwrapped."""
+          pos_n = np.asarray(pos_n, dtype=np_dtype()).reshape(-1, 3)
+          types_n = np.asarray(types_n, dtype=np.int32).reshape(-1)
+          n = int(pos_n.shape[0])
+          if n < 1:
+              return 0.0
+          order = np.argsort(types_n, kind="stable")
+          pos_s = np.ascontiguousarray(pos_n[order])
+          types_s = types_n[order]
+          counts = np.bincount(types_s, minlength=int(self.ntipos))
+          type_map = tf.constant(types_s, dtype=tf.int32)
+          pos_tf = tf.constant(pos_s.reshape(1, -1))
+          box_tf = tf.constant(np.asarray(box6, dtype=np_dtype()).reshape(1, -1))
+          x1, x2, x3bsupp, int2b, int3b, _d2, _d3, _d3s, numtriplet = self.descriptor_layer(
+              pos_tf, box_tf
+          )
+          start = 0
+          e_parts = []
+          for k in range(int(self.ntipos)):
+              nk = int(counts[k])
+              if nk == 0:
+                  continue
+              sl = slice(start, start + nk)
+              fingers = self.physics_layer[k](
+                  x1[:, sl],
+                  x3bsupp[:, sl],
+                  int2b[:, sl],
+                  x2[:, sl],
+                  int3b[:, sl],
+                  numtriplet[:, sl],
+                  type_map,
+              )
+              e_parts.append(self.nets[k].testmodel(fingers)[0])
+              start += nk
+          tot = tf.add_n([tf.reduce_sum(e, axis=-1) for e in e_parts])
+          return float(np.asarray(tot).reshape(-1)[0])

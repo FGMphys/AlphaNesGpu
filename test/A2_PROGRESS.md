@@ -23,7 +23,7 @@ See `test/A3_PREP.md` for CUDA static-state audit before multi-GPU.
 
 ## Out of A2 scope (deferred)
 
-- **`DEV/`** CG / RDF forks (Linea C) — not migrated
-- A3+ multi-GPU / A4 CPU MPI
+- **`DEV/`** CG forks (Linea C, after A6) and RDF (Linea E, waiting on latex) — not migrated
+- A4 CPU MPI (A3 CUDA ctx + A5 Horovod are in tree)
 
 A2 exit criterion for full-atom: one install command, float **or** double, regression + performance gates green — **met**.
